@@ -38,7 +38,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 ## Demo
 
 <p align="center">
-  <img src="assets/demo.gif" alt="muxd demo" width="700">
+  <img src="assets/muxd_intro.gif" alt="muxd demo" width="700">
 </p>
 
 ---
@@ -183,7 +183,7 @@ muxd --daemon                     # headless daemon mode
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-c` | | Resume a session (latest for cwd, or pass a session ID) |
-| `-model` | `claude-sonnet` | Model name or alias |
+| `-model` | | Model name or alias (e.g. `claude-sonnet`, `gpt-4o`) |
 | `-daemon` | `false` | Run in daemon mode (no TUI) |
 | `-version` | | Print version and exit |
 | `-service` | | Service management: `install` \| `uninstall` \| `status` \| `start` \| `stop` |
