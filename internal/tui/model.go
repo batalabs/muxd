@@ -139,6 +139,7 @@ type Checkpoint struct {
 type Model struct {
 	width                        int
 	height                       int
+	version                      string
 	modelID                      string
 	modelLabel                   string
 	input                        string
@@ -216,12 +217,13 @@ type Model struct {
 }
 
 // InitialModel creates the initial Bubble Tea model.
-func InitialModel(d *daemon.DaemonClient, modelLabel, modelID string, st *store.Store, session *domain.Session, resuming bool, prov provider.Provider, prefs config.Preferences, apiKey string) Model {
+func InitialModel(d *daemon.DaemonClient, version, modelLabel, modelID string, st *store.Store, session *domain.Session, resuming bool, prov provider.Provider, prefs config.Preferences, apiKey string) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.MiniDot
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	m := Model{
 		Daemon:         d,
+		version:        version,
 		modelID:        modelID,
 		modelLabel:     modelLabel,
 		spinner:        sp,
@@ -569,9 +571,9 @@ func (m Model) View() string {
 	b.WriteString("\n\n")
 	disabledCount := len(m.Prefs.DisabledToolsSet())
 	if m.Prefs.Model != "" {
-		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd v0.1.0 \u00b7 %s \u00b7 tools off: %d", m.modelLabel, disabledCount)))
+		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd %s \u00b7 %s \u00b7 tools off: %d", m.version, m.modelLabel, disabledCount)))
 	} else {
-		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd v0.1.0 \u00b7 tools off: %d", disabledCount)))
+		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd %s \u00b7 tools off: %d", m.version, disabledCount)))
 	}
 	if m.Prefs.FooterTokens {
 		b.WriteString("\n")

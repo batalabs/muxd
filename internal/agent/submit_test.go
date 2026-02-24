@@ -70,7 +70,7 @@ func TestService_Submit_toolUseParallel(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake", "fake", store, sess, &testAnthropicProvider{})
 	svc.Cwd = "."
 
 	var events []Event
@@ -175,7 +175,7 @@ func TestService_Submit_toolUseSequential_askUser(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake", "fake", store, sess, &testAnthropicProvider{})
 	svc.Cwd = "/tmp"
 
 	var events []Event
@@ -258,7 +258,7 @@ func TestService_Submit_loopLimit(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake", "fake", store, sess, &testAnthropicProvider{})
 	svc.Cwd = "."
 
 	var events []Event
@@ -305,7 +305,7 @@ func TestService_Submit_persistsErrorMessage(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", st, sess, nil)
+	svc := NewService("fake-key", "fake", "fake", st, sess, &testAnthropicProvider{})
 	svc.Cwd = "/tmp"
 
 	svc.Submit("Hello", func(evt Event) {})
@@ -338,7 +338,7 @@ func TestService_Submit_autoTitle(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", st, sess, nil)
+	svc := NewService("fake-key", "fake", "fake", st, sess, &testAnthropicProvider{})
 	svc.Cwd = "/tmp"
 
 	var gotTitled bool

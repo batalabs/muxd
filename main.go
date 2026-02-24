@@ -193,7 +193,7 @@ func main() {
 	// Ensure the first TUI frame starts from a clean terminal state.
 	resetTerminalForTUI()
 
-	p := tea.NewProgram(tui.InitialModel(dc, modelLabel, modelID, st, session, resuming, prov, prefs, apiKey))
+	p := tea.NewProgram(tui.InitialModel(dc, version, modelLabel, modelID, st, session, resuming, prov, prefs, apiKey))
 	tui.SetProgram(p)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "muxd failed: %v\n", err)

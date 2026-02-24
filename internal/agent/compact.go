@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/batalabs/muxd/internal/domain"
-	"github.com/batalabs/muxd/internal/provider"
 )
 
 const (
@@ -250,15 +249,12 @@ Conversation to summarize:
 	sumModel := a.summarizationModel()
 	var respBlocks []domain.ContentBlock
 	var err error
-	if a.prov != nil {
-		respBlocks, _, _, err = a.prov.StreamMessage(
-			a.apiKey, sumModel, msgs, nil, system, nil,
-		)
-	} else {
-		respBlocks, _, _, err = provider.StreamMessagePure(
-			a.apiKey, sumModel, msgs, nil, system, nil,
-		)
+	if a.prov == nil {
+		return fallback
 	}
+	respBlocks, _, _, err = a.prov.StreamMessage(
+		a.apiKey, sumModel, msgs, nil, system, nil,
+	)
 	if err != nil {
 		return fallback
 	}

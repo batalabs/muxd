@@ -70,14 +70,14 @@ func TestPersistCompaction(t *testing.T) {
 		sess := &domain.Session{ID: "sess-persist"}
 		st.addSession(sess)
 		// Add enough messages to have a cutoff > 0
-		for i := 0; i < CompactKeepTail + 10; i++ {
+		for i := 0; i < CompactKeepTail+10; i++ {
 			st.messages[sess.ID] = append(st.messages[sess.ID], domain.TranscriptMessage{
 				Role:    "user",
 				Content: "msg",
 			})
 		}
 
-		svc := NewService("key", "model", "label", st, sess, nil)
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.persistCompaction("test summary")
 
 		if !st.savedCalled {
@@ -96,7 +96,7 @@ func TestPersistCompaction(t *testing.T) {
 		st.addSession(sess)
 		// No messages — maxSeq will be 0
 
-		svc := NewService("key", "model", "label", st, sess, nil)
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.persistCompaction("summary")
 
 		if st.savedCalled {

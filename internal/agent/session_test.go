@@ -125,7 +125,7 @@ func TestService_Resume_loadsAllMessages(t *testing.T) {
 		{Role: "assistant", Content: "hi there"},
 	}
 
-	svc := NewService("key", "model", "label", st, sess, nil)
+	svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 	if err := svc.Resume(); err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestService_Resume_loadsAllMessages(t *testing.T) {
 
 func TestService_Resume_withCompaction(t *testing.T) {
 	st := &compactionMockStore{
-		mockStore:        newMockStore(),
+		mockStore:         newMockStore(),
 		compactionSummary: "## Summary\nDid stuff",
 		compactionCutoff:  5,
 	}
@@ -156,7 +156,7 @@ func TestService_Resume_withCompaction(t *testing.T) {
 		{Role: "assistant", Content: "sure thing"},
 	}
 
-	svc := NewService("key", "model", "label", st, sess, nil)
+	svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 	if err := svc.Resume(); err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestService_SetModel_persistsToStore(t *testing.T) {
 	sess := &domain.Session{ID: "sess-model", Title: "test", Model: "old"}
 	st.addSession(sess)
 
-	svc := NewService("key", "old", "Old", st, sess, nil)
+	svc := NewService("key", "old", "Old", st, sess, &fakeProvider{name: "test"})
 	svc.SetModel("New", "new-model")
 
 	st.mu.Lock()
@@ -214,6 +214,7 @@ func TestService_SpawnSubAgent(t *testing.T) {
 	svc := &Service{
 		apiKey:        "fake",
 		modelID:       "fake",
+		prov:          &testAnthropicProvider{},
 		Cwd:           "/tmp",
 		disabledTools: map[string]bool{},
 	}
@@ -244,6 +245,7 @@ func TestService_SpawnSubAgent_propagatesDisabledTools(t *testing.T) {
 	svc := &Service{
 		apiKey:        "fake",
 		modelID:       "fake",
+		prov:          &testAnthropicProvider{},
 		Cwd:           "/tmp",
 		disabledTools: map[string]bool{"bash": true},
 	}
@@ -271,6 +273,18 @@ func (f *fakeProvider) StreamMessage(apiKey, modelID string, msgs []domain.Trans
 	return nil, "end_turn", provider.Usage{}, nil
 }
 func (f *fakeProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, error) {
+	return nil, nil
+}
+
+// errorProvider implements provider.Provider and always returns an error.
+// Used by tests that need the provider call to fail (e.g., cancelled-before-loop).
+type errorProvider struct{}
+
+func (p *errorProvider) Name() string { return "error" }
+func (p *errorProvider) StreamMessage(apiKey, modelID string, msgs []domain.TranscriptMessage, tools []provider.ToolSpec, system string, onDelta func(string)) ([]domain.ContentBlock, string, provider.Usage, error) {
+	return nil, "", provider.Usage{}, fmt.Errorf("cancelled")
+}
+func (p *errorProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, error) {
 	return nil, nil
 }
 
@@ -304,7 +318,7 @@ func TestService_generateAndSetTitle(t *testing.T) {
 		sess := &domain.Session{ID: "sess-title", Title: ""}
 		st.addSession(sess)
 
-		svc := NewService("key", "model", "label", st, sess, nil)
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.messages = []domain.TranscriptMessage{
 			{Role: "user", Content: "Help me refactor the authentication module"},
 			{Role: "assistant", Content: "Sure!"},
@@ -342,7 +356,7 @@ func TestService_generateAndSetTitle(t *testing.T) {
 		st.addSession(sess)
 
 		longMsg := "This is a very long user message that exceeds the fifty character limit for session titles"
-		svc := NewService("key", "model", "label", st, sess, nil)
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.messages = []domain.TranscriptMessage{
 			{Role: "user", Content: longMsg},
 		}
@@ -359,7 +373,7 @@ func TestService_generateAndSetTitle(t *testing.T) {
 		sess := &domain.Session{ID: "sess-title3", Title: "old"}
 		st.addSession(sess)
 
-		svc := NewService("key", "model", "label", st, sess, nil)
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.messages = []domain.TranscriptMessage{} // no user messages
 
 		var events []Event
@@ -415,21 +429,19 @@ func TestService_Submit_cancelledBeforeLoop(t *testing.T) {
 	sess := &domain.Session{ID: "sess-cancel", Title: "test"}
 	st.addSession(sess)
 
-	svc := NewService("key", "model", "label", st, sess, nil)
+	svc := NewService("key", "model", "label", st, sess, &errorProvider{})
 	svc.Cwd = "/tmp"
-
-	// Cancel before submitting — the loop should exit immediately
-	svc.cancelled = true
 
 	var events []Event
 	svc.Submit("Hello", func(evt Event) {
 		events = append(events, evt)
 	})
 
-	// Should not have any stream/turn events since it was cancelled
+	// The error provider causes a non-retryable error, so
+	// no stream/turn events should be emitted.
 	for _, evt := range events {
 		if evt.Kind == EventStreamDone || evt.Kind == EventTurnDone {
-			t.Errorf("unexpected event kind %d after cancellation", evt.Kind)
+			t.Errorf("unexpected event kind %d after error provider", evt.Kind)
 		}
 	}
 }

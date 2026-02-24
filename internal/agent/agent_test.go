@@ -156,6 +156,23 @@ func (s *mockStore) addSession(sess *domain.Session) {
 }
 
 // ---------------------------------------------------------------------------
+// testAnthropicProvider — routes through StreamMessagePure (respects TestAPIURL)
+// ---------------------------------------------------------------------------
+
+// testAnthropicProvider implements provider.Provider and delegates to
+// provider.StreamMessagePure, which respects provider.TestAPIURL.
+// Use this for tests that set TestAPIURL to a local httptest.Server.
+type testAnthropicProvider struct{}
+
+func (p *testAnthropicProvider) Name() string { return "anthropic" }
+func (p *testAnthropicProvider) StreamMessage(apiKey, modelID string, msgs []domain.TranscriptMessage, tools []provider.ToolSpec, system string, onDelta func(string)) ([]domain.ContentBlock, string, provider.Usage, error) {
+	return provider.StreamMessagePure(apiKey, modelID, msgs, tools, system, onDelta)
+}
+func (p *testAnthropicProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, error) {
+	return nil, nil
+}
+
+// ---------------------------------------------------------------------------
 // SSE event type for fake server
 // ---------------------------------------------------------------------------
 
@@ -384,7 +401,7 @@ func TestService_Submit_endTurn(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake-model", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake-model", "fake", store, sess, &testAnthropicProvider{})
 
 	var events []Event
 	var mu sync.Mutex
@@ -496,7 +513,7 @@ func TestService_NewSession(t *testing.T) {
 		Model: "model",
 	}
 	store.addSession(sess)
-	svc := NewService("key", "model", "label", store, sess, nil)
+	svc := NewService("key", "model", "label", store, sess, &fakeProvider{name: "test"})
 	svc.messages = []domain.TranscriptMessage{{Role: "user", Content: "old"}}
 	svc.inputTokens = 100
 
@@ -674,7 +691,7 @@ func TestGenerateCompactionSummary(t *testing.T) {
 		provider.TestAPIURL = server.URL
 		defer func() { provider.TestAPIURL = origURL }()
 
-		svc := &Service{apiKey: "fake", modelID: "fake"}
+		svc := &Service{apiKey: "fake", modelID: "fake", prov: &testAnthropicProvider{}}
 		dropped := []domain.TranscriptMessage{
 			{Role: "user", Content: "edit main.go"},
 			{Role: "assistant", Content: "I'll edit it now."},
@@ -706,7 +723,7 @@ func TestGenerateCompactionSummary(t *testing.T) {
 		provider.TestAPIURL = server.URL
 		defer func() { provider.TestAPIURL = origURL }()
 
-		svc := &Service{apiKey: "fake", modelID: "fake"}
+		svc := &Service{apiKey: "fake", modelID: "fake", prov: &testAnthropicProvider{}}
 		dropped := []domain.TranscriptMessage{
 			{Role: "user", Content: "hello"},
 		}
@@ -777,6 +794,7 @@ func TestCompactIfNeeded(t *testing.T) {
 		svc := &Service{
 			apiKey:          "fake",
 			modelID:         "fake",
+			prov:            &testAnthropicProvider{},
 			lastInputTokens: CompactThreshold + 1,
 			messages:        msgs,
 		}
@@ -911,7 +929,7 @@ func TestService_Submit_retryOnRateLimit(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake-model", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake-model", "fake", store, sess, &testAnthropicProvider{})
 
 	var events []Event
 	var mu sync.Mutex
@@ -974,7 +992,7 @@ func TestService_Submit_nonRetryableError(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake-model", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake-model", "fake", store, sess, &testAnthropicProvider{})
 
 	var events []Event
 	var mu sync.Mutex
@@ -1021,7 +1039,7 @@ func TestService_Submit_retryExhausted(t *testing.T) {
 	provider.TestAPIURL = server.URL
 	defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake-model", "fake", store, sess, nil)
+	svc := NewService("fake-key", "fake-model", "fake", store, sess, &testAnthropicProvider{})
 
 	var events []Event
 	var mu sync.Mutex

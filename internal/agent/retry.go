@@ -35,15 +35,12 @@ func (a *Service) callProviderWithRetry(
 		var usage provider.Usage
 		var err error
 
-		if a.prov != nil {
-			blocks, stopReason, usage, err = a.prov.StreamMessage(
-				a.apiKey, a.modelID, messages, toolSpecs, system, onDelta,
-			)
-		} else {
-			blocks, stopReason, usage, err = provider.StreamMessagePure(
-				a.apiKey, a.modelID, messages, toolSpecs, system, onDelta,
-			)
+		if a.prov == nil {
+			return nil, "", provider.Usage{}, fmt.Errorf("no provider configured; use /config set model <provider>/<model>")
 		}
+		blocks, stopReason, usage, err = a.prov.StreamMessage(
+			a.apiKey, a.modelID, messages, toolSpecs, system, onDelta,
+		)
 
 		if err == nil {
 			return blocks, stopReason, usage, nil
