@@ -27,9 +27,10 @@ muxd/
 │   │   ├── openai.go               # OpenAIProvider
 │   │   ├── ollama.go               # OllamaProvider
 │   │   └── aliases.go              # ModelAliases, ResolveModel, ModelCost, BuildSystemPrompt
-│   ├── tools/                      # tool definitions + execution (24 tools)
+│   ├── tools/                      # tool definitions + execution (26 tools)
 │   │   ├── tools.go                # ToolDef, ToolContext, AllTools, file/bash/grep/list_files/ask_user
 │   │   ├── todo.go                 # todo_read, todo_write (in-memory per-session)
+│   │   ├── memory.go               # memory_read, memory_write (per-project persistent facts)
 │   │   ├── web.go                  # web_search (Brave API), web_fetch (HTML-to-text)
 │   │   ├── patch.go                # patch_apply (unified diff parser + applier)
 │   │   ├── plan.go                 # plan_enter, plan_exit, mode-aware tool filtering
@@ -141,12 +142,9 @@ When the TUI starts, it checks `~/.local/share/muxd/server.lock` for an existing
 
 ### SSE Event Flow
 
-```
-TUI -> POST /api/sessions/{id}/submit -> daemon
-daemon -> agent.Service.Submit() -> runs agent loop
-agent loop -> emits agent.Event callbacks -> daemon converts to SSE
-SSE events -> DaemonClient.Submit() parses -> sends tea.Msg to TUI
-```
+<p align="center">
+  <img src="../assets/sse-event-flow.png" alt="SSE Event Flow" width="600">
+</p>
 
 ## Agent Loop
 
@@ -158,12 +156,12 @@ The `agent.Service` (in `internal/agent/`) handles multi-turn tool use independe
 
 Key details:
 - Tools are executed **in parallel** by default, **sequentially** when `ask_user`, `plan_enter`, `plan_exit`, or `task` is present.
-- The agent loop is capped at **25 iterations** to prevent runaway behavior.
+- The agent loop is capped at **60 iterations** to prevent runaway behavior.
 - Cancellation via `Cancel()` stops at the next safe point.
 - Checkpoints are created before each tool-use turn.
 - **Plan mode**: When active, write tools (`file_write`, `file_edit`, `bash`, `patch_apply`) are excluded from the tool list sent to the provider. The agent can only read and search.
 - **Sub-agents**: The `task` tool spawns a fresh `agent.Service` with no store (no persistence), no git, and `isSubAgent=true`. Sub-agents have all tools except `task` (prevents recursion). They run synchronously and return their output.
-- **ToolContext**: Each tool execution receives a `*ToolContext` providing access to shared agent state: the working directory, the todo list, plan mode flag, and the sub-agent spawn callback.
+- **ToolContext**: Each tool execution receives a `*ToolContext` providing access to shared agent state: the working directory, the todo list, project memory, plan mode flag, and the sub-agent spawn callback.
 
 ## Streaming
 
