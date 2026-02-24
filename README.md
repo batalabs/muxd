@@ -1,0 +1,240 @@
+<p align="center">
+  <img src="assets/muxd_logo.png" alt="muxd" width="120">
+</p>
+
+<h1 align="center">muxd</h1>
+
+<p align="center">
+  <b>An open-source AI coding agent that lives in your terminal.</b><br>
+  <sub>Multiplex conversations across terminal, Telegram, and web. Branch, resume, and search your AI history like git.</sub>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-early%20release-orange" alt="Early Release">
+  <a href="https://github.com/batalabs/muxd/releases"><img src="https://img.shields.io/github/v/release/batalabs/muxd?include_prereleases&label=version" alt="Version"></a>
+  <a href="https://github.com/batalabs/muxd/commits/main"><img src="https://img.shields.io/github/last-commit/batalabs/muxd" alt="Last Commit"></a>
+  <a href="https://github.com/batalabs/muxd/stargazers"><img src="https://img.shields.io/github/stars/batalabs/muxd" alt="Stars"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go 1.25+"></a>
+  <img src="https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-8A2BE2" alt="Windows | Linux | macOS">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
+</p>
+
+---
+
+## Why muxd?
+
+Most AI coding tools lock you into one conversation at a time and forget everything when you close the window. muxd is different:
+
+- **Persistent sessions**: every conversation is saved to a local SQLite database. Close your terminal, reboot, come back next week, your context is still there.
+- **Branch and fork**: explore alternative approaches without losing your current thread, just like git branches.
+- **Multi-channel**: talk to the same agent from your terminal, Telegram, or a headless daemon. Conversations sync across all of them.
+- **Provider-agnostic**: switch between 9 providers with a single command.
+
+---
+
+## Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="muxd demo" width="700">
+</p>
+
+---
+
+## Features
+
+### 24 Built-in Tools
+
+| Category | Tools |
+|----------|-------|
+| **File ops** | `file_read`, `file_write`, `file_edit`, `list_files`, `patch_apply` |
+| **Code search** | `grep`, `bash`, `git_status` |
+| **Web** | `web_search`, `web_fetch` |
+| **X / Twitter** | `x_post`, `x_search`, `x_mentions`, `x_reply`, `x_schedule` + management |
+| **Workflow** | `todo_read`, `todo_write`, `ask_user`, `plan_enter`, `plan_exit`, `task` |
+
+### 9 LLM Providers
+
+| Provider | Config key | Notes |
+|----------|------------|-------|
+| Anthropic Claude | `anthropic.api_key` | |
+| OpenAI | `openai.api_key` | GPT-4o, o1, etc. |
+| Google Gemini | `google.api_key` | |
+| Grok (xAI) | `grok.api_key` | |
+| Mistral | `mistral.api_key` | |
+| Fireworks | `fireworks.api_key` | |
+| Ollama | `ollama.url` | Local models, no API key needed |
+| zAI | `zai.api_key` | |
+| Any OpenAI-compatible | `openai.api_key` | Works with any compatible endpoint |
+
+### Session Management
+
+- **Resume anywhere**: pick up where you left off with `/continue` or `Ctrl+R`
+- **Branch conversations**: fork at any point with `/branch`
+- **Auto-title & tags**: sessions are automatically named and tagged (bugfix, feature, refactor, etc.)
+- **Context compaction**: long conversations are compressed to stay within token limits, persisted across restarts
+
+### Agent Capabilities
+
+- **Undo / redo**: git-based rollback for every change the agent makes
+- **Plan mode**: read-only exploration that disables write tools until you're ready
+- **Sub-agents**: delegate independent subtasks to a fresh agent instance
+- **Streaming TUI**: real-time token streaming with markdown rendering, syntax highlighting, and table formatting
+
+---
+
+## Getting Started
+
+### Install
+
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/batalabs/muxd/main/install.ps1 | iex
+```
+
+**macOS / Linux**
+```bash
+# Coming soon, build from source for now
+```
+
+**From Source** (requires [Go 1.25+](https://go.dev/dl/))
+```bash
+go install github.com/batalabs/muxd@latest
+```
+
+**Prerequisites**: git (for undo/redo) and an API key for at least one provider.
+
+### First Run
+
+```bash
+muxd                              # start a new session
+```
+
+Set your API key:
+```
+/config set anthropic.api_key sk-ant-...
+```
+
+Or via environment variable:
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Common Commands
+
+```bash
+muxd                              # new session
+muxd -c                           # resume latest session
+muxd -c <session-id>              # resume specific session
+muxd -model claude-opus           # use a different model
+muxd --daemon                     # headless daemon mode
+```
+
+---
+
+<details>
+<summary><b>Slash Commands</b></summary>
+<br>
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/new` | Start a new session |
+| `/sessions` | Interactive session picker (`Ctrl+R`) |
+| `/continue <id>` | Resume a session by ID prefix |
+| `/branch` | Fork conversation at current point |
+| `/rename <title>` | Rename current session |
+| `/config show` | Show all preferences |
+| `/config set <key> <value>` | Set a preference |
+| `/tools list` | List all tools and their status |
+| `/tools enable/disable <tool>` | Toggle individual tools |
+| `/schedule add <tool>` | Schedule a tool to run later |
+| `/tweet <text>` | Post to X/Twitter |
+| `/undo` / `/redo` | Roll back or replay agent changes |
+| `/clear` | Clear the display |
+| `/exit` | Quit muxd |
+
+</details>
+
+<details>
+<summary><b>Key Bindings</b></summary>
+<br>
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Submit input or accept completion |
+| `Ctrl+C` / `Esc` | Cancel agent, dismiss completions, or quit |
+| `Ctrl+J` | Insert a newline |
+| `Ctrl+R` | Open session picker |
+| `Tab` / `Shift+Tab` | Cycle autocomplete |
+| `Up` / `Down` | Browse input history |
+| `Ctrl+V` | Paste from clipboard |
+| `Ctrl+Y` | Copy last assistant message |
+| `Ctrl+K` | Copy full transcript |
+
+</details>
+
+<details>
+<summary><b>CLI Flags</b></summary>
+<br>
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-c` | | Resume a session (latest for cwd, or pass a session ID) |
+| `-model` | `claude-sonnet` | Model name or alias |
+| `-daemon` | `false` | Run in daemon mode (no TUI) |
+| `-version` | | Print version and exit |
+| `-service` | | Service management: `install` \| `uninstall` \| `status` \| `start` \| `stop` |
+
+</details>
+
+---
+
+## Architecture
+
+muxd uses a client/server architecture. The TUI connects to an agent loop via HTTP/SSE, so the same agent can serve terminal, Telegram, and web clients simultaneously.
+
+<p align="center">
+  <img src="assets/architecture.png" alt="Architecture" width="600">
+</p>
+
+Built with:
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) for the TUI framework
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) for terminal styling
+- [Chroma](https://github.com/alecthomas/chroma) for syntax highlighting
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) for pure-Go SQLite (no CGo)
+
+See [docs/architecture.md](docs/architecture.md) for the full dependency graph and package layout.
+
+---
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Commands](docs/commands.md) | Full slash command reference |
+| [Configuration](docs/configuration.md) | API keys, preferences, model aliases |
+| [Tools](docs/tools.md) | All 24 built-in agent tools |
+| [Undo & Redo](docs/undo-redo.md) | Git-based checkpoint system |
+| [Architecture](docs/architecture.md) | Codebase overview and package graph |
+| [Security](docs/security.md) | Security model and threat mitigations |
+| [Contributing](docs/contributing.md) | Build instructions, testing, code style |
+
+---
+
+## Contributing
+
+```bash
+git clone https://github.com/batalabs/muxd.git
+cd muxd
+go build -o muxd.exe .
+go test ./...
+go vet ./...
+```
+
+See [docs/contributing.md](docs/contributing.md) for code style, testing conventions, and the full development guide.
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE)

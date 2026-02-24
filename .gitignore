@@ -1,0 +1,31 @@
+# Binaries
+*.exe
+*.exe~
+
+# Build output
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code
+.claude/
+CLAUDE.md
+SPEC.md
+
+# Config (contains API keys)
+config.json
+
+# Logs and temp files
+*.log
+*.out
+logs/
+coverage*.html
+coverage*.out
+
+# Firecrawl
+.firecrawl/
+
+# Mermaid source (rendered PNGs are committed)
+assets/*.mmd

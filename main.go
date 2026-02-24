@@ -1,0 +1,226 @@
+// muxd CLI entry point
+package main
+
+import (
+	"context"
+	"database/sql"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"runtime/debug"
+	"syscall"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/batalabs/muxd/internal/agent"
+	"github.com/batalabs/muxd/internal/checkpoint"
+	"github.com/batalabs/muxd/internal/config"
+	"github.com/batalabs/muxd/internal/daemon"
+	"github.com/batalabs/muxd/internal/domain"
+	"github.com/batalabs/muxd/internal/provider"
+	"github.com/batalabs/muxd/internal/service"
+	"github.com/batalabs/muxd/internal/store"
+	"github.com/batalabs/muxd/internal/tui"
+)
+
+var version = "dev"
+
+func init() {
+	if version != "dev" {
+		return
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
+}
+
+func main() {
+	versionFlag := flag.Bool("version", false, "Print version and exit")
+	modelFlag := flag.String("model", "", "Model name or alias (e.g. claude-sonnet, openai/gpt-4o)")
+	continueFlag := flag.String("c", "", "Resume a session (latest for cwd, or pass a session ID)")
+	daemonFlag := flag.Bool("daemon", false, "Run in daemon mode (no TUI)")
+	serviceCmd := flag.String("service", "", "Service management: install|uninstall|status|start|stop")
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("muxd %s\n", version)
+		return
+	}
+
+	// Handle service commands first (no store/API key needed)
+	if *serviceCmd != "" {
+		if err := service.HandleCommand(*serviceCmd); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	prefs := config.LoadPreferences()
+	provider.SetOllamaBaseURL(prefs.OllamaURL)
+
+	// Resolve provider and model (no hardcoded default — user must configure)
+	modelLabel := *modelFlag
+	if modelLabel == "" {
+		modelLabel = prefs.Model
+	}
+
+	var providerName, modelID, apiKey string
+	var prov provider.Provider
+
+	if modelLabel != "" {
+		providerName, modelID = provider.ResolveProviderAndModel(modelLabel, prefs.Provider)
+		apiKey, _ = config.LoadProviderAPIKey(prefs, providerName)
+		p, err := provider.GetProvider(providerName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		prov = p
+	}
+
+	provider.SetPricingMap(config.LoadPricing())
+
+	st, err := store.OpenStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error opening database: %v\n", err)
+		os.Exit(1)
+	}
+	defer st.Close()
+
+	// Agent factory for the daemon server
+	agentFactory := func(key, mID, mLabel string, s *store.Store, sess *domain.Session, p provider.Provider) *agent.Service {
+		return agent.NewService(key, mID, mLabel, s, sess, p)
+	}
+
+	// Daemon-only mode: start HTTP server, no TUI
+	if *daemonFlag {
+		srv := daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
+		srv.SetAgentFactory(agentFactory)
+		srv.SetDetectGitRepo(checkpoint.DetectGitRepo)
+
+		// Handle graceful shutdown
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		go func() {
+			<-ctx.Done()
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				fmt.Fprintf(os.Stderr, "daemon: shutdown: %v\n", err)
+			}
+		}()
+
+		if err := srv.Start(4096); err != nil {
+			fmt.Fprintf(os.Stderr, "server error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// TUI mode: check for existing daemon
+	var dc *daemon.DaemonClient
+	var embeddedServer *daemon.Server
+
+	lf, lfErr := daemon.ReadLockfile()
+	if lfErr == nil && !daemon.IsLockfileStale(lf) {
+		// Connect to existing daemon
+		dc = daemon.NewDaemonClient(lf.Port)
+		dc.SetAuthToken(lf.Token)
+		fmt.Fprintf(os.Stderr, "Connected to daemon on port %d\n", lf.Port)
+	} else {
+		// Start embedded server
+		embeddedServer = daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
+		embeddedServer.SetAgentFactory(agentFactory)
+		embeddedServer.SetDetectGitRepo(checkpoint.DetectGitRepo)
+		embeddedServer.SetQuiet(true)
+		go func() {
+			if err := embeddedServer.Start(4096); err != nil {
+				fmt.Fprintf(os.Stderr, "embedded server error: %v\n", err)
+			}
+		}()
+		// Port() blocks until Start() has bound the listener, so no race.
+		dc = daemon.NewDaemonClient(embeddedServer.Port())
+		dc.SetAuthToken(embeddedServer.AuthToken())
+	}
+
+	// Create or resume session
+	cwd := mustGetwd()
+	var session *domain.Session
+	resuming := false
+
+	if *continueFlag != "" {
+		// -c <id> → resume specific session
+		session, err = st.GetSession(*continueFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "session not found: %v\n", err)
+			os.Exit(1)
+		}
+		resuming = true
+	} else if flag.NArg() == 0 {
+		// Check if "-c" appeared in os.Args with no value
+		for _, arg := range os.Args[1:] {
+			if arg == "-c" {
+				session, err = st.LatestSession(cwd)
+				if err == sql.ErrNoRows {
+					fmt.Fprintf(os.Stderr, "no sessions found for %s\n", cwd)
+					os.Exit(1)
+				} else if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					os.Exit(1)
+				}
+				resuming = true
+				break
+			}
+		}
+	}
+
+	if session == nil {
+		// Create session via daemon
+		sessionID, createErr := dc.CreateSession(cwd, modelID)
+		if createErr != nil {
+			fmt.Fprintf(os.Stderr, "error creating session: %v\n", createErr)
+			os.Exit(1)
+		}
+		session, err = st.GetSession(sessionID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error loading session: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Ensure the first TUI frame starts from a clean terminal state.
+	resetTerminalForTUI()
+
+	p := tea.NewProgram(tui.InitialModel(dc, modelLabel, modelID, st, session, resuming, prov, prefs, apiKey))
+	tui.SetProgram(p)
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "muxd failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Cleanup embedded server
+	if embeddedServer != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer shutdownCancel()
+		if err := embeddedServer.Shutdown(shutdownCtx); err != nil {
+			fmt.Fprintf(os.Stderr, "embedded server: shutdown: %v\n", err)
+		}
+	}
+}
+
+func resetTerminalForTUI() {
+	// Start the TUI on a fresh line without terminal control sequences.
+	// This avoids prompt-line overlap issues on some Windows terminals.
+	fmt.Println()
+}
+
+func mustGetwd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return wd
+}
