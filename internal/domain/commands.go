@@ -26,6 +26,7 @@ var CommandDefs = []CommandDef{
 	{Name: "/telegram", Description: "start or stop telegram bot", Group: "config", TUIOnly: true},
 	{Name: "/tweet", Description: "post/schedule/list/cancel tweets", Group: "config"},
 	{Name: "/schedule", Description: "manage generic scheduled tool jobs", Group: "config"},
+	{Name: "/remember", Description: "save a fact to project memory", Group: "config"},
 	{Name: "/x", Description: "X auth/status/logout", Group: "config"},
 	// General
 	{Name: "/help", Description: "show this help", Group: "general"},

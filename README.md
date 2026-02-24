@@ -1,11 +1,7 @@
 <h1 align="center">
-
-<p align="center">
   <img src="assets/muxd_logo.png" alt="muxd" width="220">
-</p>
-
-muxd
-
+  <br>
+  muxd
 </h1>
 
 <p align="center">
@@ -17,7 +13,7 @@ muxd
   <img src="https://img.shields.io/badge/status-early%20release-orange" alt="Early Release">
   <a href="https://github.com/batalabs/muxd/releases"><img src="https://img.shields.io/github/v/release/batalabs/muxd?include_prereleases&label=version" alt="Version"></a>
   <a href="https://github.com/batalabs/muxd/commits/main"><img src="https://img.shields.io/github/last-commit/batalabs/muxd" alt="Last Commit"></a>
-  <a href="#install"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go 1.25+"></a>
+  <a href="#getting-started"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go 1.25+"></a>
   <img src="https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-8A2BE2" alt="Windows | Linux | macOS">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
 </p>
@@ -29,6 +25,7 @@ muxd
 Most AI coding tools lock you into one conversation at a time and forget everything when you close the window. muxd is different:
 
 - **Persistent sessions**: every conversation is saved to a local SQLite database. Close your terminal, reboot, come back next week, your context is still there.
+- **Project memory**: persist project-specific facts across sessions. The agent remembers your conventions, architecture decisions, and gotchas.
 - **Branch and fork**: explore alternative approaches without losing your current thread, just like git branches.
 - **Multi-channel**: talk to the same agent from your terminal, Telegram, or a headless daemon. Conversations sync across all of them.
 - **Provider-agnostic**: switch between 9 providers with a single command.
@@ -45,7 +42,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 
 ## Features
 
-### 24 Built-in Tools
+### 26 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
@@ -54,6 +51,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 | **Web** | `web_search`, `web_fetch` |
 | **X / Twitter** | `x_post`, `x_search`, `x_mentions`, `x_reply`, `x_schedule` + management |
 | **Workflow** | `todo_read`, `todo_write`, `ask_user`, `plan_enter`, `plan_exit`, `task` |
+| **Memory** | `memory_read`, `memory_write` |
 
 ### 9 LLM Providers
 
@@ -78,6 +76,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 
 ### Agent Capabilities
 
+- **Project memory**: save facts with `/remember` or let the agent use `memory_write` — they persist across sessions
 - **Undo / redo**: git-based rollback for every change the agent makes
 - **Plan mode**: read-only exploration that disables write tools until you're ready
 - **Sub-agents**: delegate independent subtasks to a fresh agent instance
@@ -96,7 +95,7 @@ irm https://raw.githubusercontent.com/batalabs/muxd/main/install.ps1 | iex
 
 **macOS / Linux**
 ```bash
-# Coming soon, build from source for now
+curl -fsSL https://raw.githubusercontent.com/batalabs/muxd/main/install.sh | bash
 ```
 
 **From Source** (requires [Go 1.25+](https://go.dev/dl/))
@@ -146,6 +145,7 @@ muxd --daemon                     # headless daemon mode
 | `/continue <id>` | Resume a session by ID prefix |
 | `/branch` | Fork conversation at current point |
 | `/rename <title>` | Rename current session |
+| `/remember <key> <value>` | Save a fact to project memory |
 | `/config show` | Show all preferences |
 | `/config set <key> <value>` | Set a preference |
 | `/tools list` | List all tools and their status |
@@ -206,21 +206,22 @@ Built with:
 - [Chroma](https://github.com/alecthomas/chroma) for syntax highlighting
 - [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) for pure-Go SQLite (no CGo)
 
-See [docs/architecture.md](docs/architecture.md) for the full dependency graph and package layout.
-
 ---
 
 ## Documentation
 
-| Doc | Description |
-|-----|-------------|
-| [Commands](docs/commands.md) | Full slash command reference |
-| [Configuration](docs/configuration.md) | API keys, preferences, model aliases |
-| [Tools](docs/tools.md) | All 24 built-in agent tools |
-| [Undo & Redo](docs/undo-redo.md) | Git-based checkpoint system |
-| [Architecture](docs/architecture.md) | Codebase overview and package graph |
-| [Security](docs/security.md) | Security model and threat mitigations |
-| [Contributing](docs/contributing.md) | Build instructions, testing, code style |
+Full documentation is at [muxd.sh/docs](https://muxd.sh/docs).
+
+| Topic | Link |
+|-------|------|
+| Commands | [muxd.sh/docs/commands](https://muxd.sh/docs/commands) |
+| Configuration | [muxd.sh/docs/configuration](https://muxd.sh/docs/configuration) |
+| Tools | [muxd.sh/docs/tools](https://muxd.sh/docs/tools) |
+| Project Memory | [muxd.sh/docs/project-memory](https://muxd.sh/docs/project-memory) |
+| Undo / Redo | [muxd.sh/docs/undo-redo](https://muxd.sh/docs/undo-redo) |
+| Architecture | [docs/architecture.md](docs/architecture.md) |
+| Security | [docs/security.md](docs/security.md) |
+| Contributing | [muxd.sh/docs/contributing](https://muxd.sh/docs/contributing) |
 
 ---
 
@@ -234,7 +235,7 @@ go test ./...
 go vet ./...
 ```
 
-See [docs/contributing.md](docs/contributing.md) for code style, testing conventions, and the full development guide.
+See [muxd.sh/docs/contributing](https://muxd.sh/docs/contributing) for code style, testing conventions, and the full development guide.
 
 ---
 

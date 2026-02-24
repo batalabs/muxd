@@ -8,6 +8,7 @@ import (
 	"github.com/batalabs/muxd/internal/domain"
 	"github.com/batalabs/muxd/internal/mcp"
 	"github.com/batalabs/muxd/internal/provider"
+	"github.com/batalabs/muxd/internal/tools"
 )
 
 // generateAndSetTitle generates a title and tags for the session using the LLM,
@@ -195,6 +196,13 @@ func (a *Service) SetMCPManager(m *mcp.Manager) {
 	a.mcpManager = m
 }
 
+// SetMemory sets the per-project memory store.
+func (a *Service) SetMemory(m *tools.ProjectMemory) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.memory = m
+}
+
 // SetDisabledTools replaces the user-disabled tools set.
 func (a *Service) SetDisabledTools(disabled map[string]bool) {
 	a.mu.Lock()
@@ -242,6 +250,7 @@ func (a *Service) SpawnSubAgent(description, prompt string) (string, error) {
 		Cwd:           a.Cwd,
 		disabledTools: disabled,
 		mcpManager:    mcpMgr,
+		memory:        a.memory,
 	}
 
 	var output strings.Builder

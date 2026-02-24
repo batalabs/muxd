@@ -862,6 +862,12 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 		}
 	}
 
+	// Set up project memory
+	cwd, _ := tools.Getwd()
+	if cwd != "" {
+		ag.SetMemory(tools.NewProjectMemory(cwd))
+	}
+
 	s.agents[sessionID] = ag
 	return ag, nil
 }

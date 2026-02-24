@@ -1319,6 +1319,9 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 	case "/telegram":
 		return m.handleTelegram(parts[1:])
 
+	case "/remember":
+		return m.handleRememberCommand(parts[1:])
+
 	case "/tools":
 		return m.handleToolsCommand(parts[1:])
 
@@ -1353,6 +1356,65 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 	default:
 		return m, PrintToScrollback(m.renderError("Unknown command: " + cmd + "  (try /help)"))
 	}
+}
+
+func (m Model) handleRememberCommand(args []string) (tea.Model, tea.Cmd) {
+	cwd, _ := tools.Getwd()
+	if cwd == "" {
+		return m, PrintToScrollback(m.renderError("Cannot determine working directory."))
+	}
+
+	mem := tools.NewProjectMemory(cwd)
+
+	// /remember --remove <key>
+	if len(args) >= 2 && args[0] == "--remove" {
+		key := args[1]
+		facts, err := mem.Load()
+		if err != nil {
+			return m, PrintToScrollback(m.renderError("Loading memory: " + err.Error()))
+		}
+		if _, ok := facts[key]; !ok {
+			return m, PrintToScrollback(m.renderError("Key " + key + " not found in project memory."))
+		}
+		delete(facts, key)
+		if err := mem.Save(facts); err != nil {
+			return m, PrintToScrollback(m.renderError("Saving memory: " + err.Error()))
+		}
+		return m, PrintToScrollback(WelcomeStyle.Render("Removed memory fact: " + key))
+	}
+
+	// /remember <key> <value...>
+	if len(args) < 2 {
+		// Show current facts
+		facts, err := mem.Load()
+		if err != nil {
+			return m, PrintToScrollback(m.renderError("Loading memory: " + err.Error()))
+		}
+		if len(facts) == 0 {
+			return m, PrintToScrollback(FooterMeta.Render("No project memory facts stored. Usage: /remember <key> <value>"))
+		}
+		formatted := mem.FormatForPrompt()
+		var lines []string
+		lines = append(lines, FooterHead.Render("Project Memory"))
+		for _, line := range strings.Split(formatted, "\n") {
+			lines = append(lines, FooterMeta.Render("  "+line))
+		}
+		return m, PrintToScrollback(strings.Join(lines, "\n"))
+	}
+
+	key := args[0]
+	value := strings.Join(args[1:], " ")
+
+	facts, err := mem.Load()
+	if err != nil {
+		return m, PrintToScrollback(m.renderError("Loading memory: " + err.Error()))
+	}
+	facts[key] = value
+	if err := mem.Save(facts); err != nil {
+		return m, PrintToScrollback(m.renderError("Saving memory: " + err.Error()))
+	}
+
+	return m, PrintToScrollback(WelcomeStyle.Render(fmt.Sprintf("Saved memory fact: %s = %s", key, value)))
 }
 
 func (m Model) handleToolsCommand(args []string) (tea.Model, tea.Cmd) {

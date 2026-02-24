@@ -29,3 +29,4 @@ coverage*.out
 
 # Mermaid source (rendered PNGs are committed)
 assets/*.mmd
+/.muxd/memory.json

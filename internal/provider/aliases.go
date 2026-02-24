@@ -82,12 +82,18 @@ func ModelCostWithCache(modelID string, inputTokens, outputTokens, cacheCreation
 
 // BuildSystemPrompt returns the system prompt for the given working directory.
 // mcpToolNames is an optional list of MCP tool names available to the agent.
-func BuildSystemPrompt(cwd string, mcpToolNames []string) string {
+// memory is an optional pre-formatted project memory string (from ProjectMemory.FormatForPrompt).
+func BuildSystemPrompt(cwd string, mcpToolNames []string, memory string) string {
 	mcpSection := ""
 	if len(mcpToolNames) > 0 {
 		mcpSection = fmt.Sprintf("\n  MCP:         %s\n", strings.Join(mcpToolNames, ", "))
 	}
-	toolCount := 23 + len(mcpToolNames)
+	toolCount := 25 + len(mcpToolNames)
+
+	memorySection := ""
+	if memory != "" {
+		memorySection = fmt.Sprintf("\nProject Memory:\n%s\n", memory)
+	}
 
 	return fmt.Sprintf(`You are muxd, a coding assistant running in the user's terminal.
 
@@ -95,7 +101,7 @@ Environment:
 - Working directory: %s
 - Platform: %s/%s
 - Date: %s
-
+%s
 Tools available (%d):
   File:        file_read, file_write, file_edit
   Shell:       bash
@@ -107,7 +113,8 @@ Tools available (%d):
   Multi-Edit:  patch_apply
   Plan Mode:   plan_enter, plan_exit
   Sub-Agent:   task
-  Git:         git_status%s
+  Git:         git_status
+  Memory:      memory_read, memory_write%s
 Guidelines:
 - Always read a file before editing it to get the exact content.
 - Prefer file_edit over file_write when modifying existing files.
@@ -118,10 +125,11 @@ Guidelines:
 - Use web_search/web_fetch for current information, docs, or APIs.
 - Use plan_enter when exploring before making changes; plan_exit when ready.
 - Use task to delegate independent subtasks to a sub-agent.
+- Use memory_read/memory_write to persist project-specific context across sessions.
 - MCP tools are external tools connected via the Model Context Protocol. Use them when relevant — they extend your capabilities beyond the built-in tools.
 - Be concise. Explain what you're doing and why.
 - Do not modify files unless the user asks you to.
 - If a task is ambiguous, ask for clarification before acting.`,
 		cwd, runtime.GOOS, runtime.GOARCH, time.Now().Format("2006-01-02"),
-		toolCount, mcpSection)
+		memorySection, toolCount, mcpSection)
 }

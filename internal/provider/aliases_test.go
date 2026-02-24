@@ -102,28 +102,55 @@ func TestSetPricingMap(t *testing.T) {
 
 func TestBuildSystemPrompt(t *testing.T) {
 	t.Run("without MCP tools", func(t *testing.T) {
-		prompt := BuildSystemPrompt("/tmp/project", nil)
+		prompt := BuildSystemPrompt("/tmp/project", nil, "")
 		if !strings.Contains(prompt, "/tmp/project") {
 			t.Error("expected cwd in prompt")
 		}
-		if !strings.Contains(prompt, "Tools available (23)") {
-			t.Error("expected 23 tools")
+		if !strings.Contains(prompt, "Tools available (25)") {
+			t.Error("expected 25 tools")
 		}
 		if strings.Contains(prompt, "MCP:") {
 			t.Error("should not contain MCP section without tools")
 		}
+		if strings.Contains(prompt, "Project Memory:") {
+			t.Error("should not contain Project Memory section without memory")
+		}
 	})
 
 	t.Run("with MCP tools", func(t *testing.T) {
-		prompt := BuildSystemPrompt("/tmp", []string{"mcp__fs__read", "mcp__fs__write"})
-		if !strings.Contains(prompt, "Tools available (25)") {
-			t.Error("expected 25 tools (23 + 2 MCP)")
+		prompt := BuildSystemPrompt("/tmp", []string{"mcp__fs__read", "mcp__fs__write"}, "")
+		if !strings.Contains(prompt, "Tools available (27)") {
+			t.Error("expected 27 tools (25 + 2 MCP)")
 		}
 		if !strings.Contains(prompt, "MCP:") {
 			t.Error("expected MCP section")
 		}
 		if !strings.Contains(prompt, "mcp__fs__read") {
 			t.Error("expected MCP tool names in prompt")
+		}
+	})
+
+	t.Run("with memory", func(t *testing.T) {
+		prompt := BuildSystemPrompt("/tmp", nil, "auth: JWT tokens\ndb: SQLite")
+		if !strings.Contains(prompt, "Project Memory:") {
+			t.Error("expected Project Memory section")
+		}
+		if !strings.Contains(prompt, "auth: JWT tokens") {
+			t.Error("expected memory facts in prompt")
+		}
+	})
+
+	t.Run("without memory", func(t *testing.T) {
+		prompt := BuildSystemPrompt("/tmp", nil, "")
+		if strings.Contains(prompt, "Project Memory:") {
+			t.Error("should not contain Project Memory section with empty memory")
+		}
+	})
+
+	t.Run("memory tools listed", func(t *testing.T) {
+		prompt := BuildSystemPrompt("/tmp", nil, "")
+		if !strings.Contains(prompt, "memory_read, memory_write") {
+			t.Error("expected memory tools in prompt")
 		}
 	})
 }
