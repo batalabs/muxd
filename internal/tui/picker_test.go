@@ -190,7 +190,7 @@ func TestSessionPicker_ViewContainsIDsAndTitles(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(view, "Enter=select") {
+	if !strings.Contains(view, "Enter=open") {
 		t.Error("view should contain footer hint")
 	}
 	if !strings.Contains(view, "r=rename") {
@@ -198,6 +198,12 @@ func TestSessionPicker_ViewContainsIDsAndTitles(t *testing.T) {
 	}
 	if !strings.Contains(view, "d=delete") {
 		t.Error("view should contain delete hint")
+	}
+	if !strings.Contains(view, "Space=select") {
+		t.Error("view should contain Space=select hint")
+	}
+	if !strings.Contains(view, "a=all") {
+		t.Error("view should contain a=all hint")
 	}
 }
 
@@ -340,5 +346,191 @@ func TestSessionPicker_ViewDeleteMode(t *testing.T) {
 	}
 	if !strings.Contains(view, "y=delete") {
 		t.Error("delete view should show confirm hint")
+	}
+}
+
+func TestSessionPicker_ToggleSelected(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+
+	t.Run("toggle on", func(t *testing.T) {
+		p.ToggleSelected()
+		if p.SelectedCount() != 1 {
+			t.Errorf("SelectedCount = %d, want 1", p.SelectedCount())
+		}
+	})
+
+	t.Run("toggle off", func(t *testing.T) {
+		p.ToggleSelected()
+		if p.SelectedCount() != 0 {
+			t.Errorf("SelectedCount = %d, want 0", p.SelectedCount())
+		}
+	})
+
+	t.Run("toggle on empty list is no-op", func(t *testing.T) {
+		p.SetFilter("zzzzzzz")
+		p.ToggleSelected()
+		if p.SelectedCount() != 0 {
+			t.Errorf("SelectedCount = %d, want 0", p.SelectedCount())
+		}
+		p.SetFilter("")
+	})
+}
+
+func TestSessionPicker_SelectAll(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+
+	t.Run("select all", func(t *testing.T) {
+		p.SelectAll()
+		if p.SelectedCount() != 3 {
+			t.Errorf("SelectedCount = %d, want 3", p.SelectedCount())
+		}
+	})
+
+	t.Run("toggle deselects all when all selected", func(t *testing.T) {
+		p.SelectAll() // all already selected → deselect
+		if p.SelectedCount() != 0 {
+			t.Errorf("SelectedCount = %d, want 0", p.SelectedCount())
+		}
+	})
+
+	t.Run("select all with partial selection selects remaining", func(t *testing.T) {
+		p.ToggleSelected() // select first
+		p.SelectAll()      // should select all
+		if p.SelectedCount() != 3 {
+			t.Errorf("SelectedCount = %d, want 3", p.SelectedCount())
+		}
+		p.ClearSelected()
+	})
+}
+
+func TestSessionPicker_SelectedIDs(t *testing.T) {
+	sessions := testSessions()
+	p := NewSessionPicker(sessions)
+
+	p.ToggleSelected() // select first (index 0)
+	p.MoveDown()
+	p.ToggleSelected() // select second (index 1)
+
+	ids := p.SelectedIDs()
+	if len(ids) != 2 {
+		t.Fatalf("SelectedIDs len = %d, want 2", len(ids))
+	}
+
+	idSet := make(map[string]bool)
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	if !idSet[sessions[0].ID] {
+		t.Errorf("expected %s in SelectedIDs", sessions[0].ID)
+	}
+	if !idSet[sessions[1].ID] {
+		t.Errorf("expected %s in SelectedIDs", sessions[1].ID)
+	}
+}
+
+func TestSessionPicker_ClearSelected(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+	p.SelectAll()
+	p.ClearSelected()
+	if p.SelectedCount() != 0 {
+		t.Errorf("SelectedCount = %d, want 0", p.SelectedCount())
+	}
+}
+
+func TestSessionPicker_RemoveSelectedMulti(t *testing.T) {
+	t.Run("removes multiple sessions", func(t *testing.T) {
+		sessions := testSessions()
+		p := NewSessionPicker(sessions)
+
+		p.ToggleSelected() // select first
+		p.MoveDown()
+		p.ToggleSelected() // select second
+
+		removed := p.RemoveSelectedMulti()
+		if len(removed) != 2 {
+			t.Fatalf("removed len = %d, want 2", len(removed))
+		}
+		if len(p.filtered) != 1 {
+			t.Errorf("filtered = %d, want 1", len(p.filtered))
+		}
+		if p.SelectedCount() != 0 {
+			t.Errorf("SelectedCount = %d, want 0 after remove", p.SelectedCount())
+		}
+		if p.Mode() != pickerBrowse {
+			t.Errorf("mode = %d, want pickerBrowse", p.Mode())
+		}
+	})
+
+	t.Run("returns nil when nothing selected", func(t *testing.T) {
+		p := NewSessionPicker(testSessions())
+		removed := p.RemoveSelectedMulti()
+		if removed != nil {
+			t.Errorf("expected nil, got %v", removed)
+		}
+	})
+
+	t.Run("adjusts index when at end", func(t *testing.T) {
+		sessions := testSessions()
+		p := NewSessionPicker(sessions)
+
+		// Move to last and select it
+		p.MoveDown()
+		p.MoveDown()
+		p.ToggleSelected()
+
+		p.RemoveSelectedMulti()
+		if p.selectedIdx >= len(p.filtered) {
+			t.Errorf("selectedIdx = %d, should be < %d", p.selectedIdx, len(p.filtered))
+		}
+	})
+
+	t.Run("removes all sessions", func(t *testing.T) {
+		p := NewSessionPicker(testSessions())
+		p.SelectAll()
+		removed := p.RemoveSelectedMulti()
+		if len(removed) != 3 {
+			t.Fatalf("removed len = %d, want 3", len(removed))
+		}
+		if len(p.filtered) != 0 {
+			t.Errorf("filtered = %d, want 0", len(p.filtered))
+		}
+		if p.selectedIdx != 0 {
+			t.Errorf("selectedIdx = %d, want 0", p.selectedIdx)
+		}
+	})
+}
+
+func TestSessionPicker_ViewMultiSelectMarkers(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+	p.ToggleSelected() // select first
+
+	view := p.View(80)
+	if !strings.Contains(view, "[x]") {
+		t.Error("view should contain [x] for selected session")
+	}
+	if !strings.Contains(view, "[ ]") {
+		t.Error("view should contain [ ] for unselected sessions")
+	}
+}
+
+func TestSessionPicker_ViewMultiDeleteConfirm(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+	p.SelectAll()
+	p.StartDelete()
+	view := p.View(80)
+
+	if !strings.Contains(view, "Delete 3 sessions?") {
+		t.Error("multi-delete view should show count: 'Delete 3 sessions?'")
+	}
+}
+
+func TestSessionPicker_ViewSingleDeleteConfirm(t *testing.T) {
+	p := NewSessionPicker(testSessions())
+	// No multi-select, just start delete on highlighted
+	p.StartDelete()
+	view := p.View(80)
+
+	if !strings.Contains(view, `Delete "Fix login bug"?`) {
+		t.Error("single-delete view should show session title")
 	}
 }

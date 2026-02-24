@@ -10,6 +10,32 @@ import (
 	"github.com/batalabs/muxd/internal/domain"
 )
 
+func TestSetOllamaBaseURL_StripsControlChars(t *testing.T) {
+	prev := ollamaBaseURL
+	t.Cleanup(func() { SetOllamaBaseURL(prev) })
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"null prefix", "\x00http://localhost:11434", "http://localhost:11434"},
+		{"null suffix", "http://localhost:11434\x00", "http://localhost:11434"},
+		{"embedded null", "http://\x00localhost:11434", "http://localhost:11434"},
+		{"normal URL unchanged", "http://localhost:11434", "http://localhost:11434"},
+		{"empty resets to default", "", "http://localhost:11434"},
+		{"trailing slash stripped", "http://localhost:11434/", "http://localhost:11434"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetOllamaBaseURL(tt.input)
+			if ollamaBaseURL != tt.want {
+				t.Errorf("ollamaBaseURL = %q, want %q", ollamaBaseURL, tt.want)
+			}
+		})
+	}
+}
+
 func TestOllamaProvider_StreamMessage_TextOnly(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/chat" {

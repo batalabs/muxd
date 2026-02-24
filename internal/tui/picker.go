@@ -11,9 +11,9 @@ import (
 type pickerMode int
 
 const (
-	pickerBrowse       pickerMode = iota // normal browsing
-	pickerRenaming                       // editing a new title
-	pickerConfirmDelete                  // waiting for y/n
+	pickerBrowse        pickerMode = iota // normal browsing
+	pickerRenaming                        // editing a new title
+	pickerConfirmDelete                   // waiting for y/n
 )
 
 // SessionPicker is an interactive session selector overlay.
@@ -26,6 +26,8 @@ type SessionPicker struct {
 
 	mode      pickerMode
 	renameBuf string // title being edited in rename mode
+
+	selected map[string]bool // multi-select: session IDs toggled on
 }
 
 // NewSessionPicker creates a picker with the given sessions.
@@ -34,6 +36,7 @@ func NewSessionPicker(sessions []domain.Session) *SessionPicker {
 		sessions: sessions,
 		filtered: sessions,
 		active:   true,
+		selected: make(map[string]bool),
 	}
 }
 
@@ -45,6 +48,7 @@ func (p *SessionPicker) IsActive() bool {
 // Dismiss closes the picker.
 func (p *SessionPicker) Dismiss() {
 	p.active = false
+	p.selected = make(map[string]bool)
 }
 
 // Mode returns the current picker mode.
@@ -192,6 +196,83 @@ func (p *SessionPicker) RemoveSelected() string {
 	return id
 }
 
+// ToggleSelected toggles the highlighted session's selection.
+func (p *SessionPicker) ToggleSelected() {
+	sel := p.SelectedSession()
+	if sel == nil {
+		return
+	}
+	if p.selected[sel.ID] {
+		delete(p.selected, sel.ID)
+	} else {
+		p.selected[sel.ID] = true
+	}
+}
+
+// SelectAll selects all filtered sessions. If all are already selected, deselects all.
+func (p *SessionPicker) SelectAll() {
+	allSelected := true
+	for _, s := range p.filtered {
+		if !p.selected[s.ID] {
+			allSelected = false
+			break
+		}
+	}
+	if allSelected {
+		p.ClearSelected()
+	} else {
+		for _, s := range p.filtered {
+			p.selected[s.ID] = true
+		}
+	}
+}
+
+// ClearSelected clears all selections.
+func (p *SessionPicker) ClearSelected() {
+	p.selected = make(map[string]bool)
+}
+
+// SelectedCount returns the number of selected sessions.
+func (p *SessionPicker) SelectedCount() int {
+	return len(p.selected)
+}
+
+// SelectedIDs returns the IDs of all selected sessions.
+func (p *SessionPicker) SelectedIDs() []string {
+	ids := make([]string, 0, len(p.selected))
+	for id := range p.selected {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// RemoveSelectedMulti removes all selected sessions from the master list,
+// clears the selection map, re-filters, adjusts the index, and returns the
+// removed IDs.
+func (p *SessionPicker) RemoveSelectedMulti() []string {
+	if len(p.selected) == 0 {
+		return nil
+	}
+	removed := make([]string, 0, len(p.selected))
+	kept := p.sessions[:0:0]
+	for _, s := range p.sessions {
+		if p.selected[s.ID] {
+			removed = append(removed, s.ID)
+		} else {
+			kept = append(kept, s)
+		}
+	}
+	p.sessions = kept
+	p.selected = make(map[string]bool)
+	p.applyFilter()
+	if p.selectedIdx >= len(p.filtered) && p.selectedIdx > 0 {
+		p.selectedIdx = len(p.filtered) - 1
+	}
+	p.mode = pickerBrowse
+	p.renameBuf = ""
+	return removed
+}
+
 func (p *SessionPicker) applyFilter() {
 	if p.filter == "" {
 		p.filtered = p.sessions
@@ -242,12 +323,16 @@ func (p *SessionPicker) View(width int) string {
 		b.WriteString(CursorStyle.Render("\u2588"))
 		b.WriteString("\n\n")
 	case pickerConfirmDelete:
-		sel := p.SelectedSession()
-		title := ""
-		if sel != nil {
-			title = sel.Title
+		if p.SelectedCount() > 0 {
+			b.WriteString(ErrorLineStyle.Render(fmt.Sprintf("  Delete %d sessions? (y/n)", p.SelectedCount())))
+		} else {
+			sel := p.SelectedSession()
+			title := ""
+			if sel != nil {
+				title = sel.Title
+			}
+			b.WriteString(ErrorLineStyle.Render(fmt.Sprintf("  Delete \"%s\"? (y/n)", title)))
 		}
-		b.WriteString(ErrorLineStyle.Render(fmt.Sprintf("  Delete \"%s\"? (y/n)", title)))
 		b.WriteString("\n\n")
 	default:
 		filterLine := "  Filter: " + p.filter
@@ -278,6 +363,11 @@ func (p *SessionPicker) View(width int) string {
 				indicator = "> "
 			}
 
+			check := "[ ] "
+			if p.selected[s.ID] {
+				check = "[x] "
+			}
+
 			idPrefix := s.ID[:8]
 			title := s.Title
 			if len(title) > 30 {
@@ -286,8 +376,8 @@ func (p *SessionPicker) View(width int) string {
 			ago := TimeAgo(s.UpdatedAt)
 			msgCount := fmt.Sprintf("%d msgs", s.MessageCount)
 
-			line := fmt.Sprintf("%s%-8s  %-30s  %-8s  %s",
-				indicator, idPrefix, title, ago, msgCount)
+			line := fmt.Sprintf("%s%s%-8s  %-30s  %-8s  %s",
+				indicator, check, idPrefix, title, ago, msgCount)
 
 			if s.Tags != "" {
 				line += "  [" + s.Tags + "]"
@@ -318,7 +408,11 @@ func (p *SessionPicker) View(width int) string {
 	case pickerConfirmDelete:
 		b.WriteString(FooterMeta.Render("  y=delete  n/Esc=cancel"))
 	default:
-		b.WriteString(FooterMeta.Render("  Enter=select  r=rename  d=delete  Esc=cancel  Type to filter"))
+		if p.SelectedCount() >= 2 {
+			b.WriteString(FooterMeta.Render("  Space=select  a=all  d=delete  Esc=clear"))
+		} else {
+			b.WriteString(FooterMeta.Render("  Space=select  a=all  d=delete  r=rename  Enter=open  Esc=cancel"))
+		}
 	}
 	b.WriteString("\n")
 

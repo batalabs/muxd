@@ -902,11 +902,18 @@ func (m Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handlePickerBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc, tea.KeyCtrlC:
+		if m.picker.SelectedCount() > 0 {
+			m.picker.ClearSelected()
+			return m, nil
+		}
 		m.picker.Dismiss()
 		m.picker = nil
 		return m, nil
 
 	case tea.KeyEnter:
+		if m.picker.SelectedCount() >= 2 {
+			return m, nil
+		}
 		sel := m.picker.SelectedSession()
 		if sel == nil {
 			return m, nil
@@ -946,15 +953,26 @@ func (m Model) handlePickerBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	default:
 		if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+			// Space always toggles selection (never added to filter).
+			if len(msg.Runes) == 1 && msg.Runes[0] == ' ' {
+				m.picker.ToggleSelected()
+				m.picker.MoveDown()
+				return m, nil
+			}
 			for _, r := range msg.Runes {
 				// 'r' starts rename, 'd' starts delete (only when filter is empty)
 				if len(msg.Runes) == 1 && m.picker.filter == "" {
 					switch msg.Runes[0] {
 					case 'r':
-						m.picker.StartRename()
-						return m, nil
+						if m.picker.SelectedCount() <= 1 {
+							m.picker.StartRename()
+							return m, nil
+						}
 					case 'd':
 						m.picker.StartDelete()
+						return m, nil
+					case 'a':
+						m.picker.SelectAll()
 						return m, nil
 					}
 				}
@@ -1002,10 +1020,21 @@ func (m Model) handlePickerDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(msg.Runes) == 1 {
 			switch msg.Runes[0] {
 			case 'y', 'Y':
-				id := m.picker.RemoveSelected()
-				if id != "" && m.Store != nil {
-					if err := m.Store.DeleteSession(id); err != nil {
-						fmt.Fprintf(os.Stderr, "tui: delete session: %v\n", err)
+				if m.picker.SelectedCount() > 0 {
+					ids := m.picker.RemoveSelectedMulti()
+					if m.Store != nil {
+						for _, id := range ids {
+							if err := m.Store.DeleteSession(id); err != nil {
+								fmt.Fprintf(os.Stderr, "tui: delete session %s: %v\n", id[:8], err)
+							}
+						}
+					}
+				} else {
+					id := m.picker.RemoveSelected()
+					if id != "" && m.Store != nil {
+						if err := m.Store.DeleteSession(id); err != nil {
+							fmt.Fprintf(os.Stderr, "tui: delete session: %v\n", err)
+						}
 					}
 				}
 				return m, nil

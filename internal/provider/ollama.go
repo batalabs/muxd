@@ -17,7 +17,14 @@ var ollamaBaseURL = "http://localhost:11434"
 
 // SetOllamaBaseURL configures the Ollama endpoint.
 func SetOllamaBaseURL(raw string) {
-	raw = strings.TrimSpace(raw)
+	// Strip control characters (null bytes, etc.) that may be pasted or
+	// read from a corrupted config file — these cause net/url parse failures.
+	raw = strings.Map(func(r rune) rune {
+		if r < 32 && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(raw))
 	if raw == "" {
 		ollamaBaseURL = "http://localhost:11434"
 		return
@@ -148,8 +155,8 @@ func streamOllamaChat(
 					} `json:"function"`
 				} `json:"tool_calls"`
 			} `json:"message"`
-			Done           bool   `json:"done"`
-			DoneReason     string `json:"done_reason"`
+			Done            bool   `json:"done"`
+			DoneReason      string `json:"done_reason"`
 			PromptEvalCount int    `json:"prompt_eval_count"`
 			EvalCount       int    `json:"eval_count"`
 		}
