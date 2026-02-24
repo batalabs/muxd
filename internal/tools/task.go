@@ -50,7 +50,7 @@ func taskTool() ToolDef {
 // IsSubAgentTool returns true for tool names that should not be available
 // to sub-agents (to prevent recursion).
 func IsSubAgentTool(name string) bool {
-	return name == "task"
+	return name == "task" || name == "schedule_task"
 }
 
 // AllToolsForSubAgent returns tools available to sub-agents (all except task).

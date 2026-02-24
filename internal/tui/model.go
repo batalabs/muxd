@@ -1596,7 +1596,7 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		return m, PrintToScrollback(m.renderError("Scheduler unavailable: no store configured."))
 	}
 	if len(args) == 0 {
-		return m, PrintToScrollback(m.renderError("Usage: /schedule add <tool> <HH:MM|RFC3339> <json> [--daily|--hourly] | /schedule list | /schedule cancel <id>"))
+		return m, PrintToScrollback(m.renderError("Usage: /schedule add <tool> <HH:MM|RFC3339> <json> [--daily|--hourly] | /schedule add-task <HH:MM|RFC3339> <prompt> [--daily|--hourly] | /schedule list | /schedule cancel <id>"))
 	}
 	switch strings.ToLower(args[0]) {
 	case "list":
@@ -1614,7 +1614,17 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 			if len(id) > 8 {
 				id = id[:8]
 			}
-			line := fmt.Sprintf("  %-8s %-14s %-9s %s", id, it.ToolName, it.Status, it.ScheduledFor.Local().Format("2006-01-02 15:04"))
+			displayName := it.ToolName
+			if it.ToolName == tools.AgentTaskToolName {
+				displayName = "agent_task"
+				if p, ok := it.ToolInput["prompt"].(string); ok && p != "" {
+					if len(p) > 40 {
+						p = p[:40] + "..."
+					}
+					displayName += ": " + p
+				}
+			}
+			line := fmt.Sprintf("  %-8s %-14s %-9s %s", id, displayName, it.Status, it.ScheduledFor.Local().Format("2006-01-02 15:04"))
 			lines = append(lines, FooterMeta.Render(line))
 		}
 		return m, PrintToScrollback(strings.Join(lines, "\n"))
@@ -1658,8 +1668,36 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		return m, PrintToScrollback(WelcomeStyle.Render(
 			fmt.Sprintf("Scheduled job %s: %s at %s (%s)", id[:8], toolName, scheduledFor.Local().Format("2006-01-02 15:04"), recurrence),
 		))
+	case "add-task":
+		if len(args) < 3 {
+			return m, PrintToScrollback(m.renderError("Usage: /schedule add-task <HH:MM|RFC3339> <prompt> [--daily|--hourly]"))
+		}
+		scheduledFor, err := tools.ParseTweetScheduleTime(args[1], time.Now())
+		if err != nil {
+			return m, PrintToScrollback(m.renderError(err.Error()))
+		}
+		recurrence := "once"
+		rawTail := strings.TrimSpace(strings.Join(args[2:], " "))
+		if strings.HasSuffix(rawTail, " --daily") {
+			recurrence = "daily"
+			rawTail = strings.TrimSpace(strings.TrimSuffix(rawTail, " --daily"))
+		} else if strings.HasSuffix(rawTail, " --hourly") {
+			recurrence = "hourly"
+			rawTail = strings.TrimSpace(strings.TrimSuffix(rawTail, " --hourly"))
+		}
+		if strings.TrimSpace(rawTail) == "" {
+			return m, PrintToScrollback(m.renderError("prompt is required"))
+		}
+		input := map[string]any{"prompt": rawTail}
+		id, err := m.Store.CreateScheduledToolJob(tools.AgentTaskToolName, input, scheduledFor, recurrence)
+		if err != nil {
+			return m, PrintToScrollback(m.renderError("Failed to schedule task: " + err.Error()))
+		}
+		return m, PrintToScrollback(WelcomeStyle.Render(
+			fmt.Sprintf("Scheduled agent task %s at %s (%s)", id[:8], scheduledFor.Local().Format("2006-01-02 15:04"), recurrence),
+		))
 	default:
-		return m, PrintToScrollback(m.renderError("Usage: /schedule [add|list|cancel]"))
+		return m, PrintToScrollback(m.renderError("Usage: /schedule [add|add-task|list|cancel]"))
 	}
 }
 

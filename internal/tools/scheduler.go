@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+// AgentTaskToolName is the sentinel tool name used to schedule full agent tasks.
+// Jobs with this tool name spawn a complete agent loop instead of executing a
+// single tool call.
+const AgentTaskToolName = "__agent_task__"
+
 // ScheduledToolCall represents one scheduled tool execution request.
 type ScheduledToolCall struct {
 	ID           string
@@ -34,14 +39,14 @@ type ToolContextProvider func() *ToolContext
 
 // ToolCallScheduler executes scheduled tool calls on an interval.
 type ToolCallScheduler struct {
-	mu         sync.Mutex
-	store      ScheduledToolCallStore
-	interval   time.Duration
+	mu          sync.Mutex
+	store       ScheduledToolCallStore
+	interval    time.Duration
 	ctxProvider ToolContextProvider
-	executor   ScheduledToolCallExecutor
-	stopCh     chan struct{}
-	doneCh     chan struct{}
-	running    bool
+	executor    ScheduledToolCallExecutor
+	stopCh      chan struct{}
+	doneCh      chan struct{}
+	running     bool
 }
 
 // NewToolCallScheduler creates a generic scheduled tool-call engine.
@@ -162,6 +167,11 @@ func isSchedulerAllowed(toolName string, ctx *ToolContext) bool {
 	if name == "" {
 		return false
 	}
+	// Agent tasks bypass the per-tool allowlist — the spawned agent
+	// enforces its own tool policy.
+	if name == AgentTaskToolName {
+		return true
+	}
 	if ctx != nil && ctx.Disabled != nil && ctx.Disabled[name] {
 		return false
 	}
@@ -181,4 +191,3 @@ func nextRecurringTime(recurrence string, from time.Time) (time.Time, bool) {
 		return time.Time{}, false
 	}
 }
-

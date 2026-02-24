@@ -63,7 +63,7 @@ func TestComputeCompletions(t *testing.T) {
 		{
 			name:  "schedule subcommands",
 			input: "/schedule ",
-			want:  []string{"/schedule add", "/schedule list", "/schedule cancel"},
+			want:  []string{"/schedule add", "/schedule add-task", "/schedule list", "/schedule cancel"},
 		},
 		{
 			name:  "schedule add tool names",

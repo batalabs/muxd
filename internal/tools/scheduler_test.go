@@ -27,6 +27,9 @@ func TestIsSchedulerAllowed(t *testing.T) {
 			Disabled:         map[string]bool{"x_post": true},
 		}, false},
 		{"case insensitive", "X_POST", &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}, true},
+		{"agent task bypasses allowlist", AgentTaskToolName, nil, true},
+		{"agent task bypasses allowlist with empty context", AgentTaskToolName, &ToolContext{}, true},
+		{"agent task bypasses even with empty allowed set", AgentTaskToolName, &ToolContext{ScheduledAllowed: map[string]bool{}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,9 +122,9 @@ func TestNewToolCallScheduler_defaultInterval(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type fakeSchedulerStore struct {
-	dueJobs       []ScheduledToolCall
-	succeededIDs  []string
-	failedIDs     []string
+	dueJobs        []ScheduledToolCall
+	succeededIDs   []string
+	failedIDs      []string
 	rescheduledIDs []string
 }
 
@@ -226,4 +229,3 @@ func TestToolCallScheduler_RunOnce(t *testing.T) {
 		}
 	})
 }
-

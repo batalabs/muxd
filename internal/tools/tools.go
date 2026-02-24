@@ -120,6 +120,7 @@ func AllTools() []ToolDef {
 		gitStatusTool(),
 		memoryReadTool(),
 		memoryWriteTool(),
+		scheduleTaskTool(),
 	}
 }
 

@@ -19,7 +19,7 @@ var SlashCommands = []string{
 var ConfigSubcommands = []string{"messaging", "models", "reset", "set", "show", "theme", "tools"}
 var ToolSubcommands = []string{"list", "enable", "disable", "toggle", "profile"}
 var ToolProfiles = []string{"safe", "coder", "research"}
-var ScheduleSubcommands = []string{"add", "list", "cancel"}
+var ScheduleSubcommands = []string{"add", "add-task", "list", "cancel"}
 var XSubcommands = []string{"auth", "status", "logout"}
 
 // ConfigKeys lists the available /config set keys.
@@ -208,7 +208,7 @@ func CommandExpectsArgs(completion string) bool {
 			return true
 		}
 		sub := strings.ToLower(fields[1])
-		return (sub == "add" || sub == "cancel") && len(fields) == 2
+		return (sub == "add" || sub == "add-task" || sub == "cancel") && len(fields) == 2
 	case "/x":
 		return len(fields) == 1
 	case "/tools":
