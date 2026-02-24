@@ -1838,6 +1838,7 @@ func (m *Model) applyConfigSetting(key, value string) {
 }
 
 func (m Model) validateConfigInput(key, value string) error {
+	value = config.SanitizeValue(value)
 	switch key {
 	case "model":
 		currentProvName := ""

@@ -434,9 +434,9 @@ func TestSanitizeValue(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sanitizeValue(tt.input)
+			got := SanitizeValue(tt.input)
 			if got != tt.want {
-				t.Errorf("sanitizeValue(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("SanitizeValue(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

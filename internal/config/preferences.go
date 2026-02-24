@@ -414,7 +414,7 @@ func (p Preferences) Get(key string) string {
 
 // Set updates a single preference key to the given value.
 func (p *Preferences) Set(key, value string) error {
-	value = sanitizeValue(value)
+	value = SanitizeValue(value)
 	switch key {
 	case "footer.tokens":
 		b, err := ParseBoolish(value)
@@ -496,11 +496,11 @@ func (p *Preferences) Set(key, value string) error {
 	return nil
 }
 
-// sanitizeValue strips null bytes, ASCII control characters (< 32 except
+// SanitizeValue strips null bytes, ASCII control characters (< 32 except
 // \n and \t), and DEL (0x7F) from a string value and trims surrounding
 // whitespace. API keys and secrets should never contain control characters —
 // these typically sneak in through clipboard paste artifacts.
-func sanitizeValue(s string) string {
+func SanitizeValue(s string) string {
 	return strings.Map(func(r rune) rune {
 		if (r < 32 && r != '\n' && r != '\t') || r == 0x7F {
 			return -1
@@ -527,7 +527,7 @@ func isSensitiveKey(key string) bool {
 func sanitizePreferences(p *Preferences) bool {
 	changed := false
 	sanitize := func(s *string) {
-		cleaned := sanitizeValue(*s)
+		cleaned := SanitizeValue(*s)
 		if cleaned != *s {
 			*s = cleaned
 			changed = true
