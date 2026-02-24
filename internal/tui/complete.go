@@ -12,7 +12,7 @@ import (
 // SlashCommands lists the available slash commands.
 var SlashCommands = []string{
 	"/branch", "/clear", "/config", "/continue", "/exit", "/help",
-	"/new", "/quit", "/redo", "/refresh", "/rename", "/resume", "/schedule", "/sessions", "/telegram", "/tools", "/tweet", "/undo", "/x",
+	"/new", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/telegram", "/tools", "/tweet", "/undo", "/x",
 }
 
 // ConfigSubcommands lists the available /config subcommands.
@@ -198,6 +198,8 @@ func CommandExpectsArgs(completion string) bool {
 	cmd := strings.ToLower(fields[0])
 	switch cmd {
 	case "/continue", "/resume", "/rename":
+		return len(fields) == 1
+	case "/remember":
 		return len(fields) == 1
 	case "/tweet":
 		return len(fields) == 1

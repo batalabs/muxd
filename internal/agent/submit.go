@@ -81,6 +81,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 		toolCtx := &tools.ToolContext{
 			Cwd:              cwd,
 			Todos:            &a.todos,
+			Memory:           a.memory,
 			PlanMode:         &a.planMode,
 			Disabled:         disabled,
 			BraveAPIKey:      a.braveAPIKey,
@@ -159,7 +160,11 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 				}
 			}
 		}
-		system := provider.BuildSystemPrompt(cwd, mcpToolNames)
+		memoryText := ""
+		if a.memory != nil {
+			memoryText = a.memory.FormatForPrompt()
+		}
+		system := provider.BuildSystemPrompt(cwd, mcpToolNames, memoryText)
 
 		blocks, stopReason, usage, err = a.callProviderWithRetry(
 			messages, toolSpecs, system,

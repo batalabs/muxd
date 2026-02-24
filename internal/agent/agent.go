@@ -142,7 +142,7 @@ type Service struct {
 	redoStack    []checkpoint.Checkpoint
 
 	// braveAPIKey is the Brave Search API key from preferences.
-	braveAPIKey string
+	braveAPIKey   string
 	xClientID     string
 	xClientSecret string
 	xAccessToken  string
@@ -155,6 +155,9 @@ type Service struct {
 
 	// mcpManager manages MCP server connections and tool routing.
 	mcpManager *mcp.Manager
+
+	// memory is the per-project persistent fact store.
+	memory *tools.ProjectMemory
 }
 
 // NewService creates a new Service for the given session.

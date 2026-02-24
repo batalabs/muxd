@@ -237,6 +237,8 @@ func TestCommandExpectsArgs(t *testing.T) {
 		{"schedule expects args", "/schedule", true},
 		{"schedule add expects args", "/schedule add", true},
 		{"schedule list does not", "/schedule list", false},
+		{"remember expects args", "/remember", true},
+		{"remember with key does not", "/remember auth JWT", false},
 	}
 
 	for _, tt := range tests {

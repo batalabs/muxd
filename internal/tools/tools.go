@@ -53,25 +53,26 @@ type MCPManager interface {
 
 // ToolContext provides shared state to tool implementations.
 type ToolContext struct {
-	Cwd           string
-	Todos         *TodoList
-	PlanMode      *bool
-	Disabled      map[string]bool
-	ScheduledAllowed map[string]bool
-	SpawnAgent    func(description, prompt string) (string, error)
-	ScheduleTweet func(text string, scheduledFor time.Time, recurrence string) (string, error) // legacy
-	ScheduleTool  func(toolName string, input map[string]any, scheduledFor time.Time, recurrence string) (string, error)
+	Cwd                string
+	Todos              *TodoList
+	Memory             *ProjectMemory
+	PlanMode           *bool
+	Disabled           map[string]bool
+	ScheduledAllowed   map[string]bool
+	SpawnAgent         func(description, prompt string) (string, error)
+	ScheduleTweet      func(text string, scheduledFor time.Time, recurrence string) (string, error) // legacy
+	ScheduleTool       func(toolName string, input map[string]any, scheduledFor time.Time, recurrence string) (string, error)
 	ListScheduledJobs  func(toolName string, limit int) ([]ScheduledJobInfo, error)
 	CancelScheduledJob func(id string) error
 	UpdateScheduledJob func(id string, toolInput map[string]any, scheduledFor *time.Time, recurrence *string) error
-	BraveAPIKey   string
-	XClientID     string
-	XClientSecret string
-	XAccessToken  string
-	XRefreshToken string
-	XTokenExpiry  string
-	SaveXOAuthTokens func(accessToken, refreshToken, tokenExpiry string) error
-	MCP           MCPManager
+	BraveAPIKey        string
+	XClientID          string
+	XClientSecret      string
+	XAccessToken       string
+	XRefreshToken      string
+	XTokenExpiry       string
+	SaveXOAuthTokens   func(accessToken, refreshToken, tokenExpiry string) error
+	MCP                MCPManager
 }
 
 // ToolFunc is the signature for tool execution functions.
@@ -117,6 +118,8 @@ func AllTools() []ToolDef {
 		planExitTool(),
 		taskTool(),
 		gitStatusTool(),
+		memoryReadTool(),
+		memoryWriteTool(),
 	}
 }
 
