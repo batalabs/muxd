@@ -150,10 +150,16 @@ func resolveXPostTokenFromContext(ctx *ToolContext) (string, error) {
 		if strings.TrimSpace(ctx.XRefreshToken) != "" && strings.TrimSpace(ctx.XClientID) != "" {
 			tok, err := RefreshXOAuthToken(ctx.XClientID, ctx.XClientSecret, ctx.XRefreshToken)
 			if err == nil {
+				saved := false
 				if ctx.SaveXOAuthTokens != nil {
-					if err := ctx.SaveXOAuthTokens(tok.AccessToken, tok.RefreshToken, tok.ExpiresAt.UTC().Format(time.RFC3339)); err != nil {
-						fmt.Fprintf(os.Stderr, "x: save oauth tokens: %v\n", err)
+					if saveErr := ctx.SaveXOAuthTokens(tok.AccessToken, tok.RefreshToken, tok.ExpiresAt.UTC().Format(time.RFC3339)); saveErr != nil {
+						fmt.Fprintf(os.Stderr, "x: save oauth tokens: %v\n", saveErr)
+					} else {
+						saved = true
 					}
+				}
+				if !saved {
+					fmt.Fprintf(os.Stderr, "x: warning: refreshed token was not persisted; you may need to re-authenticate next session\n")
 				}
 				return tok.AccessToken, nil
 			}

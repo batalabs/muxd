@@ -198,7 +198,7 @@ func (s *Server) Start(port int) error {
 					s.mu.Lock()
 					defer s.mu.Unlock()
 					if s.prefs == nil {
-						return nil
+						return fmt.Errorf("preferences not loaded")
 					}
 					s.prefs.XAccessToken = accessToken
 					s.prefs.XRefreshToken = refreshToken
