@@ -1,8 +1,12 @@
+<h1 align="center">
+
 <p align="center">
-  <img src="assets/muxd_logo.png" alt="muxd" width="120">
+  <img src="assets/muxd_logo.png" alt="muxd" width="220">
 </p>
 
-<h1 align="center">muxd</h1>
+muxd
+
+</h1>
 
 <p align="center">
   <b>An open-source AI coding agent that lives in your terminal.</b><br>
@@ -13,7 +17,6 @@
   <img src="https://img.shields.io/badge/status-early%20release-orange" alt="Early Release">
   <a href="https://github.com/batalabs/muxd/releases"><img src="https://img.shields.io/github/v/release/batalabs/muxd?include_prereleases&label=version" alt="Version"></a>
   <a href="https://github.com/batalabs/muxd/commits/main"><img src="https://img.shields.io/github/last-commit/batalabs/muxd" alt="Last Commit"></a>
-  <a href="https://github.com/batalabs/muxd/stargazers"><img src="https://img.shields.io/github/stars/batalabs/muxd" alt="Stars"></a>
   <a href="#install"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go 1.25+"></a>
   <img src="https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-8A2BE2" alt="Windows | Linux | macOS">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
