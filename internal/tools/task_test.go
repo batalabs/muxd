@@ -125,6 +125,7 @@ func TestIsSubAgentTool(t *testing.T) {
 		want bool
 	}{
 		{"task", true},
+		{"schedule_task", true},
 		{"file_read", false},
 		{"bash", false},
 		{"", false},
@@ -166,6 +167,9 @@ func TestAllToolsForSubAgent(t *testing.T) {
 	for _, tool := range subTools {
 		if tool.Spec.Name == "task" {
 			t.Error("sub-agent should not have task tool")
+		}
+		if tool.Spec.Name == "schedule_task" {
+			t.Error("sub-agent should not have schedule_task tool")
 		}
 	}
 	// Verify other tools are present.

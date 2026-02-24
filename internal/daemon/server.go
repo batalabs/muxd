@@ -234,6 +234,10 @@ func (s *Server) Start(port int) error {
 			return ctx
 		},
 		func(call tools.ScheduledToolCall, ctx *tools.ToolContext) (string, bool, error) {
+			// Agent tasks spawn a full agent loop instead of a single tool call.
+			if call.ToolName == tools.AgentTaskToolName {
+				return s.executeScheduledAgentTask(call)
+			}
 			block := domain.ContentBlock{
 				Type:      "tool_use",
 				ToolUseID: call.ID,
@@ -827,7 +831,15 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 		}
 	}
 
-	// Pass Brave API key from preferences
+	s.configureAgent(ag)
+
+	s.agents[sessionID] = ag
+	return ag, nil
+}
+
+// configureAgent sets up credentials, disabled tools, MCP, git, and memory
+// on an agent. Must be called with s.mu held.
+func (s *Server) configureAgent(ag *agent.Service) {
 	if s.prefs != nil && s.prefs.BraveAPIKey != "" {
 		ag.SetBraveAPIKey(s.prefs.BraveAPIKey)
 	}
@@ -867,9 +879,63 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	if cwd != "" {
 		ag.SetMemory(tools.NewProjectMemory(cwd))
 	}
+}
 
-	s.agents[sessionID] = ag
-	return ag, nil
+// ---------------------------------------------------------------------------
+// Scheduled agent task execution
+// ---------------------------------------------------------------------------
+
+// executeScheduledAgentTask spawns a full agent loop for a scheduled agent task.
+func (s *Server) executeScheduledAgentTask(call tools.ScheduledToolCall) (string, bool, error) {
+	promptRaw, ok := call.ToolInput["prompt"]
+	if !ok {
+		return "", true, fmt.Errorf("agent task missing prompt")
+	}
+	prompt, _ := promptRaw.(string)
+	if strings.TrimSpace(prompt) == "" {
+		return "", true, fmt.Errorf("agent task has empty prompt")
+	}
+
+	// Create ephemeral session for this scheduled task.
+	sess, err := s.store.CreateSession("__scheduled_task__", s.modelID)
+	if err != nil {
+		return "", true, fmt.Errorf("creating scheduled task session: %w", err)
+	}
+
+	if s.newAgent == nil {
+		return "", true, fmt.Errorf("no agent factory configured")
+	}
+
+	s.mu.Lock()
+	ag := s.newAgent(s.apiKey, s.modelID, s.modelLabel, s.store, sess, s.provider)
+	s.configureAgent(ag)
+	s.mu.Unlock()
+
+	// Disable ask_user in headless mode — no one to answer.
+	ag.SetDisabledTools(map[string]bool{"ask_user": true})
+
+	var result strings.Builder
+	const maxResultSize = 50 * 1024
+
+	ag.Submit(prompt, func(evt agent.Event) {
+		switch evt.Kind {
+		case agent.EventDelta:
+			if result.Len() < maxResultSize {
+				result.WriteString(evt.DeltaText)
+			}
+		case agent.EventError:
+			if evt.Err != nil {
+				result.WriteString("\nError: " + evt.Err.Error())
+			}
+		}
+	})
+
+	out := result.String()
+	if len(out) > maxResultSize {
+		out = out[:maxResultSize] + "\n... (truncated at 50KB)"
+	}
+
+	return out, false, nil
 }
 
 // ---------------------------------------------------------------------------

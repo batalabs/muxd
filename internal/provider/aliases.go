@@ -88,7 +88,7 @@ func BuildSystemPrompt(cwd string, mcpToolNames []string, memory string) string 
 	if len(mcpToolNames) > 0 {
 		mcpSection = fmt.Sprintf("\n  MCP:         %s\n", strings.Join(mcpToolNames, ", "))
 	}
-	toolCount := 25 + len(mcpToolNames)
+	toolCount := 26 + len(mcpToolNames)
 
 	memorySection := ""
 	if memory != "" {
@@ -114,7 +114,8 @@ Tools available (%d):
   Plan Mode:   plan_enter, plan_exit
   Sub-Agent:   task
   Git:         git_status
-  Memory:      memory_read, memory_write%s
+  Memory:      memory_read, memory_write
+  Scheduling:  schedule_task%s
 Guidelines:
 - Always read a file before editing it to get the exact content.
 - Prefer file_edit over file_write when modifying existing files.
@@ -126,6 +127,7 @@ Guidelines:
 - Use plan_enter when exploring before making changes; plan_exit when ready.
 - Use task to delegate independent subtasks to a sub-agent.
 - Use memory_read/memory_write to persist project-specific context across sessions.
+- Use schedule_task to schedule complex multi-step workflows for future execution.
 - MCP tools are external tools connected via the Model Context Protocol. Use them when relevant — they extend your capabilities beyond the built-in tools.
 - Be concise. Explain what you're doing and why.
 - Do not modify files unless the user asks you to.
