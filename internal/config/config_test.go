@@ -497,12 +497,15 @@ func TestSet_doesNotSanitizeNonSensitiveKeys(t *testing.T) {
 
 func TestSanitizePreferences(t *testing.T) {
 	p := Preferences{
-		AnthropicAPIKey: "\x00sk-ant-test",
-		FireworksAPIKey: "fw-\x00key",
-		XClientSecret:   "cs\x00val",
+		AnthropicAPIKey:  "\x00sk-ant-test",
+		FireworksAPIKey:  "fw-\x00key",
+		XClientSecret:    "cs\x00val",
 		TelegramBotToken: "\x00tok",
 	}
-	sanitizePreferences(&p)
+	changed := sanitizePreferences(&p)
+	if !changed {
+		t.Error("sanitizePreferences should return true when values are modified")
+	}
 	if p.AnthropicAPIKey != "sk-ant-test" {
 		t.Errorf("AnthropicAPIKey = %q, want %q", p.AnthropicAPIKey, "sk-ant-test")
 	}
@@ -514,6 +517,12 @@ func TestSanitizePreferences(t *testing.T) {
 	}
 	if p.TelegramBotToken != "tok" {
 		t.Errorf("TelegramBotToken = %q, want %q", p.TelegramBotToken, "tok")
+	}
+
+	// Clean preferences should return false.
+	clean := Preferences{Model: "gpt-4o", AnthropicAPIKey: "sk-clean"}
+	if sanitizePreferences(&clean) {
+		t.Error("sanitizePreferences should return false when no values changed")
 	}
 }
 

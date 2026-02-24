@@ -570,11 +570,14 @@ func (m Model) View() string {
 
 	b.WriteString("\n\n")
 	disabledCount := len(m.Prefs.DisabledToolsSet())
+	footerParts := []string{fmt.Sprintf("\U0001f47f muxd %s", m.version)}
 	if m.Prefs.Model != "" {
-		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd %s \u00b7 %s \u00b7 tools off: %d", m.version, m.modelLabel, disabledCount)))
-	} else {
-		b.WriteString(FooterHead.Render(fmt.Sprintf("\U0001f47f muxd %s \u00b7 tools off: %d", m.version, disabledCount)))
+		footerParts = append(footerParts, m.modelLabel)
 	}
+	if disabledCount > 0 {
+		footerParts = append(footerParts, fmt.Sprintf("tools off: %d", disabledCount))
+	}
+	b.WriteString(FooterHead.Render(strings.Join(footerParts, " \u00b7 ")))
 	if m.Prefs.FooterTokens {
 		b.WriteString("\n")
 		totalTokens := m.inputTokens + m.outputTokens

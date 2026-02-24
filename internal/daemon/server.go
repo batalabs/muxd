@@ -657,6 +657,10 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 	s.modelLabel = req.Label
 	s.provider = newProvider
 	s.apiKey = newAPIKey
+	if s.prefs != nil {
+		s.prefs.Model = req.Label
+		s.prefs.Provider = newProviderName
+	}
 	ag, ok := s.agents[sessionID]
 	s.mu.Unlock()
 

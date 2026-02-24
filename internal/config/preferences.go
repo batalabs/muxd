@@ -138,7 +138,12 @@ func LoadPreferences() Preferences {
 		warnInsecurePermissions(configPath)
 	}
 
-	sanitizePreferences(&p)
+	if sanitizePreferences(&p) {
+		// Persist cleaned values so null bytes don't accumulate across restarts.
+		if err := SavePreferences(p); err != nil {
+			fmt.Fprintf(os.Stderr, "config: save sanitized config: %v\n", err)
+		}
+	}
 
 	// If legacy preferences.json exists, merge it (values win over config.json)
 	// then delete the legacy file
@@ -409,9 +414,7 @@ func (p Preferences) Get(key string) string {
 
 // Set updates a single preference key to the given value.
 func (p *Preferences) Set(key, value string) error {
-	if isSensitiveKey(key) {
-		value = sanitizeValue(value)
-	}
+	value = sanitizeValue(value)
 	switch key {
 	case "footer.tokens":
 		b, err := ParseBoolish(value)
@@ -519,27 +522,38 @@ func isSensitiveKey(key string) bool {
 		strings.HasSuffix(key, ".bot_token")
 }
 
-// sanitizePreferences strips control characters from all sensitive fields in
-// an already-loaded Preferences struct. This repairs config files that were
-// saved with null-byte-contaminated values.
-func sanitizePreferences(p *Preferences) {
-	p.Model = sanitizeValue(p.Model)
-	p.AnthropicAPIKey = sanitizeValue(p.AnthropicAPIKey)
-	p.ZAIAPIKey = sanitizeValue(p.ZAIAPIKey)
-	p.GrokAPIKey = sanitizeValue(p.GrokAPIKey)
-	p.MistralAPIKey = sanitizeValue(p.MistralAPIKey)
-	p.OpenAIAPIKey = sanitizeValue(p.OpenAIAPIKey)
-	p.GoogleAPIKey = sanitizeValue(p.GoogleAPIKey)
-	p.FireworksAPIKey = sanitizeValue(p.FireworksAPIKey)
-	p.BraveAPIKey = sanitizeValue(p.BraveAPIKey)
-	p.XClientID = sanitizeValue(p.XClientID)
-	p.XClientSecret = sanitizeValue(p.XClientSecret)
-	p.XAccessToken = sanitizeValue(p.XAccessToken)
-	p.XRefreshToken = sanitizeValue(p.XRefreshToken)
-	p.XRedirectURL = sanitizeValue(p.XRedirectURL)
-	p.XTokenExpiry = sanitizeValue(p.XTokenExpiry)
-	p.TelegramBotToken = sanitizeValue(p.TelegramBotToken)
-	p.OllamaURL = sanitizeValue(p.OllamaURL)
+// sanitizePreferences strips control characters from all string fields in
+// an already-loaded Preferences struct. Returns true if any field was modified.
+func sanitizePreferences(p *Preferences) bool {
+	changed := false
+	sanitize := func(s *string) {
+		cleaned := sanitizeValue(*s)
+		if cleaned != *s {
+			*s = cleaned
+			changed = true
+		}
+	}
+	sanitize(&p.Model)
+	sanitize(&p.Provider)
+	sanitize(&p.AnthropicAPIKey)
+	sanitize(&p.ZAIAPIKey)
+	sanitize(&p.GrokAPIKey)
+	sanitize(&p.MistralAPIKey)
+	sanitize(&p.OpenAIAPIKey)
+	sanitize(&p.GoogleAPIKey)
+	sanitize(&p.FireworksAPIKey)
+	sanitize(&p.BraveAPIKey)
+	sanitize(&p.XClientID)
+	sanitize(&p.XClientSecret)
+	sanitize(&p.XAccessToken)
+	sanitize(&p.XRefreshToken)
+	sanitize(&p.XRedirectURL)
+	sanitize(&p.XTokenExpiry)
+	sanitize(&p.SchedulerAllowedTools)
+	sanitize(&p.ToolsDisabled)
+	sanitize(&p.TelegramBotToken)
+	sanitize(&p.OllamaURL)
+	return changed
 }
 
 // ---------------------------------------------------------------------------
