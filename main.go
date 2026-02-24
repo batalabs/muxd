@@ -73,12 +73,11 @@ func main() {
 	if modelLabel != "" {
 		providerName, modelID = provider.ResolveProviderAndModel(modelLabel, prefs.Provider)
 		apiKey, _ = config.LoadProviderAPIKey(prefs, providerName)
-		p, err := provider.GetProvider(providerName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+		if p, err := provider.GetProvider(providerName); err == nil {
+			prov = p
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 		}
-		prov = p
 	}
 
 	provider.SetPricingMap(config.LoadPricing())

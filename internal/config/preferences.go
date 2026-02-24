@@ -30,12 +30,12 @@ type Preferences struct {
 	GoogleAPIKey          string `json:"google_api_key,omitempty"`
 	FireworksAPIKey       string `json:"fireworks_api_key,omitempty"`
 	BraveAPIKey           string `json:"brave_api_key,omitempty"`
-	XClientID     string `json:"x_client_id,omitempty"`
-	XClientSecret string `json:"x_client_secret,omitempty"`
-	XAccessToken  string `json:"x_access_token,omitempty"`
-	XRefreshToken string `json:"x_refresh_token,omitempty"`
-	XTokenExpiry  string `json:"x_token_expiry,omitempty"`
-	XRedirectURL  string `json:"x_redirect_url,omitempty"`
+	XClientID             string `json:"x_client_id,omitempty"`
+	XClientSecret         string `json:"x_client_secret,omitempty"`
+	XAccessToken          string `json:"x_access_token,omitempty"`
+	XRefreshToken         string `json:"x_refresh_token,omitempty"`
+	XTokenExpiry          string `json:"x_token_expiry,omitempty"`
+	XRedirectURL          string `json:"x_redirect_url,omitempty"`
 	SchedulerAllowedTools string `json:"scheduler_allowed_tools,omitempty"`
 	ToolsDisabled         string `json:"tools_disabled,omitempty"`
 	OllamaURL             string `json:"ollama_url,omitempty"`
@@ -523,6 +523,7 @@ func isSensitiveKey(key string) bool {
 // an already-loaded Preferences struct. This repairs config files that were
 // saved with null-byte-contaminated values.
 func sanitizePreferences(p *Preferences) {
+	p.Model = sanitizeValue(p.Model)
 	p.AnthropicAPIKey = sanitizeValue(p.AnthropicAPIKey)
 	p.ZAIAPIKey = sanitizeValue(p.ZAIAPIKey)
 	p.GrokAPIKey = sanitizeValue(p.GrokAPIKey)
@@ -535,7 +536,10 @@ func sanitizePreferences(p *Preferences) {
 	p.XClientSecret = sanitizeValue(p.XClientSecret)
 	p.XAccessToken = sanitizeValue(p.XAccessToken)
 	p.XRefreshToken = sanitizeValue(p.XRefreshToken)
+	p.XRedirectURL = sanitizeValue(p.XRedirectURL)
+	p.XTokenExpiry = sanitizeValue(p.XTokenExpiry)
 	p.TelegramBotToken = sanitizeValue(p.TelegramBotToken)
+	p.OllamaURL = sanitizeValue(p.OllamaURL)
 }
 
 // ---------------------------------------------------------------------------
