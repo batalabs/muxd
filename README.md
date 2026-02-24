@@ -42,7 +42,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 
 ## Features
 
-### 26 Built-in Tools
+### 27 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
@@ -52,6 +52,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 | **X / Twitter** | `x_post`, `x_search`, `x_mentions`, `x_reply`, `x_schedule` + management |
 | **Workflow** | `todo_read`, `todo_write`, `ask_user`, `plan_enter`, `plan_exit`, `task` |
 | **Memory** | `memory_read`, `memory_write` |
+| **Scheduling** | `schedule_task` — schedule multi-step agent tasks for future execution |
 
 ### 9 LLM Providers
 
@@ -80,6 +81,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 - **Undo / redo**: git-based rollback for every change the agent makes
 - **Plan mode**: read-only exploration that disables write tools until you're ready
 - **Sub-agents**: delegate independent subtasks to a fresh agent instance
+- **Scheduled tasks**: schedule full agent workflows to run at a future time, once or on a recurring basis
 - **Streaming TUI**: real-time token streaming with markdown rendering, syntax highlighting, and table formatting
 
 ---
@@ -151,6 +153,7 @@ muxd --daemon                     # headless daemon mode
 | `/tools list` | List all tools and their status |
 | `/tools enable/disable <tool>` | Toggle individual tools |
 | `/schedule add <tool>` | Schedule a tool to run later |
+| `/schedule add-task <time> <prompt>` | Schedule a multi-step agent task |
 | `/tweet <text>` | Post to X/Twitter |
 | `/undo` / `/redo` | Roll back or replay agent changes |
 | `/clear` | Clear the display |
