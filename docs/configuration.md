@@ -82,6 +82,30 @@ Resolution order: environment variable > `/config set` preference.
 
 Boolean values accept: `true`/`false`, `on`/`off`, `yes`/`no`, `1`/`0` (case-insensitive).
 
+## X / Twitter Setup
+
+1. Create an app in the [X Developer Portal](https://developer.x.com/)
+2. Under **User authentication settings**, set the OAuth 2.0 redirect URI to:
+   ```
+   http://127.0.0.1:8080/callback
+   ```
+3. Configure your client credentials in muxd:
+   ```
+   /config set x.client_id <your-client-id>
+   /config set x.client_secret <your-client-secret>
+   ```
+4. Authenticate:
+   ```
+   /x auth
+   ```
+   This opens your browser for OAuth authorization. Tokens are saved automatically and refresh when they expire.
+
+If port 8080 is in use, muxd falls back to port 8089. You can also override the redirect URL:
+```
+/config set x.redirect_url http://127.0.0.1:9090/callback
+```
+Make sure the URL matches what you registered in the X Developer Portal.
+
 ## Model Aliases
 
 Use short aliases instead of full model IDs:
