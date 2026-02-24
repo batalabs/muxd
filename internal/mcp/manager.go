@@ -115,9 +115,9 @@ func defaultNewTransport(sc ServerConfig) (mcpsdk.Transport, context.CancelFunc)
 		// Discard child stderr to avoid polluting the TUI.
 		return &mcpsdk.CommandTransport{Command: cmd}, func() {
 			if cmd.Process != nil {
-				if err := cmd.Process.Kill(); err != nil {
-					fmt.Fprintf(os.Stderr, "mcp: kill process: %v\n", err)
-				}
+				// Ignore "invalid argument" / "process already finished" errors
+				// that occur when the child has already exited.
+				_ = cmd.Process.Kill()
 			}
 		}
 	}

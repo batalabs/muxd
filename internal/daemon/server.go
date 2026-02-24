@@ -801,6 +801,11 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	defer s.mu.Unlock()
 
 	if ag, ok := s.agents[sessionID]; ok {
+		// Sync provider if the agent was created before a model was configured.
+		if !ag.HasProvider() && s.provider != nil {
+			ag.SetProvider(s.provider, s.apiKey)
+			ag.SetModel(s.modelLabel, s.modelID)
+		}
 		return ag, nil
 	}
 

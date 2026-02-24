@@ -123,6 +123,13 @@ func (a *Service) SetProvider(prov provider.Provider, apiKey string) {
 	a.apiKey = apiKey
 }
 
+// HasProvider reports whether a provider is configured on this agent.
+func (a *Service) HasProvider() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.prov != nil
+}
+
 // Messages returns a copy of the current message history.
 func (a *Service) Messages() []domain.TranscriptMessage {
 	a.mu.Lock()
