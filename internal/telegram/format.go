@@ -34,8 +34,8 @@ func MarkdownToTelegramHTML(text string) string {
 		return placeholder
 	})
 
-	// Rewrite markdown tables into mobile-friendly row cards.
-	text = rewriteMarkdownTablesForMobile(text)
+	// Rewrite markdown tables into aligned <pre> blocks.
+	text = rewriteMarkdownTables(text, &codeBlocks)
 
 	// Phase 2: Extract and protect inline code (`...`)
 	var inlineCodes []string
@@ -54,6 +54,9 @@ func MarkdownToTelegramHTML(text string) string {
 
 	// Headers: lines starting with # (up to 6 levels) -> bold
 	text = headerRegex.ReplaceAllString(text, "<b>$1</b>")
+
+	// Horizontal rules: --- / *** / ___ -> visual separator (before bold/italic)
+	text = hrRegex.ReplaceAllString(text, "————————————————")
 
 	// Bold: **text** -> <b>text</b>
 	text = boldRegex.ReplaceAllString(text, "<b>$1</b>")
@@ -78,8 +81,11 @@ func MarkdownToTelegramHTML(text string) string {
 		return fmt.Sprintf(`<a href="%s">%s</a>`, EscapeHTMLAttr(html.UnescapeString(sub[2])), sub[1])
 	})
 
-	// Blockquotes: > text -> italic with quote marker
-	text = blockquoteRegex.ReplaceAllString(text, "  <i>$1</i>")
+	// Blockquotes: > text -> "▎ text" with italic
+	text = blockquoteRegex.ReplaceAllString(text, "▎ <i>$1</i>")
+
+	// Unordered lists: - item / * item -> • item
+	text = ulRegex.ReplaceAllString(text, "${1}• ")
 
 	// Phase 5: Restore code blocks with <pre><code> tags
 	for i, block := range codeBlocks {
@@ -153,12 +159,20 @@ var (
 	// Blockquotes: lines starting with >
 	blockquoteRegex = regexp.MustCompile(`(?m)^&gt;\s?(.+)$`)
 
+	// Horizontal rules: ---, ***, ___ (3 or more, alone on a line)
+	hrRegex = regexp.MustCompile(`(?m)^\s*(?:-{3,}|\*{3,}|_{3,})\s*$`)
+
+	// Unordered list items: lines starting with - or * followed by space
+	ulRegex = regexp.MustCompile(`(?m)^(\s*)[-*]\s+`)
+
 	// TableRowRegex: line starting with optional whitespace then |
 	TableRowRegex = regexp.MustCompile(`^\s*\|.*\|\s*$`)
 	tableSepRegex = regexp.MustCompile(`^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$`)
 )
 
-func rewriteMarkdownTablesForMobile(text string) string {
+// rewriteMarkdownTables detects markdown tables and converts them into
+// code-block placeholders so they render as aligned <pre> blocks in Telegram.
+func rewriteMarkdownTables(text string, codeBlocks *[]codeRegion) string {
 	lines := strings.Split(text, "\n")
 	var out []string
 	for i := 0; i < len(lines); {
@@ -171,7 +185,10 @@ func rewriteMarkdownTablesForMobile(text string) string {
 				rows = append(rows, parseMarkdownTableRow(strings.TrimSpace(lines[i])))
 				i++
 			}
-			out = append(out, formatMobileTable(headers, rows)...)
+			tableText := formatAlignedTable(headers, rows)
+			placeholder := fmt.Sprintf("\x00CODEBLOCK%d\x00", len(*codeBlocks))
+			*codeBlocks = append(*codeBlocks, codeRegion{code: tableText})
+			out = append(out, placeholder)
 			continue
 		}
 		out = append(out, lines[i])
@@ -192,59 +209,75 @@ func parseMarkdownTableRow(line string) []string {
 	return cells
 }
 
-func formatMobileTable(headers []string, rows [][]string) []string {
+// formatAlignedTable renders headers and rows as a preformatted code block
+// with padded columns so Telegram displays a clean, aligned table.
+func formatAlignedTable(headers []string, rows [][]string) string {
 	if len(headers) == 0 {
-		return nil
+		return ""
 	}
-	var out []string
-	out = append(out, fmt.Sprintf("Table (%d rows):", len(rows)))
+
+	// Compute column widths.
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		if len(h) > widths[i] {
+			widths[i] = len(h)
+		}
+	}
+	for _, row := range rows {
+		for i, cell := range row {
+			if i < len(widths) && len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	// Cap columns at 30 chars to keep it readable on mobile.
+	for i := range widths {
+		if widths[i] > 30 {
+			widths[i] = 30
+		}
+	}
+
+	padCell := func(s string, w int) string {
+		if len(s) > w {
+			if w > 1 {
+				return s[:w-1] + "~"
+			}
+			return s[:w]
+		}
+		return s + strings.Repeat(" ", w-len(s))
+	}
+
+	formatRow := func(cells []string) string {
+		parts := make([]string, len(headers))
+		for i := range headers {
+			cell := ""
+			if i < len(cells) {
+				cell = cells[i]
+			}
+			parts[i] = padCell(cell, widths[i])
+		}
+		return strings.Join(parts, " │ ")
+	}
+
+	var sb strings.Builder
+	// Header row.
+	sb.WriteString(formatRow(headers))
+	sb.WriteByte('\n')
+	// Separator.
+	seps := make([]string, len(headers))
+	for i, w := range widths {
+		seps[i] = strings.Repeat("─", w)
+	}
+	sb.WriteString(strings.Join(seps, "─┼─"))
+	sb.WriteByte('\n')
+	// Data rows.
 	for i, row := range rows {
-		out = append(out, fmt.Sprintf("%d)", i+1))
-		for j, h := range headers {
-			if h == "" {
-				h = fmt.Sprintf("col%d", j+1)
-			}
-			val := ""
-			if j < len(row) {
-				val = row[j]
-			}
-			out = append(out, fmt.Sprintf("  %s: %s", h, val))
-		}
+		sb.WriteString(formatRow(row))
 		if i < len(rows)-1 {
-			out = append(out, "")
+			sb.WriteByte('\n')
 		}
 	}
-	return out
-}
 
-// ProtectTables finds consecutive lines that look like markdown table rows
-// (lines containing | delimiters) and replaces them with a code block
-// placeholder so they render as monospace <pre> in Telegram.
-func ProtectTables(text string, codeBlocks *[]codeRegion) string {
-	lines := strings.Split(text, "\n")
-	var result []string
-	var tableLines []string
-
-	flushTable := func() {
-		if len(tableLines) == 0 {
-			return
-		}
-		tableText := strings.Join(tableLines, "\n")
-		placeholder := fmt.Sprintf("\x00CODEBLOCK%d\x00", len(*codeBlocks))
-		*codeBlocks = append(*codeBlocks, codeRegion{code: tableText})
-		result = append(result, placeholder)
-		tableLines = nil
-	}
-
-	for _, line := range lines {
-		if TableRowRegex.MatchString(line) {
-			tableLines = append(tableLines, line)
-		} else {
-			flushTable()
-			result = append(result, line)
-		}
-	}
-	flushTable()
-
-	return strings.Join(result, "\n")
+	return sb.String()
 }

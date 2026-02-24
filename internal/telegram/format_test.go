@@ -196,14 +196,17 @@ func TestMarkdownToTelegramHTML_realResponse(t *testing.T) {
 	if strings.Contains(got, "```") {
 		t.Error("output still contains raw ``` markers")
 	}
-	// Tables should be rewritten into mobile-friendly row cards.
-	if !strings.Contains(got, "Table (1 rows):") {
-		t.Error("table summary missing")
+	// Tables should be rendered as aligned <pre> blocks.
+	if !strings.Contains(got, "<pre><code>") {
+		t.Error("table should be wrapped in <pre><code>")
 	}
-	if !strings.Contains(got, "Property: Initial stack") {
-		t.Error("table row conversion missing")
+	if !strings.Contains(got, "Property") && !strings.Contains(got, "Initial stack") {
+		t.Error("table content missing")
 	}
-	// Blockquote should be converted to italic
+	// Blockquote should have quote marker and italic
+	if !strings.Contains(got, "▎") {
+		t.Error("blockquote missing ▎ marker")
+	}
 	if !strings.Contains(got, "<i>") {
 		t.Error("blockquote not converted to italic")
 	}
@@ -214,23 +217,54 @@ func TestMarkdownToTelegramHTML_table(t *testing.T) {
 	got := MarkdownToTelegramHTML(input)
 	t.Logf("Table output:\n%s", got)
 
-	if strings.Contains(got, "<pre><code>") {
-		t.Error("table-only output should not be wrapped as code block")
+	if !strings.Contains(got, "<pre><code>") {
+		t.Error("table should be wrapped in <pre><code>")
 	}
-	if !strings.Contains(got, "Table (2 rows):") {
-		t.Error("table summary missing")
+	if !strings.Contains(got, "Name") || !strings.Contains(got, "Age") {
+		t.Error("table headers missing")
 	}
-	if !strings.Contains(got, "Name: Alice") || !strings.Contains(got, "Age: 30") {
-		t.Error("table rows not converted to mobile cards")
+	if !strings.Contains(got, "Alice") || !strings.Contains(got, "Bob") {
+		t.Error("table data missing")
 	}
 }
 
 func TestMarkdownToTelegramHTML_blockquote(t *testing.T) {
 	input := "> This is a quote"
 	got := MarkdownToTelegramHTML(input)
-	want := "  <i>This is a quote</i>"
+	want := "▎ <i>This is a quote</i>"
 	if got != want {
 		t.Errorf("blockquote:\n  got:  %q\n  want: %q", got, want)
+	}
+}
+
+func TestMarkdownToTelegramHTML_horizontalRule(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"dashes", "above\n---\nbelow"},
+		{"asterisks", "above\n***\nbelow"},
+		{"underscores", "above\n___\nbelow"},
+		{"long dashes", "above\n----------\nbelow"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MarkdownToTelegramHTML(tt.input)
+			if !strings.Contains(got, "————————————————") {
+				t.Errorf("horizontal rule not converted:\n  got: %q", got)
+			}
+		})
+	}
+}
+
+func TestMarkdownToTelegramHTML_bulletList(t *testing.T) {
+	input := "- first item\n- second item\n* third item"
+	got := MarkdownToTelegramHTML(input)
+	if !strings.Contains(got, "• first item") {
+		t.Errorf("bullet not converted:\n  got: %q", got)
+	}
+	if !strings.Contains(got, "• third item") {
+		t.Errorf("asterisk bullet not converted:\n  got: %q", got)
 	}
 }
 
@@ -285,104 +319,71 @@ func TestParseMarkdownTableRow(t *testing.T) {
 	}
 }
 
-func TestFormatMobileTable(t *testing.T) {
-	t.Run("normal table", func(t *testing.T) {
+func TestFormatAlignedTable(t *testing.T) {
+	t.Run("basic alignment", func(t *testing.T) {
 		headers := []string{"Name", "Age"}
 		rows := [][]string{{"Alice", "30"}, {"Bob", "25"}}
-		got := formatMobileTable(headers, rows)
-		joined := strings.Join(got, "\n")
-		if !strings.Contains(joined, "Table (2 rows):") {
-			t.Error("missing table summary")
+		got := formatAlignedTable(headers, rows)
+		t.Logf("Aligned table:\n%s", got)
+		if !strings.Contains(got, "Name") || !strings.Contains(got, "Age") {
+			t.Error("headers missing")
 		}
-		if !strings.Contains(joined, "Name: Alice") {
-			t.Error("missing Name: Alice")
+		if !strings.Contains(got, "Alice") || !strings.Contains(got, "Bob") {
+			t.Error("data missing")
 		}
-		if !strings.Contains(joined, "Age: 25") {
-			t.Error("missing Age: 25")
+		if !strings.Contains(got, "─┼─") {
+			t.Error("separator missing")
+		}
+		// Check alignment: all lines should have same column separator positions.
+		lines := strings.Split(got, "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d", len(lines))
 		}
 	})
 
 	t.Run("empty headers", func(t *testing.T) {
-		got := formatMobileTable([]string{}, nil)
-		if got != nil {
-			t.Errorf("expected nil for empty headers, got %v", got)
+		got := formatAlignedTable([]string{}, nil)
+		if got != "" {
+			t.Errorf("expected empty string, got %q", got)
 		}
 	})
 
-	t.Run("row shorter than headers", func(t *testing.T) {
-		headers := []string{"A", "B", "C"}
-		rows := [][]string{{"x"}}
-		got := formatMobileTable(headers, rows)
-		joined := strings.Join(got, "\n")
-		if !strings.Contains(joined, "A: x") {
-			t.Error("missing A: x")
-		}
-		// B and C should have empty values
-		if !strings.Contains(joined, "B: ") {
-			t.Error("missing B with empty value")
-		}
-	})
-
-	t.Run("empty header name uses colN", func(t *testing.T) {
-		headers := []string{"", "Name"}
-		rows := [][]string{{"1", "Alice"}}
-		got := formatMobileTable(headers, rows)
-		joined := strings.Join(got, "\n")
-		if !strings.Contains(joined, "col1: 1") {
-			t.Error("expected col1 for empty header name")
+	t.Run("long cell truncated", func(t *testing.T) {
+		headers := []string{"X"}
+		rows := [][]string{{"a very long string that exceeds thirty characters limit"}}
+		got := formatAlignedTable(headers, rows)
+		// Should be truncated with ~
+		if !strings.Contains(got, "~") {
+			t.Error("long cell should be truncated with ~")
 		}
 	})
 }
 
-func TestProtectTables(t *testing.T) {
-	t.Run("protects table rows", func(t *testing.T) {
-		input := "before\n| A | B |\n| C | D |\nafter"
-		var blocks []codeRegion
-		got := ProtectTables(input, &blocks)
-		if len(blocks) != 1 {
-			t.Fatalf("expected 1 code block, got %d", len(blocks))
-		}
-		if !strings.Contains(blocks[0].code, "| A | B |") {
-			t.Error("code block should contain table content")
-		}
-		if strings.Contains(got, "| A |") {
-			t.Error("output should not contain raw table row")
-		}
-		if !strings.Contains(got, "before") || !strings.Contains(got, "after") {
-			t.Error("non-table content should be preserved")
-		}
-	})
-
-	t.Run("no tables unchanged", func(t *testing.T) {
-		input := "just plain text\nno tables here"
-		var blocks []codeRegion
-		got := ProtectTables(input, &blocks)
-		if len(blocks) != 0 {
-			t.Errorf("expected 0 blocks, got %d", len(blocks))
-		}
-		if got != input {
-			t.Errorf("expected unchanged output")
-		}
-	})
-}
-
-func TestRewriteMarkdownTablesForMobile(t *testing.T) {
-	t.Run("converts table to mobile format", func(t *testing.T) {
+func TestRewriteMarkdownTables(t *testing.T) {
+	t.Run("converts table to aligned pre block", func(t *testing.T) {
 		input := "| Name | Age |\n|---|---|\n| Alice | 30 |"
-		got := rewriteMarkdownTablesForMobile(input)
+		var blocks []codeRegion
+		got := rewriteMarkdownTables(input, &blocks)
 		if strings.Contains(got, "|---|") {
 			t.Error("separator row should be consumed")
 		}
-		if !strings.Contains(got, "Name: Alice") {
-			t.Error("expected mobile card format")
+		if len(blocks) != 1 {
+			t.Fatalf("expected 1 code block, got %d", len(blocks))
+		}
+		if !strings.Contains(blocks[0].code, "Name") || !strings.Contains(blocks[0].code, "Alice") {
+			t.Error("code block should contain table content")
 		}
 	})
 
 	t.Run("non-table content preserved", func(t *testing.T) {
 		input := "hello\nworld"
-		got := rewriteMarkdownTablesForMobile(input)
+		var blocks []codeRegion
+		got := rewriteMarkdownTables(input, &blocks)
 		if got != input {
 			t.Errorf("expected unchanged, got %q", got)
+		}
+		if len(blocks) != 0 {
+			t.Errorf("expected 0 blocks, got %d", len(blocks))
 		}
 	})
 }
