@@ -141,7 +141,7 @@ func memoryReadTool() ToolDef {
 
 			var b strings.Builder
 			for _, k := range keys {
-				fmt.Fprintf(&b, "%s: %s\n", k, facts[k])
+				fmt.Fprintf(&b, "%s: %s\n", k, strings.TrimRight(facts[k], " \t"))
 			}
 			return strings.TrimRight(b.String(), "\n"), nil
 		},
@@ -174,6 +174,7 @@ func memoryWriteTool() ToolDef {
 			key, _ := input["key"].(string)
 			key = strings.TrimSpace(key)
 			value, _ := input["value"].(string)
+			value = strings.TrimSpace(value)
 
 			if key == "" {
 				return "", fmt.Errorf("key is required")
