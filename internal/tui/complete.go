@@ -12,7 +12,7 @@ import (
 // SlashCommands lists the available slash commands.
 var SlashCommands = []string{
 	"/branch", "/clear", "/config", "/continue", "/exit", "/help",
-	"/new", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/telegram", "/tools", "/tweet", "/undo", "/x",
+	"/new", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/sh", "/telegram", "/tools", "/tweet", "/undo", "/x",
 }
 
 // ConfigSubcommands lists the available /config subcommands.
