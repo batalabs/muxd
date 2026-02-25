@@ -223,15 +223,26 @@ func (s *Store) LatestSession(projectPath string) (*domain.Session, error) {
 	return scanSession(row)
 }
 
-// ListSessions returns the most recent sessions for a project path, up to limit.
+// ListSessions returns the most recent sessions up to limit.
+// If projectPath is non-empty, results are filtered to that project.
+// If projectPath is empty, all sessions are returned.
 func (s *Store) ListSessions(projectPath string, limit int) ([]domain.Session, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-	rows, err := s.db.Query(
-		`SELECT id, project_path, title, model, total_tokens, COALESCE(input_tokens,0), COALESCE(output_tokens,0), message_count, COALESCE(parent_session_id,''), COALESCE(branch_point,0), COALESCE(tags,''), created_at, updated_at
-		 FROM sessions WHERE project_path = ? ORDER BY updated_at DESC LIMIT ?`,
-		projectPath, limit)
+	var rows *sql.Rows
+	var err error
+	if projectPath == "" {
+		rows, err = s.db.Query(
+			`SELECT id, project_path, title, model, total_tokens, COALESCE(input_tokens,0), COALESCE(output_tokens,0), message_count, COALESCE(parent_session_id,''), COALESCE(branch_point,0), COALESCE(tags,''), created_at, updated_at
+			 FROM sessions ORDER BY updated_at DESC LIMIT ?`,
+			limit)
+	} else {
+		rows, err = s.db.Query(
+			`SELECT id, project_path, title, model, total_tokens, COALESCE(input_tokens,0), COALESCE(output_tokens,0), message_count, COALESCE(parent_session_id,''), COALESCE(branch_point,0), COALESCE(tags,''), created_at, updated_at
+			 FROM sessions WHERE project_path = ? ORDER BY updated_at DESC LIMIT ?`,
+			projectPath, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
