@@ -389,6 +389,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/qrcode", s.withAuth(s.handleQRCode))
 	mux.HandleFunc("POST /api/sessions", s.withAuth(s.handleCreateSession))
 	mux.HandleFunc("GET /api/sessions/{id}", s.withAuth(s.handleGetSession))
+	mux.HandleFunc("DELETE /api/sessions/{id}", s.withAuth(s.handleDeleteSession))
 	mux.HandleFunc("GET /api/sessions", s.withAuth(s.handleListSessions))
 	mux.HandleFunc("POST /api/sessions/{id}/submit", s.withAuth(s.handleSubmit))
 	mux.HandleFunc("POST /api/sessions/{id}/cancel", s.withAuth(s.handleCancel))
@@ -515,6 +516,32 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, sess)
+}
+
+func (s *Server) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	// Try to find the session first (supports prefix match)
+	sess, err := s.store.GetSession(id)
+	if err != nil {
+		sess, err = s.store.FindSessionByPrefix(id)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+			return
+		}
+	}
+
+	// Clean up any active agent for this session
+	s.mu.Lock()
+	delete(s.agents, sess.ID)
+	s.mu.Unlock()
+
+	if err := s.store.DeleteSession(sess.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
