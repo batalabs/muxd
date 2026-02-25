@@ -104,7 +104,7 @@ func (m *ProjectMemory) FormatForPrompt() string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s: %s\n", k, facts[k])
+		fmt.Fprintf(&b, "%s: %s\n", k, strings.TrimRight(facts[k], " \t"))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

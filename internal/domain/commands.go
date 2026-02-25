@@ -20,6 +20,7 @@ var CommandDefs = []CommandDef{
 	// Editing
 	{Name: "/undo", Description: "undo last agent turn", Group: "editing", TUIOnly: true},
 	{Name: "/redo", Description: "redo last undone turn", Group: "editing", TUIOnly: true},
+	{Name: "/sh", Description: "drop into muxd shell", Group: "editing", TUIOnly: true},
 	// Config & tools
 	{Name: "/config", Description: "show/set preferences", Group: "config"},
 	{Name: "/tools", Description: "picker + enable/disable/profile tools", Group: "config"},
@@ -30,7 +31,7 @@ var CommandDefs = []CommandDef{
 	{Name: "/x", Description: "X auth/status/logout", Group: "config"},
 	// General
 	{Name: "/help", Description: "show this help", Group: "general"},
-	{Name: "/clear", Description: "clear display", Group: "general", TUIOnly: true},
+	{Name: "/clear", Description: "clear chat", Group: "general", TUIOnly: true},
 	{Name: "/refresh", Description: "reload current session messages", Group: "general", TUIOnly: true},
 	{Name: "/exit", Description: "quit muxd", Group: "general", TUIOnly: true},
 	// Telegram-only

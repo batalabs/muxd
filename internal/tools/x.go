@@ -49,6 +49,7 @@ func xPostTool() ToolDef {
 			if !ok {
 				return "", fmt.Errorf("text is required")
 			}
+			text = strings.TrimSpace(text)
 			token, tokenErr := resolveXPostTokenFromContext(ctx)
 			if tokenErr != nil {
 				return "", tokenErr
@@ -82,6 +83,7 @@ func xScheduleTool() ToolDef {
 			if !ok {
 				return "", fmt.Errorf("text is required")
 			}
+			text = strings.TrimSpace(text)
 			if err := validateTweetText(text); err != nil {
 				return "", err
 			}
@@ -312,6 +314,7 @@ func xScheduleUpdateTool() ToolDef {
 			hasUpdate := false
 
 			if text, ok := input["text"].(string); ok && strings.TrimSpace(text) != "" {
+				text = strings.TrimSpace(text)
 				if err := validateTweetText(text); err != nil {
 					return "", err
 				}
@@ -613,6 +616,7 @@ func xReplyTool() ToolDef {
 			if !ok {
 				return "", fmt.Errorf("text is required")
 			}
+			text = strings.TrimSpace(text)
 			token, err := resolveXPostTokenFromContext(ctx)
 			if err != nil {
 				return "", err
