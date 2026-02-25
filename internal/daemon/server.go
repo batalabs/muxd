@@ -651,12 +651,11 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.mu.Lock()
 	newAPIKey := s.apiKey
 	if key, err := config.LoadProviderAPIKey(*s.prefs, newProviderName); err == nil {
 		newAPIKey = key
 	}
-
-	s.mu.Lock()
 	s.modelID = req.ModelID
 	s.modelLabel = req.Label
 	s.provider = newProvider
