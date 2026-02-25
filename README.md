@@ -82,6 +82,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 - **Plan mode**: read-only exploration that disables write tools until you're ready
 - **Sub-agents**: delegate independent subtasks to a fresh agent instance
 - **Scheduled tasks**: schedule full agent workflows to run at a future time, once or on a recurring basis
+- **Interactive shell**: drop into a shell with `/sh` that auto-detects cmd.exe, PowerShell, and bash commands on Windows
 - **Streaming TUI**: real-time token streaming with markdown rendering, syntax highlighting, and table formatting
 
 ---
@@ -155,8 +156,9 @@ muxd --daemon                     # headless daemon mode
 | `/schedule add <tool>` | Schedule a tool to run later |
 | `/schedule add-task <time> <prompt>` | Schedule a multi-step agent task |
 | `/tweet <text>` | Post to X/Twitter |
+| `/sh` | Drop into the muxd interactive shell |
 | `/undo` / `/redo` | Roll back or replay agent changes |
-| `/clear` | Clear the display |
+| `/clear` | Clear the chat |
 | `/exit` | Quit muxd |
 
 </details>
