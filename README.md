@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="assets/muxd_logo.png" alt="muxd" width="220">
+  <img src="assets/muxd_logo_transparent.png" alt="muxd" width="220">
   <br>
   muxd
 </h1>
