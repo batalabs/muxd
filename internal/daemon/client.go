@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +57,24 @@ func NewDaemonClient(port int) *DaemonClient {
 // SetAuthToken sets the daemon bearer token used on protected endpoints.
 func (c *DaemonClient) SetAuthToken(token string) {
 	c.authToken = strings.TrimSpace(token)
+}
+
+// AuthToken returns the current auth token.
+func (c *DaemonClient) AuthToken() string {
+	return c.authToken
+}
+
+// Port returns the daemon port by parsing the baseURL.
+func (c *DaemonClient) Port() int {
+	// baseURL format: "http://localhost:4096"
+	parts := strings.Split(c.baseURL, ":")
+	if len(parts) >= 3 {
+		port, err := strconv.Atoi(parts[2])
+		if err == nil {
+			return port
+		}
+	}
+	return 0
 }
 
 func (c *DaemonClient) do(req *http.Request) (*http.Response, error) {

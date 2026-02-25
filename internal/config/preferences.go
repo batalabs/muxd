@@ -43,6 +43,9 @@ type Preferences struct {
 	// Telegram settings
 	TelegramBotToken   string  `json:"telegram_bot_token,omitempty"`
 	TelegramAllowedIDs []int64 `json:"telegram_allowed_ids,omitempty"`
+
+	// Daemon settings
+	DaemonBindAddress string `json:"daemon_bind_address,omitempty"`
 }
 
 // PrefEntry holds a single key-value preference entry for display.
@@ -76,6 +79,10 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	{
 		Name: "messaging",
 		Keys: []string{"telegram.bot_token", "telegram.allowed_ids"},
+	},
+	{
+		Name: "daemon",
+		Keys: []string{"daemon.bind_address"},
 	},
 	{
 		Name: "theme",
@@ -228,6 +235,9 @@ func mergePreferences(dst, src *Preferences) {
 	if len(src.TelegramAllowedIDs) > 0 {
 		dst.TelegramAllowedIDs = src.TelegramAllowedIDs
 	}
+	if src.DaemonBindAddress != "" {
+		dst.DaemonBindAddress = src.DaemonBindAddress
+	}
 	// Booleans: copy from src (they represent the user's last settings)
 	dst.FooterTokens = src.FooterTokens
 	dst.FooterCost = src.FooterCost
@@ -344,6 +354,7 @@ func (p Preferences) All() []PrefEntry {
 		{"ollama.url", p.OllamaURL},
 		{"telegram.bot_token", MaskKey(p.TelegramBotToken)},
 		{"telegram.allowed_ids", allowedStr},
+		{"daemon.bind_address", p.DaemonBindAddress},
 	}
 }
 
@@ -407,6 +418,8 @@ func (p Preferences) Get(key string) string {
 			parts[i] = strconv.FormatInt(id, 10)
 		}
 		return strings.Join(parts, ",")
+	case "daemon.bind_address":
+		return p.DaemonBindAddress
 	default:
 		return ""
 	}
@@ -490,6 +503,8 @@ func (p *Preferences) Set(key, value string) error {
 			return err
 		}
 		p.TelegramAllowedIDs = ids
+	case "daemon.bind_address":
+		p.DaemonBindAddress = value
 	default:
 		return fmt.Errorf("unknown key: %s", key)
 	}
@@ -553,6 +568,7 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.ToolsDisabled)
 	sanitize(&p.TelegramBotToken)
 	sanitize(&p.OllamaURL)
+	sanitize(&p.DaemonBindAddress)
 	return changed
 }
 
@@ -699,7 +715,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	case "show":
 		return FormatConfigGroups(prefs.Grouped()), nil
 
-	case "models", "tools", "messaging", "theme":
+	case "models", "tools", "messaging", "daemon", "theme":
 		group := prefs.GroupByName(sub)
 		if group == nil {
 			return "", fmt.Errorf("unknown config group: %s", sub)
