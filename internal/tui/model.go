@@ -665,9 +665,9 @@ func (m Model) View() string {
 		if len(cwd) > 30 {
 			cwd = "..." + cwd[len(cwd)-27:]
 		}
-		// Build header: 👿 muxd shell | branch* | exit to return | cwd
+		// Build header: muxd shell | branch* | exit to return | cwd
 		headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("34"))
-		header := "\U0001f47f muxd shell"
+		header := "muxd shell"
 		if gitInfo := shellGitInfo(m.shellCwd); gitInfo != "" {
 			branchColor := "114" // green
 			if strings.HasSuffix(gitInfo, "*") {
@@ -740,7 +740,7 @@ func (m Model) View() string {
 
 	b.WriteString("\n\n")
 	disabledCount := len(m.Prefs.DisabledToolsSet())
-	footerParts := []string{fmt.Sprintf("\U0001f47f muxd %s", m.version)}
+	footerParts := []string{fmt.Sprintf("muxd %s", m.version)}
 	if m.Prefs.Model != "" {
 		footerParts = append(footerParts, m.modelLabel)
 	}
@@ -1527,7 +1527,7 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 			cwd = "~"
 		}
 		m.shellCwd = cwd
-		return m, PrintToScrollback(WelcomeStyle.Render("Entered \U0001f47f muxd shell. Type commands directly. Use 'exit' to return."))
+		return m, PrintToScrollback(WelcomeStyle.Render("Entered muxd shell. Type commands directly. Use 'exit' to return."))
 
 	case "/telegram":
 		return m.handleTelegram(parts[1:])
@@ -2303,7 +2303,7 @@ func (m Model) handleShellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.shellInputCursor = 0
 		if cmd == "exit" {
 			m.shellActive = false
-			return m, PrintToScrollback(WelcomeStyle.Render("Exited \U0001f47f muxd shell."))
+			return m, PrintToScrollback(WelcomeStyle.Render("Exited muxd shell."))
 		}
 		if cmd == "/help" {
 			return m, PrintToScrollback(shellHelpText())
@@ -2329,7 +2329,7 @@ func (m Model) handleShellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.shellActive = false
 		m.shellInput = ""
 		m.shellInputCursor = 0
-		return m, PrintToScrollback(WelcomeStyle.Render("Exited \U0001f47f muxd shell."))
+		return m, PrintToScrollback(WelcomeStyle.Render("Exited muxd shell."))
 	case tea.KeyEsc:
 		// Esc clears current input; if already empty, exits.
 		if m.shellInput != "" {
@@ -2338,7 +2338,7 @@ func (m Model) handleShellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.shellActive = false
-		return m, PrintToScrollback(WelcomeStyle.Render("Exited \U0001f47f muxd shell."))
+		return m, PrintToScrollback(WelcomeStyle.Render("Exited muxd shell."))
 	case tea.KeyBackspace:
 		if m.shellInputCursor > 0 {
 			m.shellInput = m.shellInput[:m.shellInputCursor-1] + m.shellInput[m.shellInputCursor:]
@@ -2395,7 +2395,7 @@ func (m Model) handleShellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // shellHelpText returns a formatted help string for the muxd shell.
 func shellHelpText() string {
 	var b strings.Builder
-	b.WriteString(WelcomeStyle.Render("\U0001f47f muxd shell") + "\n\n")
+	b.WriteString(WelcomeStyle.Render("muxd shell") + "\n\n")
 	lines := []struct{ key, desc string }{
 		{"exit", "Return to muxd chat"},
 		{"/help", "Show this help"},
