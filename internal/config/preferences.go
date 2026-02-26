@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -18,6 +19,7 @@ type Preferences struct {
 	FooterCwd         bool   `json:"footer_cwd"`
 	FooterSession     bool   `json:"footer_session"`
 	FooterKeybindings bool   `json:"footer_keybindings"`
+	FooterEmoji       string `json:"footer_emoji,omitempty"`
 	Model             string `json:"model"`
 
 	// Provider and API keys
@@ -86,7 +88,7 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "theme",
-		Keys: []string{"footer.tokens", "footer.cost", "footer.cwd", "footer.session", "footer.keybindings"},
+		Keys: []string{"footer.tokens", "footer.cost", "footer.cwd", "footer.session", "footer.keybindings", "footer.emoji"},
 	},
 }
 
@@ -244,6 +246,9 @@ func mergePreferences(dst, src *Preferences) {
 	dst.FooterCwd = src.FooterCwd
 	dst.FooterSession = src.FooterSession
 	dst.FooterKeybindings = src.FooterKeybindings
+	if src.FooterEmoji != "" {
+		dst.FooterEmoji = src.FooterEmoji
+	}
 }
 
 // SavePreferences writes preferences to ~/.config/muxd/config.json.
@@ -337,6 +342,7 @@ func (p Preferences) All() []PrefEntry {
 		{"footer.cwd", strconv.FormatBool(p.FooterCwd)},
 		{"footer.session", strconv.FormatBool(p.FooterSession)},
 		{"footer.keybindings", strconv.FormatBool(p.FooterKeybindings)},
+		{"footer.emoji", p.FooterEmoji},
 		{"model", p.Model},
 		{"anthropic.api_key", resolveKeyDisplay(p.AnthropicAPIKey, "ANTHROPIC_API_KEY")},
 		{"zai.api_key", resolveKeyDisplay(p.ZAIAPIKey, "ZAI_API_KEY")},
@@ -371,6 +377,8 @@ func (p Preferences) Get(key string) string {
 		return strconv.FormatBool(p.FooterSession)
 	case "footer.keybindings":
 		return strconv.FormatBool(p.FooterKeybindings)
+	case "footer.emoji":
+		return p.FooterEmoji
 	case "model":
 		return p.Model
 	case "anthropic.api_key":
@@ -459,6 +467,8 @@ func (p *Preferences) Set(key, value string) error {
 			return err
 		}
 		p.FooterKeybindings = b
+	case "footer.emoji":
+		p.FooterEmoji = ResolveEmoji(value)
 	case "model":
 		p.Model = value
 	case "anthropic.api_key":
@@ -569,7 +579,50 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.TelegramBotToken)
 	sanitize(&p.OllamaURL)
 	sanitize(&p.DaemonBindAddress)
+	sanitize(&p.FooterEmoji)
 	return changed
+}
+
+// emojiPresets maps short names to their Unicode emoji for footer.emoji config.
+var emojiPresets = map[string]string{
+	"devil":   "\U0001f608",
+	"imp":     "\U0001f47f",
+	"fire":    "\U0001f525",
+	"rocket":  "\U0001f680",
+	"star":    "\u2b50",
+	"bolt":    "\u26a1",
+	"heart":   "\u2764\ufe0f",
+	"skull":   "\U0001f480",
+	"ghost":   "\U0001f47b",
+	"alien":   "\U0001f47e",
+	"robot":   "\U0001f916",
+	"diamond": "\U0001f48e",
+	"snake":   "\U0001f40d",
+	"cat":     "\U0001f431",
+	"dog":     "\U0001f436",
+	"none":    "",
+	"off":     "",
+}
+
+// ResolveEmoji maps a preset name to its emoji, or returns the value as-is.
+func ResolveEmoji(value string) string {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	if emoji, ok := emojiPresets[lower]; ok {
+		return emoji
+	}
+	return value
+}
+
+// EmojiPresetNames returns sorted preset names for display.
+func EmojiPresetNames() []string {
+	names := make([]string, 0, len(emojiPresets))
+	for k := range emojiPresets {
+		if k != "off" && k != "none" {
+			names = append(names, k)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 // ---------------------------------------------------------------------------

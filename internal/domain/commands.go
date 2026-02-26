@@ -24,6 +24,7 @@ var CommandDefs = []CommandDef{
 	// Config & tools
 	{Name: "/config", Description: "show/set preferences", Group: "config"},
 	{Name: "/tools", Description: "picker + enable/disable/profile tools", Group: "config"},
+	{Name: "/emoji", Description: "pick a footer emoji", Group: "config", TUIOnly: true},
 	{Name: "/telegram", Description: "start or stop telegram bot", Group: "config", TUIOnly: true},
 	{Name: "/qr", Description: "show QR code for mobile app connection", Group: "config", TUIOnly: true},
 	{Name: "/tweet", Description: "post/schedule/list/cancel tweets", Group: "config"},

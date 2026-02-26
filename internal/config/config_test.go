@@ -174,9 +174,12 @@ func TestPreferences_Grouped(t *testing.T) {
 		}
 	}
 
-	// Theme group: all booleans should show "true"
+	// Theme group: booleans should show "true", emoji is a string
 	theme := groups[4]
 	for _, e := range theme.Entries {
+		if e.Key == "footer.emoji" {
+			continue // string field, not a boolean
+		}
 		if e.Value != "true" {
 			t.Errorf("theme key %q = %q, want %q", e.Key, e.Value, "true")
 		}

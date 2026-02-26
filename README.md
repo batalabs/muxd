@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="assets/muxd_logo_transparent.png" alt="muxd" width="220">
+  <img src="assets/muxd_logo_transparent_v2.png" alt="muxd" width="220">
   <br>
   muxd
 </h1>
@@ -27,7 +27,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 - **Persistent sessions**: every conversation is saved to a local SQLite database. Close your terminal, reboot, come back next week, your context is still there.
 - **Project memory**: persist project-specific facts across sessions. The agent remembers your conventions, architecture decisions, and gotchas.
 - **Branch and fork**: explore alternative approaches without losing your current thread, just like git branches.
-- **Multi-channel**: talk to the same agent from your terminal, Telegram, or a headless daemon. Conversations sync across all of them.
+- **Multi-channel**: talk to the same agent from your terminal, Telegram, mobile app, or a headless daemon. Conversations sync across all of them.
 - **Provider-agnostic**: switch between 9 providers with a single command.
 
 ---
@@ -82,6 +82,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 - **Plan mode**: read-only exploration that disables write tools until you're ready
 - **Sub-agents**: delegate independent subtasks to a fresh agent instance
 - **Scheduled tasks**: schedule full agent workflows to run at a future time, once or on a recurring basis
+- **Mobile app**: connect from your phone with `/qr` — scan the QR code and chat with your agent on the go
 - **Interactive shell**: drop into a shell with `/sh` that auto-detects cmd.exe, PowerShell, and bash commands on Windows
 - **Streaming TUI**: real-time token streaming with markdown rendering, syntax highlighting, and table formatting
 
@@ -132,6 +133,7 @@ muxd -c                           # resume latest session
 muxd -c <session-id>              # resume specific session
 muxd -model claude-opus           # use a different model
 muxd --daemon                     # headless daemon mode
+muxd --daemon -bind 0.0.0.0      # daemon accessible from LAN / mobile
 ```
 
 ---
@@ -156,6 +158,7 @@ muxd --daemon                     # headless daemon mode
 | `/schedule add <tool>` | Schedule a tool to run later |
 | `/schedule add-task <time> <prompt>` | Schedule a multi-step agent task |
 | `/tweet <text>` | Post to X/Twitter |
+| `/qr` | Show QR code for mobile app connection |
 | `/sh` | Drop into the muxd interactive shell |
 | `/undo` / `/redo` | Roll back or replay agent changes |
 | `/clear` | Clear the chat |
@@ -190,6 +193,7 @@ muxd --daemon                     # headless daemon mode
 | `-c` | | Resume a session (latest for cwd, or pass a session ID) |
 | `-model` | | Model name or alias (e.g. `claude-sonnet`, `gpt-4o`) |
 | `-daemon` | `false` | Run in daemon mode (no TUI) |
+| `-bind` | `localhost` | Network interface to bind (`localhost`, `0.0.0.0`, or specific IP) |
 | `-version` | | Print version and exit |
 | `-service` | | Service management: `install` \| `uninstall` \| `status` \| `start` \| `stop` |
 

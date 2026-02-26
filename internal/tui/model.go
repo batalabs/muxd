@@ -208,6 +208,8 @@ type Model struct {
 	toolPicker *ToolPicker
 	// Config picker overlay
 	configPicker *ConfigPicker
+	// Emoji picker overlay
+	emojiPicker *EmojiPicker
 
 	// MCP tool names (fetched from daemon at startup)
 	mcpToolNames []string
@@ -652,6 +654,10 @@ func (m Model) View() string {
 		b.WriteString(m.configPicker.View(m.width))
 		return b.String()
 	}
+	if m.emojiPicker.IsActive() {
+		b.WriteString(m.emojiPicker.View(m.width))
+		return b.String()
+	}
 
 	// Calculate available width for text wrapping
 	promptWidth := 2
@@ -742,7 +748,13 @@ func (m Model) View() string {
 
 	b.WriteString("\n\n")
 	disabledCount := len(m.Prefs.DisabledToolsSet())
-	footerParts := []string{fmt.Sprintf("muxd %s", m.version)}
+	prefix := ""
+	indent := ""
+	if m.Prefs.FooterEmoji != "" {
+		prefix = m.Prefs.FooterEmoji + " "
+		indent = "   "
+	}
+	footerParts := []string{fmt.Sprintf("%smuxd %s", prefix, m.version)}
 	if m.Prefs.Model != "" {
 		footerParts = append(footerParts, m.modelLabel)
 	}
@@ -753,7 +765,7 @@ func (m Model) View() string {
 	if m.Prefs.FooterTokens {
 		b.WriteString("\n")
 		totalTokens := m.inputTokens + m.outputTokens
-		tokenStr := fmt.Sprintf("   session tokens: %.1fk", float64(totalTokens)/1000.0)
+		tokenStr := fmt.Sprintf("%ssession tokens: %.1fk", indent, float64(totalTokens)/1000.0)
 		if m.Prefs.FooterCost {
 			sessionCost := provider.ModelCost(m.modelID, m.inputTokens, m.outputTokens)
 			turnCost := provider.ModelCost(m.modelID, m.lastInputTokens, m.lastOutputTokens)
@@ -789,13 +801,13 @@ func (m Model) View() string {
 	}
 	if m.Prefs.FooterCwd {
 		b.WriteString("\n")
-		b.WriteString(FooterMeta.Render(fmt.Sprintf("   cwd: %s", MustGetwd())))
+		b.WriteString(FooterMeta.Render(fmt.Sprintf("%scwd: %s", indent, MustGetwd())))
 	}
 	if m.Prefs.FooterSession {
 		b.WriteString("\n")
-		sessionLine := fmt.Sprintf("   session: %s", m.Session.ID[:8])
+		sessionLine := fmt.Sprintf("%ssession: %s", indent, m.Session.ID[:8])
 		if m.Session.Title != "New Session" {
-			sessionLine = fmt.Sprintf("   session: %s", m.Session.Title)
+			sessionLine = fmt.Sprintf("%ssession: %s", indent, m.Session.Title)
 		}
 		b.WriteString(FooterMeta.Render(sessionLine))
 	}
@@ -818,6 +830,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.configPicker.IsActive() {
 		return m.handleConfigPickerKey(msg)
+	}
+	if m.emojiPicker.IsActive() {
+		return m.handleEmojiPickerKey(msg)
 	}
 
 	// Route to shell mode when active.
@@ -1536,6 +1551,10 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 	case "/qr":
 		return m.handleQRCommand(parts[1:])
 
+	case "/emoji":
+		m.emojiPicker = NewEmojiPicker(m.Prefs.FooterEmoji)
+		return m, nil
+
 	case "/remember":
 		return m.handleRememberCommand(parts[1:])
 
@@ -2052,6 +2071,34 @@ func (m Model) handleToolPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (m Model) handleEmojiPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc, tea.KeyCtrlC:
+		m.emojiPicker.Dismiss()
+		m.emojiPicker = nil
+		return m, nil
+	case tea.KeyUp:
+		m.emojiPicker.MoveUp()
+		return m, nil
+	case tea.KeyDown:
+		m.emojiPicker.MoveDown()
+		return m, nil
+	case tea.KeyEnter:
+		emoji := m.emojiPicker.Selected()
+		name := m.emojiPicker.SelectedName()
+		m.Prefs.FooterEmoji = emoji
+		m.emojiPicker.Dismiss()
+		m.emojiPicker = nil
+		config.SavePreferences(m.Prefs)
+		if name == "none" {
+			return m, PrintToScrollback(WelcomeStyle.Render("Footer emoji removed."))
+		}
+		return m, PrintToScrollback(WelcomeStyle.Render("Footer emoji set to " + emoji + " (" + name + ")."))
+	default:
+		return m, nil
+	}
+}
+
 func (m *Model) applyDisabledToolsSetting(disabled map[string]bool) {
 	disabledCSV := disabledToolsCSV(disabled)
 	m.Prefs.ToolsDisabled = disabledCSV
@@ -2241,6 +2288,12 @@ func (m Model) handleConfigPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			key := entry.Key
+			if key == "footer.emoji" {
+				m.configPicker.Dismiss()
+				m.configPicker = nil
+				m.emojiPicker = NewEmojiPicker(m.Prefs.FooterEmoji)
+				return m, nil
+			}
 			if isBoolConfigKey(key) {
 				cur, _ := config.ParseBoolish(m.Prefs.Get(key))
 				next := "true"
