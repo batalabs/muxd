@@ -1222,16 +1222,15 @@ func (m Model) handlePickerDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // openSessionPicker fetches sessions and opens the picker.
 func (m Model) openSessionPicker() tea.Cmd {
-	cwd := MustGetwd()
 	daemon := m.Daemon
 	store := m.Store
 	return func() tea.Msg {
 		var sessions []domain.Session
 		var err error
 		if daemon != nil {
-			sessions, err = daemon.ListSessions(cwd, 50)
+			sessions, err = daemon.ListSessions("", 100)
 		} else if store != nil {
-			sessions, err = store.ListSessions(cwd, 50)
+			sessions, err = store.ListSessions("", 100)
 		}
 		return SessionPickerMsg{Sessions: sessions, Err: err}
 	}
