@@ -44,8 +44,8 @@ type Server struct {
 	askChans map[string]chan<- string  // askID -> response channel
 
 	port     int
-	bindAddr string           // "localhost", "0.0.0.0", or specific IP
-	ready    chan struct{}    // closed once port is assigned in Start()
+	bindAddr string        // "localhost", "0.0.0.0", or specific IP
+	ready    chan struct{} // closed once port is assigned in Start()
 	server   *http.Server
 	quiet    bool
 	token    string
@@ -424,11 +424,18 @@ func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
 // ---------------------------------------------------------------------------
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"status": "ok",
 		"pid":    os.Getpid(),
 		"port":   s.port,
-	})
+	}
+	if s.modelLabel != "" {
+		resp["model"] = s.modelLabel
+	}
+	if s.provider != nil {
+		resp["provider"] = s.provider.Name()
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleQRCode(w http.ResponseWriter, r *http.Request) {

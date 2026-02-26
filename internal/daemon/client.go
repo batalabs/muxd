@@ -84,18 +84,49 @@ func (c *DaemonClient) do(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
+// HealthInfo contains information returned by the daemon health endpoint.
+type HealthInfo struct {
+	Port     int
+	PID      int
+	Model    string
+	Provider string
+}
+
 // Health checks if the daemon is responding.
 func (c *DaemonClient) Health() error {
+	_, err := c.HealthCheck()
+	return err
+}
+
+// HealthCheck returns detailed health info from the daemon.
+func (c *DaemonClient) HealthCheck() (*HealthInfo, error) {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(c.baseURL + "/api/health")
 	if err != nil {
-		return fmt.Errorf("health check: %w", err)
+		return nil, fmt.Errorf("health check: %w", err)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("health check: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("health check: status %d", resp.StatusCode)
 	}
-	return nil
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("health check: decode: %w", err)
+	}
+	info := &HealthInfo{}
+	if v, ok := raw["port"].(float64); ok {
+		info.Port = int(v)
+	}
+	if v, ok := raw["pid"].(float64); ok {
+		info.PID = int(v)
+	}
+	if v, ok := raw["model"].(string); ok {
+		info.Model = v
+	}
+	if v, ok := raw["provider"].(string); ok {
+		info.Provider = v
+	}
+	return info, nil
 }
 
 // CreateSession creates a new session on the daemon.

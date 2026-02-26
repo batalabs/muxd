@@ -139,7 +139,16 @@ func main() {
 		// Connect to existing daemon
 		dc = daemon.NewDaemonClient(lf.Port)
 		dc.SetAuthToken(lf.Token)
-		fmt.Fprintf(os.Stderr, "Connected to daemon on port %d\n", lf.Port)
+		if info, err := dc.HealthCheck(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: daemon on port %d not responding: %v\n", lf.Port, err)
+			fmt.Fprintf(os.Stderr, "hint: kill the old process and restart muxd\n")
+		} else if info.Provider == "" || info.Model == "" {
+			fmt.Fprintf(os.Stderr, "Connected to daemon on port %d (pid %d) — no model configured\n", lf.Port, info.PID)
+			fmt.Fprintf(os.Stderr, "hint: the daemon was started without a provider/model.\n")
+			fmt.Fprintf(os.Stderr, "      kill the process (pid %d) and restart: muxd --daemon\n", info.PID)
+		} else {
+			fmt.Fprintf(os.Stderr, "Connected to daemon on port %d (%s/%s)\n", lf.Port, info.Provider, info.Model)
+		}
 	} else {
 		// Start embedded server
 		embeddedServer = daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
