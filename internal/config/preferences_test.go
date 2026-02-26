@@ -59,7 +59,7 @@ func TestDataDir(t *testing.T) {
 
 func TestConfigGroupNames(t *testing.T) {
 	names := ConfigGroupNames()
-	want := []string{"models", "tools", "messaging", "theme"}
+	want := []string{"models", "tools", "messaging", "daemon", "theme"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d group names, got %d", len(want), len(names))
 	}
@@ -417,9 +417,9 @@ func TestLoadPreferences(t *testing.T) {
 		t.Cleanup(func() { configDirOverride = orig })
 
 		data, _ := json.Marshal(Preferences{
-			Model:       "gpt-4o",
-			OllamaURL:   "http://localhost:11434",
-			FooterCwd:   false,
+			Model:     "gpt-4o",
+			OllamaURL: "http://localhost:11434",
+			FooterCwd: false,
 		})
 		os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
 

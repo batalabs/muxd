@@ -43,12 +43,13 @@ type Server struct {
 	agents   map[string]*agent.Service // sessionID -> agent
 	askChans map[string]chan<- string  // askID -> response channel
 
-	port   int
-	ready  chan struct{} // closed once port is assigned in Start()
-	server *http.Server
-	quiet  bool
-	token  string
-	sched  *tools.ToolCallScheduler
+	port     int
+	bindAddr string           // "localhost", "0.0.0.0", or specific IP
+	ready    chan struct{}    // closed once port is assigned in Start()
+	server   *http.Server
+	quiet    bool
+	token    string
+	sched    *tools.ToolCallScheduler
 
 	newAgent      AgentFactory
 	detectGitRepo DetectGitRepoFunc
@@ -101,6 +102,20 @@ func (s *Server) SetQuiet(quiet bool) {
 	s.quiet = quiet
 }
 
+// SetBindAddress sets the network interface to bind to (e.g., "localhost", "0.0.0.0").
+// Must be called before Start(). Defaults to "localhost" if not set.
+func (s *Server) SetBindAddress(addr string) {
+	s.bindAddr = addr
+}
+
+// BindAddress returns the bind address. Returns "localhost" if not explicitly set.
+func (s *Server) BindAddress() string {
+	if s.bindAddr == "" {
+		return "localhost"
+	}
+	return s.bindAddr
+}
+
 // initMCP loads .mcp.json config and starts MCP server connections.
 func (s *Server) initMCP() {
 	cwd, _ := tools.Getwd()
@@ -135,21 +150,26 @@ func (s *Server) initMCP() {
 // Start begins listening on the given port. If the port is taken, falls back
 // to an OS-assigned port. Blocks until the server shuts down.
 func (s *Server) Start(port int) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	bindAddr := s.bindAddr
+	if bindAddr == "" {
+		bindAddr = "localhost" // secure default
+	}
+
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", bindAddr, port))
 	if err != nil {
 		// Port in use -- let OS assign
-		ln, err = net.Listen("tcp", "localhost:0")
+		ln, err = net.Listen("tcp", fmt.Sprintf("%s:0", bindAddr))
 		if err != nil {
 			return fmt.Errorf("listening: %w", err)
 		}
 	}
 	s.port = ln.Addr().(*net.TCPAddr).Port
 	if !s.quiet {
-		fmt.Fprintf(os.Stderr, "muxd server listening on port %d\n", s.port)
+		fmt.Fprintf(os.Stderr, "muxd server listening on %s:%d\n", bindAddr, s.port)
 	}
 	close(s.ready) // signal that port is assigned
 
-	if err := WriteLockfile(s.port, s.token); err != nil {
+	if err := WriteLockfile(s.port, s.token, bindAddr); err != nil {
 		ln.Close()
 		return fmt.Errorf("writing lockfile: %w", err)
 	}
@@ -366,14 +386,17 @@ func (s *Server) Port() int {
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/qrcode", s.withAuth(s.handleQRCode))
 	mux.HandleFunc("POST /api/sessions", s.withAuth(s.handleCreateSession))
 	mux.HandleFunc("GET /api/sessions/{id}", s.withAuth(s.handleGetSession))
+	mux.HandleFunc("DELETE /api/sessions/{id}", s.withAuth(s.handleDeleteSession))
 	mux.HandleFunc("GET /api/sessions", s.withAuth(s.handleListSessions))
 	mux.HandleFunc("POST /api/sessions/{id}/submit", s.withAuth(s.handleSubmit))
 	mux.HandleFunc("POST /api/sessions/{id}/cancel", s.withAuth(s.handleCancel))
 	mux.HandleFunc("POST /api/sessions/{id}/ask-response", s.withAuth(s.handleAskResponse))
 	mux.HandleFunc("GET /api/sessions/{id}/messages", s.withAuth(s.handleGetMessages))
 	mux.HandleFunc("POST /api/sessions/{id}/model", s.withAuth(s.handleSetModel))
+	mux.HandleFunc("POST /api/sessions/{id}/title", s.withAuth(s.handleSetTitle))
 	mux.HandleFunc("POST /api/sessions/{id}/branch", s.withAuth(s.handleBranch))
 	mux.HandleFunc("POST /api/config", s.withAuth(s.handleSetConfig))
 	mux.HandleFunc("GET /api/config", s.withAuth(s.handleGetConfig))
@@ -406,6 +429,59 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"pid":    os.Getpid(),
 		"port":   s.port,
 	})
+}
+
+func (s *Server) handleQRCode(w http.ResponseWriter, r *http.Request) {
+	// Get preferred host from query param or auto-detect
+	host := r.URL.Query().Get("host")
+	if host == "" {
+		// If bound to 0.0.0.0, try to get local IP; otherwise use bind address
+		bindAddr := s.BindAddress()
+		if bindAddr == "0.0.0.0" || bindAddr == "" {
+			ips := GetLocalIPs()
+			if len(ips) > 0 {
+				host = ips[0]
+			} else {
+				host = "localhost"
+			}
+		} else {
+			host = bindAddr
+		}
+	}
+
+	// Parse size from query param, default to 256
+	sizeStr := r.URL.Query().Get("size")
+	size := 256
+	if sizeStr != "" {
+		if n, err := strconv.Atoi(sizeStr); err == nil && n > 0 && n <= 1024 {
+			size = n
+		}
+	}
+
+	// Check if ASCII format is requested
+	format := r.URL.Query().Get("format")
+	if format == "ascii" {
+		ascii, err := GenerateQRCodeASCII(host, s.port, s.token)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(ascii))
+		return
+	}
+
+	// Generate PNG QR code
+	png, err := GenerateQRCode(host, s.port, s.token, size)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.WriteHeader(http.StatusOK)
+	w.Write(png)
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -441,6 +517,32 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, sess)
+}
+
+func (s *Server) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	// Try to find the session first (supports prefix match)
+	sess, err := s.store.GetSession(id)
+	if err != nil {
+		sess, err = s.store.FindSessionByPrefix(id)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+			return
+		}
+	}
+
+	// Clean up any active agent for this session
+	s.mu.Lock()
+	delete(s.agents, sess.ID)
+	s.mu.Unlock()
+
+	if err := s.store.DeleteSession(sess.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
@@ -680,6 +782,27 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		"status":   "ok",
 		"label":    req.Label,
 		"model_id": req.ModelID,
+	})
+}
+
+func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if err := s.store.UpdateSessionTitle(sessionID, req.Title); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"title":  req.Title,
 	})
 }
 

@@ -15,6 +15,7 @@ import (
 type LockfileData struct {
 	PID       int       `json:"pid"`
 	Port      int       `json:"port"`
+	BindAddr  string    `json:"bind_addr,omitempty"`
 	Token     string    `json:"token,omitempty"`
 	StartedAt time.Time `json:"started_at"`
 }
@@ -31,8 +32,8 @@ func LockfilePath() (string, error) {
 	return filepath.Join(dir, LockfileName), nil
 }
 
-// WriteLockfile writes the daemon lockfile with the current PID, port, and timestamp.
-func WriteLockfile(port int, token string) error {
+// WriteLockfile writes the daemon lockfile with the current PID, port, bind address, and timestamp.
+func WriteLockfile(port int, token, bindAddr string) error {
 	p, err := LockfilePath()
 	if err != nil {
 		return err
@@ -40,6 +41,7 @@ func WriteLockfile(port int, token string) error {
 	data := LockfileData{
 		PID:       os.Getpid(),
 		Port:      port,
+		BindAddr:  bindAddr,
 		Token:     token,
 		StartedAt: time.Now(),
 	}
@@ -87,8 +89,12 @@ func IsLockfileStale(lf *LockfileData) bool {
 		return true
 	}
 	// PID is alive -- verify with HTTP health check
+	host := lf.BindAddr
+	if host == "" || host == "0.0.0.0" {
+		host = "localhost" // Connect to localhost for health checks
+	}
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", lf.Port))
+	resp, err := client.Get(fmt.Sprintf("http://%s:%d/api/health", host, lf.Port))
 	if err != nil {
 		return true
 	}

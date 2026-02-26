@@ -41,6 +41,7 @@ func main() {
 	modelFlag := flag.String("model", "", "Model name or alias (e.g. claude-sonnet, openai/gpt-4o)")
 	continueFlag := flag.String("c", "", "Resume a session (latest for cwd, or pass a session ID)")
 	daemonFlag := flag.Bool("daemon", false, "Run in daemon mode (no TUI)")
+	bindFlag := flag.String("bind", "", "Network interface to bind (localhost, 0.0.0.0, or specific IP)")
 	serviceCmd := flag.String("service", "", "Service management: install|uninstall|status|start|stop")
 	flag.Parse()
 
@@ -94,11 +95,21 @@ func main() {
 		return agent.NewService(key, mID, mLabel, s, sess, p)
 	}
 
+	// Resolve bind address from flag or preferences
+	bindAddr := *bindFlag
+	if bindAddr == "" {
+		bindAddr = prefs.DaemonBindAddress
+	}
+	if bindAddr == "" {
+		bindAddr = "localhost" // secure default
+	}
+
 	// Daemon-only mode: start HTTP server, no TUI
 	if *daemonFlag {
 		srv := daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
 		srv.SetAgentFactory(agentFactory)
 		srv.SetDetectGitRepo(checkpoint.DetectGitRepo)
+		srv.SetBindAddress(bindAddr)
 
 		// Handle graceful shutdown
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -135,6 +146,7 @@ func main() {
 		embeddedServer.SetAgentFactory(agentFactory)
 		embeddedServer.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		embeddedServer.SetQuiet(true)
+		embeddedServer.SetBindAddress(bindAddr)
 		go func() {
 			if err := embeddedServer.Start(4096); err != nil {
 				fmt.Fprintf(os.Stderr, "embedded server error: %v\n", err)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1220,16 +1222,15 @@ func (m Model) handlePickerDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // openSessionPicker fetches sessions and opens the picker.
 func (m Model) openSessionPicker() tea.Cmd {
-	cwd := MustGetwd()
 	daemon := m.Daemon
 	store := m.Store
 	return func() tea.Msg {
 		var sessions []domain.Session
 		var err error
 		if daemon != nil {
-			sessions, err = daemon.ListSessions(cwd, 50)
+			sessions, err = daemon.ListSessions("", 100)
 		} else if store != nil {
-			sessions, err = store.ListSessions(cwd, 50)
+			sessions, err = store.ListSessions("", 100)
 		}
 		return SessionPickerMsg{Sessions: sessions, Err: err}
 	}
@@ -1531,6 +1532,9 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 
 	case "/telegram":
 		return m.handleTelegram(parts[1:])
+
+	case "/qr":
+		return m.handleQRCommand(parts[1:])
 
 	case "/remember":
 		return m.handleRememberCommand(parts[1:])
@@ -2557,6 +2561,62 @@ func (m Model) handleTelegram(args []string) (tea.Model, tea.Cmd) {
 	default:
 		return m, PrintToScrollback(m.renderError("Usage: /telegram [start|stop|status]"))
 	}
+}
+
+func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
+	if m.Daemon == nil {
+		return m, PrintToScrollback(m.renderError("No daemon connection available."))
+	}
+
+	// Fetch QR code from daemon
+	qrURL := fmt.Sprintf("http://localhost:%d/api/qrcode?format=ascii", m.Daemon.Port())
+	req, err := http.NewRequest("GET", qrURL, nil)
+	if err != nil {
+		return m, PrintToScrollback(m.renderError("Failed to create request: " + err.Error()))
+	}
+	req.Header.Set("Authorization", "Bearer "+m.Daemon.AuthToken())
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return m, PrintToScrollback(m.renderError("Failed to fetch QR code: " + err.Error()))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return m, PrintToScrollback(m.renderError(fmt.Sprintf("Server returned %d", resp.StatusCode)))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return m, PrintToScrollback(m.renderError("Failed to read response: " + err.Error()))
+	}
+
+	// Build output with instructions
+	var lines []string
+	lines = append(lines, FooterHead.Render("Mobile Connection QR Code"))
+	lines = append(lines, "")
+	lines = append(lines, string(body))
+	lines = append(lines, "")
+	lines = append(lines, FooterMeta.Render("Scan this QR code with the muxd mobile app to connect."))
+	lines = append(lines, FooterMeta.Render("The QR code contains: host, port, and authentication token."))
+
+	// Show connection info
+	lf, lfErr := daemon.ReadLockfile()
+	if lfErr == nil {
+		bindAddr := lf.BindAddr
+		if bindAddr == "" {
+			bindAddr = "localhost"
+		}
+		ips := daemon.GetLocalIPs()
+		if len(ips) > 0 && (bindAddr == "0.0.0.0" || bindAddr == "") {
+			lines = append(lines, "")
+			lines = append(lines, FooterMeta.Render("Local IPs: "+strings.Join(ips, ", ")))
+		}
+		lines = append(lines, FooterMeta.Render(fmt.Sprintf("Server: %s:%d", bindAddr, lf.Port)))
+	}
+
+	return m, PrintToScrollback(strings.Join(lines, "\n"))
 }
 
 func (m *Model) startTelegramBot() tea.Cmd {

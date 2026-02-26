@@ -25,6 +25,7 @@ var CommandDefs = []CommandDef{
 	{Name: "/config", Description: "show/set preferences", Group: "config"},
 	{Name: "/tools", Description: "picker + enable/disable/profile tools", Group: "config"},
 	{Name: "/telegram", Description: "start or stop telegram bot", Group: "config", TUIOnly: true},
+	{Name: "/qr", Description: "show QR code for mobile app connection", Group: "config", TUIOnly: true},
 	{Name: "/tweet", Description: "post/schedule/list/cancel tweets", Group: "config"},
 	{Name: "/schedule", Description: "manage generic scheduled tool jobs", Group: "config"},
 	{Name: "/remember", Description: "save a fact to project memory", Group: "config"},
