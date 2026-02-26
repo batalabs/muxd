@@ -140,15 +140,21 @@ func LoadPreferences() Preferences {
 	p := DefaultPreferences()
 
 	// Load config.json if it exists
+	configLoaded := false
 	if data, err := os.ReadFile(configPath); err == nil {
+		// Strip UTF-8 BOM that Windows editors (e.g. Notepad) may add
+		data = stripBOM(data)
 		if err := json.Unmarshal(data, &p); err != nil {
 			fmt.Fprintf(os.Stderr, "config: parse %s: %v\n", configPath, err)
+		} else {
+			configLoaded = true
 		}
 		warnInsecurePermissions(configPath)
 	}
 
-	if sanitizePreferences(&p) {
-		// Persist cleaned values so null bytes don't accumulate across restarts.
+	// Only sanitize and re-save if we successfully loaded the config.
+	// This prevents overwriting the user's file with defaults on parse errors.
+	if configLoaded && sanitizePreferences(&p) {
 		if err := SavePreferences(p); err != nil {
 			fmt.Fprintf(os.Stderr, "config: save sanitized config: %v\n", err)
 		}
@@ -157,6 +163,7 @@ func LoadPreferences() Preferences {
 	// If legacy preferences.json exists, merge it (values win over config.json)
 	// then delete the legacy file
 	if data, err := os.ReadFile(legacyPath); err == nil {
+		data = stripBOM(data)
 		legacy := DefaultPreferences()
 		if json.Unmarshal(data, &legacy) == nil {
 			mergePreferences(&p, &legacy)
@@ -265,6 +272,15 @@ func SavePreferences(p Preferences) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 	return os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
+}
+
+// stripBOM removes a UTF-8 BOM prefix if present. Windows editors like
+// Notepad may add a BOM which breaks JSON parsing.
+func stripBOM(data []byte) []byte {
+	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		return data[3:]
+	}
+	return data
 }
 
 // warnInsecurePermissions prints a warning to stderr if the config file is
