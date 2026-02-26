@@ -137,12 +137,12 @@ func TestPreferences_Grouped(t *testing.T) {
 	p.TelegramBotToken = "123456:ABC-DEF"
 
 	groups := p.Grouped()
-	if len(groups) != 4 {
-		t.Fatalf("expected 4 groups, got %d", len(groups))
+	if len(groups) != 5 {
+		t.Fatalf("expected 5 groups, got %d", len(groups))
 	}
 
 	// Verify group names
-	wantNames := []string{"models", "tools", "messaging", "theme"}
+	wantNames := []string{"models", "tools", "messaging", "daemon", "theme"}
 	for i, g := range groups {
 		if g.Name != wantNames[i] {
 			t.Errorf("group %d name = %q, want %q", i, g.Name, wantNames[i])
@@ -175,7 +175,7 @@ func TestPreferences_Grouped(t *testing.T) {
 	}
 
 	// Theme group: all booleans should show "true"
-	theme := groups[3]
+	theme := groups[4]
 	for _, e := range theme.Entries {
 		if e.Value != "true" {
 			t.Errorf("theme key %q = %q, want %q", e.Key, e.Value, "true")
