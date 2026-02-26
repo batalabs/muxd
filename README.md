@@ -133,7 +133,7 @@ muxd -c                           # resume latest session
 muxd -c <session-id>              # resume specific session
 muxd -model claude-opus           # use a different model
 muxd --daemon                     # headless daemon mode
-muxd --daemon -bind 0.0.0.0      # daemon accessible from LAN / mobile
+muxd --daemon -bind 0.0.0.0       # daemon accessible from LAN / mobile
 ```
 
 ---
@@ -158,6 +158,7 @@ muxd --daemon -bind 0.0.0.0      # daemon accessible from LAN / mobile
 | `/schedule add <tool>` | Schedule a tool to run later |
 | `/schedule add-task <time> <prompt>` | Schedule a multi-step agent task |
 | `/tweet <text>` | Post to X/Twitter |
+| `/emoji` | Pick a footer emoji |
 | `/qr` | Show QR code for mobile app connection |
 | `/sh` | Drop into the muxd interactive shell |
 | `/undo` / `/redo` | Roll back or replay agent changes |
