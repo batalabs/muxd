@@ -4,6 +4,7 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let baseURL: URL
     private let authToken: String
     private var task: URLSessionDataTask?
+    private var session: URLSession?
     private var buffer = Data()
     private let lock = NSLock()
 
@@ -11,13 +12,20 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     var onComplete: (@Sendable () -> Void)?
     var onError: (@Sendable (Error) -> Void)?
 
-    init(host: String, port: Int, token: String) {
-        self.baseURL = URL(string: "http://\(host):\(port)")!
+    init?(host: String, port: Int, token: String) {
+        let sanitizedHost = host.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? host
+        guard let url = URL(string: "http://\(sanitizedHost):\(port)") else {
+            return nil
+        }
+        self.baseURL = url
         self.authToken = token
         super.init()
     }
 
     func submit(sessionID: String, text: String) {
+        // Invalidate previous session to prevent memory leak
+        session?.invalidateAndCancel()
+
         let url = baseURL.appendingPathComponent("/api/sessions/\(sessionID)/submit")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -30,19 +38,21 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 300 // 5 min for long operations
-        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
 
         lock.lock()
         buffer = Data()
         lock.unlock()
 
-        task = session.dataTask(with: request)
+        task = session?.dataTask(with: request)
         task?.resume()
     }
 
     func cancel() {
         task?.cancel()
         task = nil
+        session?.invalidateAndCancel()
+        session = nil
     }
 
     // MARK: - URLSessionDataDelegate

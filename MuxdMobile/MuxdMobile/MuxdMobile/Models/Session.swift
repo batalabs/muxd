@@ -1,6 +1,6 @@
 import Foundation
 
-struct Session: Codable, Identifiable, Equatable, Hashable, Sendable {
+struct Session: Codable, Identifiable, Hashable, Equatable, Sendable {
     let id: String
     let projectPath: String
     var title: String
@@ -14,6 +14,15 @@ struct Session: Codable, Identifiable, Equatable, Hashable, Sendable {
     var tags: String?
     let createdAt: Date
     var updatedAt: Date
+
+    // Custom Hashable - only use id for navigation path matching
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    static func == (lhs: Session, rhs: Session) -> Bool {
+        lhs.id == rhs.id
+    }
 
     enum CodingKeys: String, CodingKey {
         case id

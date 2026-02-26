@@ -52,7 +52,37 @@ struct ContentBlock: Codable, Identifiable, Sendable {
     let isError: Bool?
 
     var id: String {
-        toolUseID ?? UUID().uuidString
+        // Use toolUseID if available, otherwise generate stable ID from content
+        if let toolID = toolUseID {
+            return toolID
+        }
+        // Generate stable ID from type and text content
+        let textHash = (text ?? "").hashValue
+        return "\(type)_\(textHash)"
+    }
+
+    // Check if tool result contains base64 image data
+    var isImageResult: Bool {
+        guard let result = toolResult else { return false }
+        return result.hasPrefix("data:image/") ||
+               result.hasPrefix("iVBOR") || // PNG base64
+               result.hasPrefix("/9j/")     // JPEG base64
+    }
+
+    // Extract base64 image data
+    var imageData: Data? {
+        guard let result = toolResult else { return nil }
+
+        // Handle data URI format: data:image/png;base64,xxxxx
+        if result.hasPrefix("data:image/") {
+            if let commaIndex = result.firstIndex(of: ",") {
+                let base64String = String(result[result.index(after: commaIndex)...])
+                return Data(base64Encoded: base64String)
+            }
+        }
+
+        // Try direct base64 decode
+        return Data(base64Encoded: result)
     }
 
     enum CodingKeys: String, CodingKey {

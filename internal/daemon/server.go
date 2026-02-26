@@ -368,12 +368,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("POST /api/sessions", s.withAuth(s.handleCreateSession))
 	mux.HandleFunc("GET /api/sessions/{id}", s.withAuth(s.handleGetSession))
+	mux.HandleFunc("DELETE /api/sessions/{id}", s.withAuth(s.handleDeleteSession))
 	mux.HandleFunc("GET /api/sessions", s.withAuth(s.handleListSessions))
 	mux.HandleFunc("POST /api/sessions/{id}/submit", s.withAuth(s.handleSubmit))
 	mux.HandleFunc("POST /api/sessions/{id}/cancel", s.withAuth(s.handleCancel))
 	mux.HandleFunc("POST /api/sessions/{id}/ask-response", s.withAuth(s.handleAskResponse))
 	mux.HandleFunc("GET /api/sessions/{id}/messages", s.withAuth(s.handleGetMessages))
 	mux.HandleFunc("POST /api/sessions/{id}/model", s.withAuth(s.handleSetModel))
+	mux.HandleFunc("POST /api/sessions/{id}/title", s.withAuth(s.handleSetTitle))
 	mux.HandleFunc("POST /api/sessions/{id}/branch", s.withAuth(s.handleBranch))
 	mux.HandleFunc("POST /api/config", s.withAuth(s.handleSetConfig))
 	mux.HandleFunc("GET /api/config", s.withAuth(s.handleGetConfig))
@@ -441,6 +443,32 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, sess)
+}
+
+func (s *Server) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	// Try to find the session first (supports prefix match)
+	sess, err := s.store.GetSession(id)
+	if err != nil {
+		sess, err = s.store.FindSessionByPrefix(id)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+			return
+		}
+	}
+
+	// Clean up any active agent for this session
+	s.mu.Lock()
+	delete(s.agents, sess.ID)
+	s.mu.Unlock()
+
+	if err := s.store.DeleteSession(sess.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
@@ -680,6 +708,27 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		"status":   "ok",
 		"label":    req.Label,
 		"model_id": req.ModelID,
+	})
+}
+
+func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if err := s.store.UpdateSessionTitle(sessionID, req.Title); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"title":  req.Title,
 	})
 }
 

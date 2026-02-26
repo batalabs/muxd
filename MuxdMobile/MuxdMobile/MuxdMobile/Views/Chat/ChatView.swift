@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import MarkdownUI
 
 // Glass effect modifier with iOS 26+ liquid glass support
 struct GlassInputModifier: ViewModifier {
@@ -26,6 +27,7 @@ struct ChatView: View {
     @StateObject private var viewModel: ChatViewModel
     @State private var inputText = ""
     @State private var showModelPicker = false
+    @State private var isReady = false
     @FocusState private var inputFocused: Bool
 
     let session: Session
@@ -59,6 +61,7 @@ struct ChatView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
+            .opacity(isReady ? 1 : 0)
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
                 // Only scroll when new messages are added (not on first load)
                 if oldCount > 0 && newCount > oldCount {
@@ -162,6 +165,11 @@ struct ChatView: View {
             viewModel.client = appState.getClient()
             viewModel.sseClient = appState.getSSEClient()
             await viewModel.loadMessages()
+            // Small delay to let scroll position settle before showing
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            withAnimation(.easeIn(duration: 0.15)) {
+                isReady = true
+            }
         }
     }
 
@@ -180,54 +188,144 @@ struct ChatView: View {
 struct MessageBubbleView: View {
     let message: TranscriptMessage
 
-    var body: some View {
-        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-            // Role label for assistant
-            if !message.isUser {
-                HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .font(.caption2)
-                    Text("Assistant")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                }
-                .foregroundColor(.secondary)
+    private var hasVisibleContent: Bool {
+        // Has text content
+        if !message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        // Has tool result blocks with actual content (these should show)
+        for block in message.toolResultBlocks {
+            if block.isImageResult && block.imageData != nil {
+                return true
             }
-
-            HStack {
-                if message.isUser { Spacer(minLength: 60) }
-
-                MarkdownText(message.textContent)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(message.isUser ? Color.accentColor : Color(.systemGray5))
-                    .foregroundColor(message.isUser ? .white : .primary)
-                    .cornerRadius(18)
-
-                if !message.isUser { Spacer(minLength: 60) }
-            }
-
-            // Tool uses
-            if !message.toolUseBlocks.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(message.toolUseBlocks) { block in
-                        HStack(spacing: 4) {
-                            Image(systemName: "wrench.fill")
-                                .font(.caption2)
-                            Text(block.toolName ?? "Tool")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                    }
-                }
-                .foregroundColor(.secondary)
+            if let result = block.toolResult, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return true
             }
         }
-        .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+        // Don't show messages with only tool_use blocks (no text) - they're just indicators
+        return false
+    }
+
+    // Tool results should always be left-aligned (system output), even though they're in "user" messages
+    private var hasToolResults: Bool {
+        message.toolResultBlocks.contains { block in
+            (block.isImageResult && block.imageData != nil) ||
+            (block.toolResult != nil && !block.toolResult!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    // True user message = user text, not tool results
+    private var isActualUserMessage: Bool {
+        message.isUser && !hasToolResults
+    }
+
+    var body: some View {
+        if hasVisibleContent {
+            VStack(alignment: isActualUserMessage ? .trailing : .leading, spacing: 4) {
+                // Role label for assistant - show muxd branding
+                if !isActualUserMessage && !hasToolResults {
+                    HStack(spacing: 4) {
+                        Image("Logo")
+                            .resizable()
+                            .frame(width: 16, height: 16)
+                            .cornerRadius(4)
+                        Text("muxd")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.secondary)
+                }
+
+                // Text content
+                if !message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    HStack {
+                        if isActualUserMessage { Spacer(minLength: 60) }
+
+                        MarkdownText(message.textContent)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(isActualUserMessage ? Color.accentColor : Color(.systemGray5))
+                            .foregroundColor(isActualUserMessage ? .white : .primary)
+                            .cornerRadius(18)
+
+                        if !isActualUserMessage { Spacer(minLength: 60) }
+                    }
+                }
+
+                // Tool uses
+                if !message.toolUseBlocks.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(message.toolUseBlocks) { block in
+                            HStack(spacing: 4) {
+                                Image(systemName: "wrench.fill")
+                                    .font(.caption2)
+                                Text(block.toolName ?? "Tool")
+                                    .font(.caption)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
+                    }
+                    .foregroundColor(.secondary)
+                }
+
+                // Tool results with content
+                ForEach(message.toolResultBlocks) { block in
+                    ToolResultBlockView(block: block)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: isActualUserMessage ? .trailing : .leading)
+        }
+    }
+}
+
+struct ToolResultBlockView: View {
+    let block: ContentBlock
+
+    private var hasContent: Bool {
+        if block.isImageResult && block.imageData != nil {
+            return true
+        }
+        if let result = block.toolResult, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return false
+    }
+
+    var body: some View {
+        if hasContent {
+            VStack(alignment: .leading, spacing: 4) {
+                // Show image if it's an image result
+                if block.isImageResult, let imageData = block.imageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: 300, maxHeight: 400)
+                        .cornerRadius(12)
+                } else if let result = block.toolResult, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // Show text result
+                    HStack(spacing: 4) {
+                        Image(systemName: block.isError == true ? "xmark.circle.fill" : "checkmark.circle.fill")
+                            .foregroundColor(block.isError == true ? .red : .green)
+                            .font(.caption)
+                        Text(block.toolName ?? "Result")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("done")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text(result)
+                        .font(.caption)
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                }
+            }
+        }
     }
 }
 
@@ -239,11 +337,14 @@ struct MarkdownText: View {
     }
 
     var body: some View {
-        if let attributed = try? AttributedString(markdown: text) {
-            Text(attributed)
-        } else {
-            Text(text)
-        }
+        Markdown(text)
+            .markdownBlockStyle(\.codeBlock) { configuration in
+                configuration.label
+                    .font(.system(.caption, design: .monospaced))
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(6)
+            }
     }
 }
 
@@ -254,16 +355,17 @@ struct StreamingTextView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .font(.caption2)
-                    Text("Assistant")
+                    Image("Logo")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .cornerRadius(4)
+                    Text("muxd")
                         .font(.caption2)
                         .fontWeight(.medium)
                 }
                 .foregroundColor(.secondary)
 
                 MarkdownText(text)
-                    .textSelection(.enabled)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Color(.systemGray5))

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ManualConnectionView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
     @State private var host = ""
     @State private var port = "4096"
     @State private var token = ""
@@ -17,6 +18,13 @@ struct ManualConnectionView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    TextField("Name (optional)", text: $name)
+                        .autocapitalization(.words)
+                } footer: {
+                    Text("A friendly name for this server")
+                }
+
                 Section {
                     TextField("Host (IP or hostname)", text: $host)
                         .textContentType(.URL)
@@ -75,10 +83,14 @@ struct ManualConnectionView: View {
         isConnecting = true
         error = nil
 
+        let trimmedHost = host.trimmingCharacters(in: .whitespaces)
+        let serverName = name.isEmpty ? trimmedHost : name.trimmingCharacters(in: .whitespaces)
+
         let info = ConnectionInfo(
-            host: host.trimmingCharacters(in: .whitespaces),
+            host: trimmedHost,
             port: portNum,
-            token: token.trimmingCharacters(in: .whitespaces)
+            token: token.trimmingCharacters(in: .whitespaces),
+            name: serverName
         )
 
         onConnect(info)

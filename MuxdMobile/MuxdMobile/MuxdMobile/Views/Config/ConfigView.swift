@@ -34,12 +34,19 @@ struct ConfigView: View {
 
                 Section("Connection") {
                     if appState.isConnected, let info = appState.connectionInfo {
+                        LabeledContent("Server", value: info.name)
                         LabeledContent("Host", value: info.host)
                         LabeledContent("Port", value: "\(info.port)")
-                        LabeledContent("Token", value: "****" + String(info.token.suffix(4)))
+                        LabeledContent("Token", value: "••••••••")
 
-                        Button("Disconnect", role: .destructive) {
-                            appState.disconnect()
+                        if appState.savedConnections.count > 1 {
+                            Button("Switch Server") {
+                                appState.disconnect()
+                            }
+                        } else {
+                            Button("Disconnect", role: .destructive) {
+                                appState.disconnect()
+                            }
                         }
                     } else {
                         Text("Not connected")
@@ -123,7 +130,6 @@ struct ConfigView: View {
             config = try await client.getConfig()
         } catch {
             // Silently fail - config is not critical
-            print("ConfigView: failed to load config: \(error)")
         }
     }
 }

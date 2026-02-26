@@ -157,11 +157,8 @@ class QRScannerViewModel: NSObject, ObservableObject {
         // Only process once
         guard scannedInfo == nil else { return }
 
-        print("QR scanned raw value: \(value.prefix(100))...")
-
         // Decode connection info from QR code
         if let info = ConnectionInfo.decode(from: value) {
-            print("QR decode successful!")
             // Stop scanning immediately
             stopScanning()
 
@@ -170,8 +167,6 @@ class QRScannerViewModel: NSObject, ObservableObject {
             generator.notificationOccurred(.success)
 
             scannedInfo = info
-        } else {
-            print("QR decode failed for value")
         }
     }
 }

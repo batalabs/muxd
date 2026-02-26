@@ -6,102 +6,96 @@ struct SessionListView: View {
     @StateObject private var viewModel = SessionListViewModel()
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.sessions.isEmpty && !viewModel.isLoading {
-                    ContentUnavailableView {
-                        Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
-                    } description: {
-                        Text("Create a new session to get started")
-                    } actions: {
-                        Button("New Session") {
-                            viewModel.showNewSession = true
-                        }
-                        .buttonStyle(.borderedProminent)
+        Group {
+            if viewModel.sessions.isEmpty && !viewModel.isLoading {
+                ContentUnavailableView {
+                    Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
+                } description: {
+                    Text("Create a new session to get started")
+                } actions: {
+                    Button("New Session") {
+                        viewModel.showNewSession = true
                     }
-                } else {
-                    List {
-                        ForEach(Array(viewModel.sessions.enumerated()), id: \.element.id) { index, session in
-                            NavigationLink(value: session) {
-                                SessionRowView(session: session)
+                    .buttonStyle(.borderedProminent)
+                }
+            } else {
+                List {
+                    ForEach(Array(viewModel.sessions.enumerated()), id: \.element.id) { index, session in
+                        NavigationLink(value: session) {
+                            SessionRowView(session: session)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
+                        .contextMenu {
+                            Button {
+                                viewModel.sessionToRename = session
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
                             }
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
-                            .contextMenu {
-                                Button {
-                                    viewModel.sessionToRename = session
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
 
-                                Button(role: .destructive) {
-                                    Task {
-                                        await viewModel.deleteSession(session)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                            Button(role: .destructive) {
+                                Task {
+                                    await viewModel.deleteSession(session)
                                 }
-                            }
-                        }
-                        .onDelete { indexSet in
-                            Task {
-                                await viewModel.deleteSessions(at: indexSet)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
-                    .listStyle(.plain)
-                    .refreshable {
-                        await viewModel.loadSessions()
+                    .onDelete { indexSet in
+                        Task {
+                            await viewModel.deleteSessions(at: indexSet)
+                        }
                     }
                 }
-            }
-            .navigationTitle("Sessions")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { viewModel.showNewSession = true }) {
-                        Image(systemName: "plus")
-                    }
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { appState.disconnect() }) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                    }
+                .listStyle(.plain)
+                .refreshable {
+                    await viewModel.loadSessions()
                 }
             }
-            .navigationDestination(for: Session.self) { session in
-                ChatView(session: session)
-            }
-            .sheet(isPresented: $viewModel.showNewSession) {
-                NewSessionView { projectPath, modelID in
-                    await viewModel.createSession(projectPath: projectPath, modelID: modelID)
+        }
+        .navigationTitle(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { viewModel.showNewSession = true }) {
+                    Image(systemName: "plus")
                 }
             }
-            .sheet(item: $viewModel.sessionToRename) { session in
-                RenameSessionView(session: session) { newTitle in
-                    await viewModel.renameSession(session, title: newTitle)
-                }
+        }
+        .navigationDestination(for: Session.self) { session in
+            ChatView(session: session)
+        }
+        .sheet(isPresented: $viewModel.showNewSession) {
+            NewSessionView { projectPath, modelID in
+                await viewModel.createSession(projectPath: projectPath, modelID: modelID)
             }
-            .overlay {
-                if viewModel.isLoading {
-                    ProgressView()
-                }
+        }
+        .sheet(item: $viewModel.sessionToRename) { session in
+            RenameSessionView(session: session) { newTitle in
+                await viewModel.renameSession(session, title: newTitle)
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.error != nil },
-                set: { if !$0 { viewModel.error = nil } }
-            )) {
-                Button("OK") { viewModel.error = nil }
-            } message: {
-                Text(viewModel.error ?? "Unknown error")
+        }
+        .overlay {
+            if viewModel.isLoading {
+                ProgressView()
             }
-            .task {
-                viewModel.client = appState.getClient()
-                await viewModel.loadSessions()
-            }
-            .onChange(of: viewModel.needsReconnect) { _, needsReconnect in
-                if needsReconnect {
-                    appState.disconnect()
-                }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { viewModel.error != nil },
+            set: { if !$0 { viewModel.error = nil } }
+        )) {
+            Button("OK") { viewModel.error = nil }
+        } message: {
+            Text(viewModel.error ?? "Unknown error")
+        }
+        .task {
+            viewModel.client = appState.getClient()
+            await viewModel.loadSessions()
+        }
+        .onChange(of: viewModel.needsReconnect) { _, needsReconnect in
+            if needsReconnect {
+                appState.disconnect()
             }
         }
     }

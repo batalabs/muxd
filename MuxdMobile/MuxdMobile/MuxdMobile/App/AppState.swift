@@ -7,51 +7,64 @@ class AppState: ObservableObject {
     @Published var connectionInfo: ConnectionInfo?
     @Published var currentSession: Session?
     @Published var error: AppError?
+    @Published var savedConnections: [ConnectionInfo] = []
 
     private var client: MuxdClient?
     private var sseClient: SSEClient?
 
+    init() {
+        loadSavedConnections()
+    }
+
     // MARK: - Connection
 
-    func connect(with info: ConnectionInfo) async {
-        print("AppState: connecting to \(info.host):\(info.port)")
-        client = MuxdClient(host: info.host, port: info.port, token: info.token)
+    func connect(with info: ConnectionInfo, silent: Bool = false) async {
+        guard let newClient = MuxdClient(host: info.host, port: info.port, token: info.token) else {
+            if !silent {
+                error = .connectionFailed("Invalid server address: \(info.host):\(info.port)")
+            }
+            return
+        }
+
+        client = newClient
         sseClient = SSEClient(host: info.host, port: info.port, token: info.token)
 
         do {
-            print("AppState: checking health...")
-            let healthy = try await client?.health() ?? false
-            print("AppState: health check result: \(healthy)")
+            let healthy = try await newClient.health()
             if healthy {
-                // Verify token is valid by calling an authenticated endpoint
-                print("AppState: verifying token...")
-                _ = try await client?.listSessions(project: nil, limit: 1)
+                // Verify token is valid by making an authenticated request
+                _ = try await newClient.listSessions(project: nil, limit: 1)
 
                 connectionInfo = info
                 isConnected = true
-                // Save connection info to keychain
-                print("AppState: saving to keychain...")
                 KeychainHelper.save(connectionInfo: info)
-                print("AppState: connected successfully!")
+                loadSavedConnections()
             } else {
-                print("AppState: server not responding")
                 connectionInfo = nil
                 isConnected = false
-                error = .connectionFailed("Server not responding")
+                client = nil
+                sseClient = nil
+                if !silent {
+                    error = .connectionFailed("Server not responding")
+                }
             }
         } catch MuxdError.unauthorized {
-            print("AppState: invalid token")
             connectionInfo = nil
             isConnected = false
             client = nil
             sseClient = nil
             KeychainHelper.deleteConnectionInfo()
-            // Don't show error - just go to QR scanner
+            if !silent {
+                error = .connectionFailed("Invalid or expired token")
+            }
         } catch {
-            print("AppState: connection error: \(error)")
             connectionInfo = nil
             isConnected = false
-            self.error = .connectionFailed(error.localizedDescription)
+            client = nil
+            sseClient = nil
+            if !silent {
+                self.error = .connectionFailed(error.localizedDescription)
+            }
         }
     }
 
@@ -65,12 +78,27 @@ class AppState: ObservableObject {
     }
 
     func restoreConnection() async {
-        print("AppState: trying to restore connection from keychain...")
         if let savedInfo = KeychainHelper.loadConnectionInfo() {
-            print("AppState: found saved connection to \(savedInfo.host):\(savedInfo.port)")
-            await connect(with: savedInfo)
-        } else {
-            print("AppState: no saved connection found")
+            await connect(with: savedInfo, silent: true)
+        }
+    }
+
+    // MARK: - Saved Connections
+
+    func loadSavedConnections() {
+        savedConnections = KeychainHelper.loadConnections()
+    }
+
+    func removeConnection(id: String) {
+        KeychainHelper.removeConnection(id: id)
+        loadSavedConnections()
+    }
+
+    func renameConnection(id: String, name: String) {
+        KeychainHelper.updateConnectionName(id: id, name: name)
+        loadSavedConnections()
+        if connectionInfo?.id == id {
+            connectionInfo?.name = name
         }
     }
 
