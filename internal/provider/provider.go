@@ -135,7 +135,15 @@ func ResolveProviderAndModel(spec string, currentProvider string) (string, strin
 		case "mistral", "openai", "google", "ollama", "fireworks":
 			return prefix, model
 		}
-		// Unknown prefix -- treat as full model name with current provider
+		// Unknown prefix (e.g. "accounts/fireworks/models/...") --
+		// scan all path segments for a known provider name
+		lower := strings.ToLower(spec)
+		for _, prov := range []string{"fireworks", "anthropic", "openai", "mistral", "google", "grok", "ollama", "zai"} {
+			if strings.Contains(lower, "/"+prov+"/") || strings.HasPrefix(lower, prov+"/") {
+				return prov, spec
+			}
+		}
+		// No known provider found -- treat as full model name with current provider
 	}
 
 	// Handle "anthropic.model-id" (dot separator instead of slash)
