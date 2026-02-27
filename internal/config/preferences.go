@@ -21,6 +21,9 @@ type Preferences struct {
 	FooterKeybindings bool   `json:"footer_keybindings"`
 	FooterEmoji       string `json:"footer_emoji,omitempty"`
 	Model             string `json:"model"`
+	ModelCompact      string `json:"model_compact,omitempty"`
+	ModelTitle        string `json:"model_title,omitempty"`
+	ModelTags         string `json:"model_tags,omitempty"`
 
 	// Provider and API keys
 	Provider              string `json:"provider,omitempty"`
@@ -74,7 +77,7 @@ type ConfigGroupDef struct {
 var ConfigGroupDefs = []ConfigGroupDef{
 	{
 		Name: "models",
-		Keys: []string{"model", "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "ollama.url"},
+		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "ollama.url"},
 	},
 	{
 		Name: "tools",
@@ -185,6 +188,15 @@ func LoadPreferences() Preferences {
 func mergePreferences(dst, src *Preferences) {
 	if src.Model != "" {
 		dst.Model = src.Model
+	}
+	if src.ModelCompact != "" {
+		dst.ModelCompact = src.ModelCompact
+	}
+	if src.ModelTitle != "" {
+		dst.ModelTitle = src.ModelTitle
+	}
+	if src.ModelTags != "" {
+		dst.ModelTags = src.ModelTags
 	}
 	if src.Provider != "" {
 		dst.Provider = src.Provider
@@ -368,6 +380,9 @@ func (p Preferences) All() []PrefEntry {
 		{"footer.keybindings", strconv.FormatBool(p.FooterKeybindings)},
 		{"footer.emoji", p.FooterEmoji},
 		{"model", p.Model},
+		{"model.compact", p.ModelCompact},
+		{"model.title", p.ModelTitle},
+		{"model.tags", p.ModelTags},
 		{"anthropic.api_key", resolveKeyDisplay(p.AnthropicAPIKey, "ANTHROPIC_API_KEY")},
 		{"zai.api_key", resolveKeyDisplay(p.ZAIAPIKey, "ZAI_API_KEY")},
 		{"grok.api_key", resolveKeyDisplay(p.GrokAPIKey, "XAI_API_KEY")},
@@ -407,6 +422,12 @@ func (p Preferences) Get(key string) string {
 		return p.FooterEmoji
 	case "model":
 		return p.Model
+	case "model.compact":
+		return p.ModelCompact
+	case "model.title":
+		return p.ModelTitle
+	case "model.tags":
+		return p.ModelTags
 	case "anthropic.api_key":
 		return MaskKey(p.AnthropicAPIKey)
 	case "zai.api_key":
@@ -501,6 +522,12 @@ func (p *Preferences) Set(key, value string) error {
 		p.FooterEmoji = ResolveEmoji(value)
 	case "model":
 		p.Model = value
+	case "model.compact":
+		p.ModelCompact = value
+	case "model.title":
+		p.ModelTitle = value
+	case "model.tags":
+		p.ModelTags = value
 	case "anthropic.api_key":
 		p.AnthropicAPIKey = value
 	case "zai.api_key":
@@ -593,6 +620,9 @@ func sanitizePreferences(p *Preferences) bool {
 		}
 	}
 	sanitize(&p.Model)
+	sanitize(&p.ModelCompact)
+	sanitize(&p.ModelTitle)
+	sanitize(&p.ModelTags)
 	sanitize(&p.Provider)
 	sanitize(&p.AnthropicAPIKey)
 	sanitize(&p.ZAIAPIKey)

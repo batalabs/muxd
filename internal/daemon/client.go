@@ -34,6 +34,7 @@ type SSEEvent struct {
 	ErrorMsg                 string
 	Title                    string
 	Tags                     string
+	ModelUsed                string
 	RetryAttempt             int
 	RetryWaitMs              int
 	RetryMessage             string
@@ -303,6 +304,23 @@ func (c *DaemonClient) SetModel(sessionID, label, modelID string) error {
 	return nil
 }
 
+// RenameSession sets the session title via the daemon, which also marks the
+// agent as user-renamed to prevent auto-title from overwriting it.
+func (c *DaemonClient) RenameSession(sessionID, title string) error {
+	body, _ := json.Marshal(map[string]string{"title": title})
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/api/sessions/"+sessionID+"/title", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("renaming session: %w", err)
+	}
+	resp.Body.Close()
+	return nil
+}
+
 // GetConfig retrieves the current preferences from the daemon.
 func (c *DaemonClient) GetConfig() (*config.Preferences, error) {
 	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/api/config", nil)
@@ -536,11 +554,12 @@ func ParseSSEEvent(eventType, data string) SSEEvent {
 		evt.ErrorMsg, _ = raw["error"].(string)
 
 	case "compacted":
-		// No fields
+		evt.ModelUsed, _ = raw["model"].(string)
 
 	case "titled":
 		evt.Title, _ = raw["title"].(string)
 		evt.Tags, _ = raw["tags"].(string)
+		evt.ModelUsed, _ = raw["model"].(string)
 
 	case "retrying":
 		if v, ok := raw["attempt"].(float64); ok {

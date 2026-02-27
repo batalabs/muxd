@@ -325,41 +325,98 @@ func TestService_Submit_persistsErrorMessage(t *testing.T) {
 }
 
 func TestService_Submit_autoTitle(t *testing.T) {
-	st := newMockStore()
-	sess := &domain.Session{ID: domain.NewUUID(), Title: "New Session", Model: "fake"}
-	st.addSession(sess)
+	t.Run("no title before 3 user messages", func(t *testing.T) {
+		st := newMockStore()
+		sess := &domain.Session{ID: domain.NewUUID(), Title: "New Session", Model: "fake"}
+		st.addSession(sess)
 
-	server := fakeSSEServer(t, []domain.ContentBlock{
-		{Type: "text", Text: "Response text"},
-	}, "end_turn", 100, 50)
-	defer server.Close()
+		server := fakeSSEServer(t, []domain.ContentBlock{
+			{Type: "text", Text: "Response text"},
+		}, "end_turn", 100, 50)
+		defer server.Close()
 
-	origURL := provider.TestAPIURL
-	provider.TestAPIURL = server.URL
-	defer func() { provider.TestAPIURL = origURL }()
+		origURL := provider.TestAPIURL
+		provider.TestAPIURL = server.URL
+		defer func() { provider.TestAPIURL = origURL }()
 
-	svc := NewService("fake-key", "fake", "fake", st, sess, &testAnthropicProvider{})
-	svc.Cwd = "/tmp"
+		svc := NewService("fake-key", "fake", "fake", st, sess, &testAnthropicProvider{})
+		svc.Cwd = "/tmp"
 
-	var gotTitled bool
-	var mu sync.Mutex
-	svc.Submit("My first question", func(evt Event) {
+		var gotTitled bool
+		var mu sync.Mutex
+
+		// Only 1 user message — should NOT trigger title
+		svc.Submit("First question", func(evt Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			if evt.Kind == EventTitled {
+				gotTitled = true
+			}
+		})
+
 		mu.Lock()
-		defer mu.Unlock()
-		if evt.Kind == EventTitled {
-			gotTitled = true
+		if gotTitled {
+			t.Error("did not expect EventTitled after only 1 user message")
 		}
+		mu.Unlock()
+
+		// 2nd user message — still no title
+		svc.Submit("Second question", func(evt Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			if evt.Kind == EventTitled {
+				gotTitled = true
+			}
+		})
+
+		mu.Lock()
+		if gotTitled {
+			t.Error("did not expect EventTitled after only 2 user messages")
+		}
+		mu.Unlock()
 	})
 
-	mu.Lock()
-	defer mu.Unlock()
+	t.Run("titles after 3 user messages", func(t *testing.T) {
+		st := newMockStore()
+		sess := &domain.Session{ID: domain.NewUUID(), Title: "New Session", Model: "fake"}
+		st.addSession(sess)
 
-	if !gotTitled {
-		t.Error("expected EventTitled on first response")
-	}
-	if sess.Title == "New Session" || sess.Title == "" {
-		t.Errorf("expected title to be updated, got %q", sess.Title)
-	}
+		server := fakeSSEServer(t, []domain.ContentBlock{
+			{Type: "text", Text: "Response text"},
+		}, "end_turn", 100, 50)
+		defer server.Close()
+
+		origURL := provider.TestAPIURL
+		provider.TestAPIURL = server.URL
+		defer func() { provider.TestAPIURL = origURL }()
+
+		svc := NewService("fake-key", "fake", "fake", st, sess, &testAnthropicProvider{})
+		svc.Cwd = "/tmp"
+
+		var gotTitled bool
+		var mu sync.Mutex
+		onEvent := func(evt Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			if evt.Kind == EventTitled {
+				gotTitled = true
+			}
+		}
+
+		svc.Submit("First question", onEvent)
+		svc.Submit("Second question", onEvent)
+		svc.Submit("Third question", onEvent)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !gotTitled {
+			t.Error("expected EventTitled after 3 user messages")
+		}
+		if sess.Title == "New Session" || sess.Title == "" {
+			t.Errorf("expected title to be updated, got %q", sess.Title)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

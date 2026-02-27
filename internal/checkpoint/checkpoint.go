@@ -1,6 +1,7 @@
 package checkpoint
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -20,13 +21,23 @@ type Checkpoint struct {
 // ---------------------------------------------------------------------------
 
 // GitRun executes a git command and returns trimmed stdout.
+// Stderr is captured separately so that warnings (e.g. CRLF on Windows)
+// don't corrupt the stdout result.
 func GitRun(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := strings.TrimSpace(stdout.String())
 	if err != nil {
-		return strings.TrimSpace(string(out)), fmt.Errorf("git %s: %s: %w", args[0], strings.TrimSpace(string(out)), err)
+		errMsg := strings.TrimSpace(stderr.String())
+		if errMsg == "" {
+			errMsg = out
+		}
+		return out, fmt.Errorf("git %s: %s: %w", args[0], errMsg, err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return out, nil
 }
 
 // DetectGitRepo returns the repo root if the cwd is inside a git repo.

@@ -368,6 +368,31 @@ func TestService_generateAndSetTitle(t *testing.T) {
 		}
 	})
 
+	t.Run("skips when user renamed", func(t *testing.T) {
+		st := newMockStore()
+		sess := &domain.Session{ID: "sess-renamed", Title: "My Custom Title"}
+		st.addSession(sess)
+
+		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
+		svc.messages = []domain.TranscriptMessage{
+			{Role: "user", Content: "Help me refactor"},
+			{Role: "assistant", Content: "Sure!"},
+		}
+		svc.SetUserRenamed()
+
+		var events []Event
+		svc.generateAndSetTitle("Sure!", func(evt Event) {
+			events = append(events, evt)
+		})
+
+		if sess.Title != "My Custom Title" {
+			t.Errorf("expected title unchanged after user rename, got %q", sess.Title)
+		}
+		if len(events) != 0 {
+			t.Error("expected no events when user renamed")
+		}
+	})
+
 	t.Run("skips empty user text", func(t *testing.T) {
 		st := newMockStore()
 		sess := &domain.Session{ID: "sess-title3", Title: "old"}
@@ -422,6 +447,32 @@ func TestService_Submit_alreadyRunning(t *testing.T) {
 	if events[0].Err == nil || events[0].Err.Error() != "agent is already running" {
 		t.Errorf("expected 'agent is already running' error, got %v", events[0].Err)
 	}
+}
+
+func TestService_SetUtilityModels(t *testing.T) {
+	t.Run("SetModelCompact stores value", func(t *testing.T) {
+		svc := &Service{}
+		svc.SetModelCompact("claude-haiku-4-5-20251001")
+		if svc.modelCompact != "claude-haiku-4-5-20251001" {
+			t.Errorf("expected claude-haiku-4-5-20251001, got %s", svc.modelCompact)
+		}
+	})
+
+	t.Run("SetModelTitle stores value", func(t *testing.T) {
+		svc := &Service{}
+		svc.SetModelTitle("gpt-4o-mini")
+		if svc.modelTitle != "gpt-4o-mini" {
+			t.Errorf("expected gpt-4o-mini, got %s", svc.modelTitle)
+		}
+	})
+
+	t.Run("SetModelTags stores value", func(t *testing.T) {
+		svc := &Service{}
+		svc.SetModelTags("claude-haiku-4-5-20251001")
+		if svc.modelTags != "claude-haiku-4-5-20251001" {
+			t.Errorf("expected claude-haiku-4-5-20251001, got %s", svc.modelTags)
+		}
+	})
 }
 
 func TestService_Submit_cancelledBeforeLoop(t *testing.T) {

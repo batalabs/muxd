@@ -8,44 +8,69 @@ import (
 )
 
 func TestSummarizationModel(t *testing.T) {
-	t.Run("returns haiku for anthropic", func(t *testing.T) {
+	t.Run("defaults to main model for anthropic", func(t *testing.T) {
 		svc := &Service{
 			modelID: "claude-sonnet-4-20250514",
 			prov:    &fakeProvider{name: "anthropic"},
 		}
 		got := svc.summarizationModel()
-		if got != "claude-haiku-4-5-20251001" {
-			t.Errorf("expected haiku model, got %s", got)
+		if got != "claude-sonnet-4-20250514" {
+			t.Errorf("expected main model, got %s", got)
 		}
 	})
 
-	t.Run("returns gpt-4o-mini for openai", func(t *testing.T) {
+	t.Run("defaults to main model for openai", func(t *testing.T) {
 		svc := &Service{
 			modelID: "gpt-4o",
 			prov:    &fakeProvider{name: "openai"},
 		}
 		got := svc.summarizationModel()
-		if got != "gpt-4o-mini" {
-			t.Errorf("expected gpt-4o-mini, got %s", got)
+		if got != "gpt-4o" {
+			t.Errorf("expected main model, got %s", got)
 		}
 	})
 
-	t.Run("falls back to current model for unknown provider", func(t *testing.T) {
+	t.Run("defaults to main model for unknown provider", func(t *testing.T) {
 		svc := &Service{
 			modelID: "custom-model",
 			prov:    &fakeProvider{name: "ollama"},
 		}
 		got := svc.summarizationModel()
 		if got != "custom-model" {
-			t.Errorf("expected current model fallback, got %s", got)
+			t.Errorf("expected main model, got %s", got)
 		}
 	})
 
-	t.Run("falls back to current model when no provider", func(t *testing.T) {
+	t.Run("defaults to main model when no provider", func(t *testing.T) {
 		svc := &Service{modelID: "my-model"}
 		got := svc.summarizationModel()
 		if got != "my-model" {
-			t.Errorf("expected current model fallback, got %s", got)
+			t.Errorf("expected main model, got %s", got)
+		}
+	})
+
+	t.Run("returns modelCompact when set", func(t *testing.T) {
+		svc := &Service{
+			modelCompact: "custom-cheap-model",
+			modelID:      "claude-opus-4-6",
+			prov:         &fakeProvider{name: "anthropic"},
+		}
+		got := svc.summarizationModel()
+		if got != "custom-cheap-model" {
+			t.Errorf("expected custom-cheap-model, got %s", got)
+		}
+	})
+
+	t.Run("modelCompact overrides provider default", func(t *testing.T) {
+		svc := &Service{
+			modelCompact: "claude-sonnet-4-6",
+			modelID:      "claude-opus-4-6",
+			prov:         &fakeProvider{name: "anthropic"},
+		}
+		got := svc.summarizationModel()
+		// Should use modelCompact, not the default haiku
+		if got != "claude-sonnet-4-6" {
+			t.Errorf("expected claude-sonnet-4-6, got %s", got)
 		}
 	})
 }

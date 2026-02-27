@@ -98,7 +98,11 @@ func (a *Service) compactIfNeeded(onEvent EventFunc) {
 
 	a.messages = result.Messages
 	a.lastInputTokens = 0
+	droppedCount := len(result.Dropped)
+	sumModel := a.summarizationModel()
 	a.mu.Unlock()
+
+	onEvent(Event{Kind: EventToolStart, ToolUseID: "internal_compact", ToolName: "compact_context"})
 
 	// Generate LLM summary of dropped messages (unlocked — makes API call).
 	summary := a.generateCompactionSummary(result.Dropped)
@@ -114,7 +118,8 @@ func (a *Service) compactIfNeeded(onEvent EventFunc) {
 	a.mu.Unlock()
 
 	a.persistCompaction(summary)
-	onEvent(Event{Kind: EventCompacted})
+	onEvent(Event{Kind: EventToolDone, ToolUseID: "internal_compact", ToolName: "compact_context", ToolResult: fmt.Sprintf("Compacted %d messages (model: %s)", droppedCount, sumModel)})
+	onEvent(Event{Kind: EventCompacted, ModelUsed: sumModel})
 }
 
 // persistCompaction saves the current compaction state to the database.
@@ -194,17 +199,12 @@ func summarizeToolInput(input map[string]any) string {
 	return result
 }
 
-// summarizationModel returns a cheap, fast model ID for compaction summaries.
-// Uses Haiku for Anthropic, gpt-4o-mini for OpenAI, or falls back to the
-// current model if the provider is unknown.
+// summarizationModel returns the model ID for compaction summaries.
+// Uses the user-configured model.compact if set, otherwise defaults to the
+// main model.
 func (a *Service) summarizationModel() string {
-	if a.prov != nil {
-		switch a.prov.Name() {
-		case "anthropic":
-			return "claude-haiku-4-5-20251001"
-		case "openai":
-			return "gpt-4o-mini"
-		}
+	if a.modelCompact != "" {
+		return a.modelCompact
 	}
 	return a.modelID
 }

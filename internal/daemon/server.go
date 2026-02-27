@@ -715,12 +715,13 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 			sendSSE("error", map[string]string{"error": errMsg})
 
 		case agent.EventCompacted:
-			sendSSE("compacted", map[string]string{})
+			sendSSE("compacted", map[string]string{"model": evt.ModelUsed})
 
 		case agent.EventTitled:
 			sendSSE("titled", map[string]string{
 				"title": evt.NewTitle,
 				"tags":  evt.NewTags,
+				"model": evt.ModelUsed,
 			})
 		}
 	})
@@ -840,6 +841,13 @@ func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Mark the agent as user-renamed so auto-title doesn't overwrite.
+	s.mu.Lock()
+	if ag, ok := s.agents[sessionID]; ok {
+		ag.SetUserRenamed()
+	}
+	s.mu.Unlock()
+
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 		"title":  req.Title,
@@ -937,6 +945,24 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 			ag.SetDisabledTools(disabled)
 		}
 	}
+	if req.Key == "model.compact" {
+		_, id := provider.ResolveProviderAndModel(req.Value, s.provider.Name())
+		for _, ag := range s.agents {
+			ag.SetModelCompact(id)
+		}
+	}
+	if req.Key == "model.title" {
+		_, id := provider.ResolveProviderAndModel(req.Value, s.provider.Name())
+		for _, ag := range s.agents {
+			ag.SetModelTitle(id)
+		}
+	}
+	if req.Key == "model.tags" {
+		_, id := provider.ResolveProviderAndModel(req.Value, s.provider.Name())
+		for _, ag := range s.agents {
+			ag.SetModelTags(id)
+		}
+	}
 	display := s.prefs.Get(req.Key)
 	s.mu.Unlock()
 
@@ -1032,6 +1058,18 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	}
 	if s.prefs != nil {
 		ag.SetDisabledTools(s.prefs.DisabledToolsSet())
+	}
+	if s.prefs != nil && s.prefs.ModelCompact != "" {
+		_, compactID := provider.ResolveProviderAndModel(s.prefs.ModelCompact, s.provider.Name())
+		ag.SetModelCompact(compactID)
+	}
+	if s.prefs != nil && s.prefs.ModelTitle != "" {
+		_, titleID := provider.ResolveProviderAndModel(s.prefs.ModelTitle, s.provider.Name())
+		ag.SetModelTitle(titleID)
+	}
+	if s.prefs != nil && s.prefs.ModelTags != "" {
+		_, tagsID := provider.ResolveProviderAndModel(s.prefs.ModelTags, s.provider.Name())
+		ag.SetModelTags(tagsID)
 	}
 	if s.mcpManager != nil {
 		ag.SetMCPManager(s.mcpManager)

@@ -88,7 +88,9 @@ type MCPToolsMsg struct {
 }
 
 // CompactedMsg signals that the server compacted the context.
-type CompactedMsg struct{}
+type CompactedMsg struct {
+	ModelUsed string
+}
 
 // AskUserMsg is sent when the agent's ask_user tool needs user input.
 type AskUserMsg struct {
@@ -98,8 +100,9 @@ type AskUserMsg struct {
 
 // TitledMsg signals that the session title and tags were generated.
 type TitledMsg struct {
-	Title string
-	Tags  string
+	Title     string
+	Tags      string
+	ModelUsed string
 }
 
 // RetryingMsg signals that the agent is retrying after a rate limit error.
@@ -361,7 +364,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTurnDone(msg)
 
 	case CompactedMsg:
-		return m, PrintToScrollback(WelcomeStyle.Render("Context compacted to stay within limits."))
+		return m, nil
 
 	case historyBatchMsg:
 		var historyCmd tea.Cmd
@@ -1179,7 +1182,11 @@ func (m Model) handlePickerRename(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEnter:
 		id, newTitle := m.picker.CommitRename()
 		if id != "" && newTitle != "" {
-			if m.Store != nil {
+			if m.Daemon != nil {
+				if err := m.Daemon.RenameSession(id, newTitle); err != nil {
+					fmt.Fprintf(os.Stderr, "tui: rename via daemon: %v\n", err)
+				}
+			} else if m.Store != nil {
 				if err := m.Store.UpdateSessionTitle(id, newTitle); err != nil {
 					fmt.Fprintf(os.Stderr, "tui: update session title: %v\n", err)
 				}
@@ -1428,7 +1435,12 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 			return m, PrintToScrollback(m.renderError("Usage: /rename <new title>"))
 		}
 		newTitle := strings.Join(parts[1:], " ")
-		if m.Store != nil {
+		if m.Daemon != nil {
+			// Use the daemon endpoint which also marks agent as user-renamed.
+			if err := m.Daemon.RenameSession(m.Session.ID, newTitle); err != nil {
+				fmt.Fprintf(os.Stderr, "tui: rename via daemon: %v\n", err)
+			}
+		} else if m.Store != nil {
 			if err := m.Store.UpdateSessionTitle(m.Session.ID, newTitle); err != nil {
 				fmt.Fprintf(os.Stderr, "tui: update session title: %v\n", err)
 			}
@@ -3037,9 +3049,9 @@ func StreamViaDaemon(d *daemon.DaemonClient, sessionID, text string) tea.Cmd {
 			case "error":
 				Prog.Send(StreamDoneMsg{Err: fmt.Errorf("%s", evt.ErrorMsg)})
 			case "compacted":
-				Prog.Send(CompactedMsg{})
+				Prog.Send(CompactedMsg{ModelUsed: evt.ModelUsed})
 			case "titled":
-				Prog.Send(TitledMsg{Title: evt.Title, Tags: evt.Tags})
+				Prog.Send(TitledMsg{Title: evt.Title, Tags: evt.Tags, ModelUsed: evt.ModelUsed})
 			}
 		})
 		if err != nil {

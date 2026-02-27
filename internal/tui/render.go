@@ -799,6 +799,10 @@ func ToolResultHeader(toolName, result string) string {
 		}
 		n := strings.Count(result, "\n") + 1
 		return fmt.Sprintf("[files] %d entries", n)
+	case "generate_title":
+		return "[title] " + result
+	case "compact_context":
+		return "[compact] " + result
 	default:
 		return "[result] " + toolName
 	}

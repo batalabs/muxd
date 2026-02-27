@@ -221,11 +221,20 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 			}
 		}
 
-		// Auto-title on first response
+		// Auto-title after 3 user messages
 		a.mu.Lock()
-		shouldTitle := !a.titled && a.store != nil && a.session != nil
-		if shouldTitle {
-			a.titled = true
+		shouldTitle := false
+		if !a.titled && a.store != nil && a.session != nil {
+			userCount := 0
+			for _, m := range a.messages {
+				if m.Role == "user" && m.Content != "" && !m.HasBlocks() {
+					userCount++
+				}
+			}
+			if userCount >= 3 {
+				shouldTitle = true
+				a.titled = true
+			}
 		}
 		a.mu.Unlock()
 

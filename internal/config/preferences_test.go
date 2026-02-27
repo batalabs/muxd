@@ -874,3 +874,67 @@ func TestSet_invalidBoolValue(t *testing.T) {
 		t.Fatal("expected error for invalid bool value")
 	}
 }
+
+func TestPerTaskModelConfig(t *testing.T) {
+	t.Run("Set and Get model.compact", func(t *testing.T) {
+		p := DefaultPreferences()
+		if err := p.Set("model.compact", "claude-haiku"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := p.Get("model.compact"); got != "claude-haiku" {
+			t.Errorf("expected claude-haiku, got %s", got)
+		}
+	})
+
+	t.Run("Set and Get model.title", func(t *testing.T) {
+		p := DefaultPreferences()
+		if err := p.Set("model.title", "gpt-4o-mini"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := p.Get("model.title"); got != "gpt-4o-mini" {
+			t.Errorf("expected gpt-4o-mini, got %s", got)
+		}
+	})
+
+	t.Run("Set and Get model.tags", func(t *testing.T) {
+		p := DefaultPreferences()
+		if err := p.Set("model.tags", "claude-haiku"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := p.Get("model.tags"); got != "claude-haiku" {
+			t.Errorf("expected claude-haiku, got %s", got)
+		}
+	})
+
+	t.Run("appears in All()", func(t *testing.T) {
+		p := DefaultPreferences()
+		_ = p.Set("model.compact", "claude-haiku")
+		found := false
+		for _, e := range p.All() {
+			if e.Key == "model.compact" && e.Value == "claude-haiku" {
+				found = true
+			}
+		}
+		if !found {
+			t.Error("model.compact not found in All()")
+		}
+	})
+
+	t.Run("appears in models config group", func(t *testing.T) {
+		p := DefaultPreferences()
+		_ = p.Set("model.compact", "claude-haiku")
+		group := p.GroupByName("models")
+		if group == nil {
+			t.Fatal("models group not found")
+		}
+		found := false
+		for _, e := range group.Entries {
+			if e.Key == "model.compact" {
+				found = true
+			}
+		}
+		if !found {
+			t.Error("model.compact not in models group")
+		}
+	})
+}

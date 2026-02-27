@@ -51,6 +51,7 @@ type Event struct {
 	AskResponse              chan<- string         // EventAskUser: adapter sends answer here
 	NewTitle                 string                // EventTitled
 	NewTags                  string                // EventTitled
+	ModelUsed                string                // EventTitled / EventCompacted
 	RetryAttempt             int                   // EventRetrying
 	RetryAfter               time.Duration         // EventRetrying
 	RetryMessage             string                // EventRetrying
@@ -119,9 +120,10 @@ type Service struct {
 	lastInputTokens int
 	agentLoopCount  int
 
-	running   bool
-	cancelled bool
-	titled    bool
+	running     bool
+	cancelled   bool
+	titled      bool
+	userRenamed bool // true when user manually renamed the session
 
 	// Cwd is the working directory used for system prompts.
 	Cwd string
@@ -144,12 +146,18 @@ type Service struct {
 	// braveAPIKey is the Brave Search API key from preferences.
 	braveAPIKey    string
 	textbeltAPIKey string
-	xClientID      string
-	xClientSecret  string
-	xAccessToken   string
-	xRefreshToken  string
-	xTokenExpiry   string
-	xTokenSaver    func(accessToken, refreshToken, tokenExpiry string) error
+
+	// Per-task utility model overrides (resolved model IDs).
+	modelCompact string // for compaction summaries
+	modelTitle   string // for auto-title generation
+	modelTags    string // for auto-tag generation
+
+	xClientID     string
+	xClientSecret string
+	xAccessToken  string
+	xRefreshToken string
+	xTokenExpiry  string
+	xTokenSaver   func(accessToken, refreshToken, tokenExpiry string) error
 
 	// disabledTools are excluded from model tool specs and execution.
 	disabledTools map[string]bool

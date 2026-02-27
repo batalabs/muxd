@@ -11,10 +11,16 @@ import (
 	"github.com/batalabs/muxd/internal/tools"
 )
 
-// generateAndSetTitle generates a title and tags for the session using the LLM,
-// falling back to a truncated user message on failure.
+// generateAndSetTitle generates a title for the session. If model.title is
+// configured, it uses a cheap LLM call to produce a concise title. Otherwise
+// it falls back to truncating the first user message. Skipped entirely if the
+// user has manually renamed the session.
 func (a *Service) generateAndSetTitle(asstText string, onEvent EventFunc) {
 	a.mu.Lock()
+	if a.userRenamed {
+		a.mu.Unlock()
+		return
+	}
 	var userText string
 	for _, tmsg := range a.messages {
 		if tmsg.Role == "user" {
@@ -22,19 +28,21 @@ func (a *Service) generateAndSetTitle(asstText string, onEvent EventFunc) {
 			break
 		}
 	}
+	titleModel := a.modelTitle
 	a.mu.Unlock()
 
 	if userText == "" {
 		return
 	}
 
-	// Use a simple truncation instead of an LLM call to avoid burning
-	// an extra API request (which causes immediate rate limiting on Opus).
-	title := userText
-	if len(title) > 50 {
-		title = title[:50] + "..."
+	// Default to the main model when model.title is not configured.
+	if titleModel == "" {
+		titleModel = a.modelID
 	}
-	title = strings.Join(strings.Fields(title), " ")
+
+	onEvent(Event{Kind: EventToolStart, ToolUseID: "internal_title", ToolName: "generate_title"})
+
+	title := a.generateTitle(userText, asstText, titleModel)
 
 	a.mu.Lock()
 	a.session.Title = title
@@ -44,7 +52,59 @@ func (a *Service) generateAndSetTitle(asstText string, onEvent EventFunc) {
 		fmt.Fprintf(os.Stderr, "agent: update session title: %v\n", err)
 	}
 
-	onEvent(Event{Kind: EventTitled, NewTitle: title})
+	onEvent(Event{Kind: EventToolDone, ToolUseID: "internal_title", ToolName: "generate_title", ToolResult: title + " (model: " + titleModel + ")"})
+	onEvent(Event{Kind: EventTitled, NewTitle: title, ModelUsed: titleModel})
+}
+
+// generateTitle produces a session title. When titleModel is set and a
+// provider is available, it asks the LLM for a short title. Otherwise it
+// truncates the user message.
+func (a *Service) generateTitle(userText, asstText, titleModel string) string {
+	if titleModel != "" && a.prov != nil {
+		title := a.llmTitle(userText, asstText, titleModel)
+		if title != "" {
+			return title
+		}
+	}
+	// Fallback: truncate the first user message.
+	title := userText
+	if len(title) > 50 {
+		title = title[:50] + "..."
+	}
+	return strings.Join(strings.Fields(title), " ")
+}
+
+// llmTitle calls a cheap model to generate a concise session title.
+func (a *Service) llmTitle(userText, asstText, titleModel string) string {
+	prompt := fmt.Sprintf("Generate a short title (max 50 chars) for this conversation. Return ONLY the title, no quotes or punctuation wrapping.\n\nUser: %s\n\nAssistant: %s", userText, asstText)
+	if len(prompt) > 2000 {
+		prompt = prompt[:2000]
+	}
+
+	msgs := []domain.TranscriptMessage{
+		{Role: "user", Content: prompt},
+	}
+	system := "You generate concise session titles. Return only the title text, nothing else. Maximum 50 characters."
+
+	blocks, _, _, err := a.prov.StreamMessage(a.apiKey, titleModel, msgs, nil, system, nil)
+	if err != nil {
+		return ""
+	}
+
+	var title string
+	for _, b := range blocks {
+		if b.Type == "text" {
+			title += b.Text
+		}
+	}
+	title = strings.TrimSpace(title)
+	if len(title) > 60 {
+		title = title[:60]
+	}
+	if title == "" {
+		return ""
+	}
+	return title
 }
 
 // Cancel signals the running Submit loop to stop at the next safe point.
@@ -156,6 +216,7 @@ func (a *Service) NewSession(projectPath string) error {
 	a.outputTokens = 0
 	a.lastInputTokens = 0
 	a.titled = false
+	a.userRenamed = false
 	a.agentLoopCount = 0
 	a.checkpoints = nil
 	a.redoStack = nil
@@ -182,6 +243,36 @@ func (a *Service) SetTextbeltAPIKey(key string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.textbeltAPIKey = key
+}
+
+// SetUserRenamed marks the session as manually renamed by the user,
+// preventing auto-title generation from overwriting it.
+func (a *Service) SetUserRenamed() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.userRenamed = true
+	a.titled = true
+}
+
+// SetModelCompact sets the model ID for compaction summaries.
+func (a *Service) SetModelCompact(id string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.modelCompact = id
+}
+
+// SetModelTitle sets the model ID for auto-title generation.
+func (a *Service) SetModelTitle(id string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.modelTitle = id
+}
+
+// SetModelTags sets the model ID for auto-tag generation.
+func (a *Service) SetModelTags(id string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.modelTags = id
 }
 
 // SetXOAuth configures X OAuth runtime credentials for this agent.
