@@ -7,7 +7,7 @@ struct GlassInputModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .glassEffect(.regular, in: .capsule)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
         } else {
             content
                 .background {
@@ -323,6 +323,7 @@ struct ChatView: View {
 
 struct MessageBubbleView: View {
     let message: TranscriptMessage
+    @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
 
     private var hasVisibleContent: Bool {
         // Has text content
@@ -377,14 +378,14 @@ struct MessageBubbleView: View {
                     HStack {
                         if isActualUserMessage { Spacer(minLength: 60) }
 
-                        MarkdownText(message.textContent)
+                        MarkdownText(message.textContent, scale: fontSize.scale)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(isActualUserMessage ? Color.accentColor : Color(.systemGray5))
                             .foregroundColor(isActualUserMessage ? .white : .primary)
                             .cornerRadius(18)
 
-                        if !isActualUserMessage { Spacer(minLength: 60) }
+                        if !isActualUserMessage { Spacer(minLength: 20) }
                     }
                 }
 
@@ -467,16 +468,32 @@ struct ToolResultBlockView: View {
 
 struct MarkdownText: View {
     let text: String
+    let scale: CGFloat
 
-    init(_ text: String) {
+    init(_ text: String, scale: CGFloat = 1.0) {
         self.text = text
+        self.scale = scale
+    }
+
+    private var textSize: CGFloat {
+        17 * scale  // Base size 17pt (body)
+    }
+
+    private var codeSize: CGFloat {
+        13 * scale  // Base size 13pt (caption)
     }
 
     var body: some View {
         Markdown(text)
+            .markdownTextStyle(\.text) {
+                FontSize(textSize)
+            }
+            .markdownTextStyle(\.code) {
+                FontSize(codeSize)
+            }
             .markdownBlockStyle(\.codeBlock) { configuration in
                 configuration.label
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(size: codeSize, design: .monospaced))
                     .padding(8)
                     .background(Color(.systemGray6))
                     .cornerRadius(6)
@@ -486,6 +503,7 @@ struct MarkdownText: View {
 
 struct StreamingTextView: View {
     let text: String
+    @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
 
     var body: some View {
         HStack {
@@ -501,7 +519,7 @@ struct StreamingTextView: View {
                 }
                 .foregroundColor(.secondary)
 
-                MarkdownText(text)
+                MarkdownText(text, scale: fontSize.scale)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Color(.systemGray5))
@@ -515,7 +533,7 @@ struct StreamingTextView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            Spacer(minLength: 60)
+            Spacer(minLength: 20)
         }
     }
 }

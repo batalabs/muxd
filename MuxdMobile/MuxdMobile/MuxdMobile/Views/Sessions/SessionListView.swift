@@ -62,7 +62,7 @@ struct SessionListView: View {
                 }
             } else {
                 List {
-                    ForEach(Array(viewModel.sessions.enumerated()), id: \.element.id) { index, session in
+                    ForEach(viewModel.sessions) { session in
                         ZStack(alignment: .leading) {
                             NavigationLink(value: session) {
                                 EmptyView()
@@ -78,7 +78,7 @@ struct SessionListView: View {
                             }
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
+                        .listRowSeparator(session.id == viewModel.sessions.first?.id ? .hidden : .visible, edges: .top)
                         .contextMenu {
                             Button {
                                 viewModel.sessionToRename = session
@@ -253,23 +253,6 @@ enum ModelProvider {
     }
 }
 
-struct ModelBadgeView: View {
-    let model: String
-
-    var body: some View {
-        let provider = ModelProvider(model: model)
-
-        Text(model)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
-            .background(provider.color.opacity(0.15))
-            .foregroundColor(provider.color)
-            .cornerRadius(6)
-    }
-}
-
 struct SessionRowView: View {
     let session: Session
 
@@ -290,7 +273,10 @@ struct SessionRowView: View {
 
             HStack {
                 if !session.model.isEmpty {
-                    ModelBadgeView(model: session.model)
+                    Text(session.model)
+                        .font(.caption)
+                        .foregroundColor(ModelProvider(model: session.model).color)
+                        .lineLimit(1)
                 }
 
                 Spacer()
@@ -347,7 +333,6 @@ class SessionListViewModel: ObservableObject {
 
     func createSession(projectPath: String, modelID: String?) async {
         guard let client = client else {
-            print("SessionListViewModel: client is nil!")
             self.error = "Not connected to server"
             return
         }
@@ -356,20 +341,16 @@ class SessionListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            print("SessionListViewModel: creating session at \(projectPath)")
-            let sessionID = try await client.createSession(projectPath: projectPath, modelID: modelID)
-            print("SessionListViewModel: created session \(sessionID)")
+            _ = try await client.createSession(projectPath: projectPath, modelID: modelID)
             await loadSessions()
             showNewSession = false
         } catch {
-            print("SessionListViewModel: create error: \(error)")
             self.error = error.localizedDescription
         }
     }
 
     func deleteSessions(at indexSet: IndexSet) async {
         guard let client = client else {
-            print("SessionListViewModel: client is nil for delete!")
             self.error = "Not connected to server"
             return
         }
@@ -377,17 +358,13 @@ class SessionListViewModel: ObservableObject {
         for index in indexSet {
             let session = sessions[index]
             do {
-                print("SessionListViewModel: deleting session \(session.id)")
                 try await client.deleteSession(id: session.id)
-                print("SessionListViewModel: deleted session \(session.id)")
             } catch {
-                print("SessionListViewModel: delete error: \(error)")
                 self.error = error.localizedDescription
                 return
             }
         }
 
-        // Remove from local list
         sessions.remove(atOffsets: indexSet)
     }
 

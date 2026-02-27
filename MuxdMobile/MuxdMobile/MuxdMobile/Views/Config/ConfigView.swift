@@ -14,9 +14,24 @@ enum AppTheme: String, CaseIterable {
     }
 }
 
+enum AppFontSize: String, CaseIterable {
+    case small = "Small"
+    case medium = "Medium"
+    case large = "Large"
+
+    var scale: CGFloat {
+        switch self {
+        case .small: return 0.85
+        case .medium: return 1.0
+        case .large: return 1.15
+        }
+    }
+}
+
 struct ConfigView: View {
     @EnvironmentObject var appState: AppState
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
+    @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
     @State private var config: [String: Any] = [:]
     @State private var isLoading = false
     @State private var error: String?
@@ -28,6 +43,12 @@ struct ConfigView: View {
                     Picker("Theme", selection: $appTheme) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
                             Text(theme.rawValue).tag(theme)
+                        }
+                    }
+
+                    Picker("Font Size", selection: $fontSize) {
+                        ForEach(AppFontSize.allCases, id: \.self) { size in
+                            Text(size.rawValue).tag(size)
                         }
                     }
                 }
@@ -51,6 +72,18 @@ struct ConfigView: View {
                 Section("About") {
                     LabeledContent("App Version", value: "1.0.0")
                     LabeledContent("muxd Mobile", value: "iOS Client")
+                }
+
+                Section("Support") {
+                    Link(destination: URL(string: "https://www.muxd.sh/support")!) {
+                        HStack {
+                            Text("Get Help")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
 
                 Section("Legal") {

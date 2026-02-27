@@ -1,5 +1,47 @@
 import SwiftUI
 
+struct AppGlassModifier: ViewModifier {
+    var circular: Bool = false
+
+    func body(content: Content) -> some View {
+        if circular {
+            if #available(iOS 26.0, *) {
+                content
+                    .frame(width: 44, height: 44)
+                    .glassEffect(.regular, in: .circle)
+            } else {
+                content
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+        } else {
+            if #available(iOS 26.0, *) {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .glassEffect(.regular, in: .capsule)
+            } else {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+        }
+    }
+}
+
+struct AppGlassButtonStyle: ButtonStyle {
+    var circular: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(AppGlassModifier(circular: circular))
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
 @main
 struct MuxdMobileApp: App {
     @StateObject private var appState = AppState()
@@ -25,7 +67,7 @@ struct ContentView: View {
                     Text("Home")
                 }
 
-            ServersView()
+            ClientsView()
                 .tabItem {
                     Image(systemName: "server.rack")
                     Text("Clients")
@@ -47,17 +89,11 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
+            VStack(spacing: 0) {
                 Spacer()
 
-                // Logo header
+                // Header
                 VStack(spacing: 8) {
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 80, height: 80)
-                        .cornerRadius(16)
-
                     Text("muxd")
                         .font(.system(size: 36, weight: .bold))
 
@@ -93,8 +129,8 @@ struct HomeView: View {
                         .padding(.top, 8)
                 }
                 .padding(.horizontal, 24)
+                .padding(.top, 40)
 
-                Spacer()
                 Spacer()
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -119,7 +155,7 @@ struct HomeView: View {
     }
 }
 
-struct ServersView: View {
+struct ClientsView: View {
     @EnvironmentObject var appState: AppState
     @State private var navigationPath = NavigationPath()
     @State private var showScanner = false
@@ -144,7 +180,7 @@ struct ServersView: View {
                 } else {
                     List {
                         ForEach(Array(appState.savedConnections.enumerated()), id: \.element.id) { index, connection in
-                            ServerRowView(
+                            ClientRowView(
                                 connection: connection,
                                 isConnecting: connectingToID == connection.id,
                                 isDisabled: connectingToID != nil && connectingToID != connection.id,
@@ -168,13 +204,22 @@ struct ServersView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Clients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "server.rack")
+                        Text("Clients")
+                    }
+                    .padding(.horizontal, 8)
+                    .modifier(AppGlassModifier())
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { showScanner = true }) {
                         Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
                     }
+                    .buttonStyle(AppGlassButtonStyle(circular: true))
                 }
             }
             .navigationDestination(for: String.self) { _ in
@@ -228,13 +273,16 @@ struct ServersView: View {
     }
 }
 
-struct ServerRowView: View {
+struct ClientRowView: View {
     let connection: ConnectionInfo
     let isConnecting: Bool
     let isDisabled: Bool
     let onConnect: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
+
+    @State private var showSpinner = false
+    @State private var spinnerTask: Task<Void, Never>?
 
     var body: some View {
         Button(action: {
@@ -260,14 +308,18 @@ struct ServerRowView: View {
 
                 Spacer()
 
-                if isConnecting {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
+                ZStack {
                     Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(.tertiaryLabel))
+                        .opacity(showSpinner ? 0 : 1)
+
+                    if showSpinner {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
                 }
+                .frame(width: 20, height: 20)
             }
         }
         .buttonStyle(.plain)
@@ -290,6 +342,26 @@ struct ServerRowView: View {
             Button(role: .destructive, action: onDelete) {
                 Label("Delete", systemImage: "trash")
             }
+        }
+        .onChange(of: isConnecting) { _, connecting in
+            spinnerTask?.cancel()
+            if connecting {
+                spinnerTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeIn(duration: 0.15)) {
+                        showSpinner = true
+                    }
+                }
+            } else {
+                withAnimation {
+                    showSpinner = false
+                }
+            }
+        }
+        .onDisappear {
+            spinnerTask?.cancel()
+            showSpinner = false
         }
     }
 }
