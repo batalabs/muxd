@@ -28,7 +28,7 @@ struct ContentView: View {
             ServersView()
                 .tabItem {
                     Image(systemName: "server.rack")
-                    Text("Servers")
+                    Text("Clients")
                 }
 
             ConfigView()
@@ -132,9 +132,9 @@ struct ServersView: View {
             Group {
                 if appState.savedConnections.isEmpty {
                     ContentUnavailableView {
-                        Label("No Servers", systemImage: "server.rack")
+                        Label("No Clients", systemImage: "server.rack")
                     } description: {
-                        Text("Add a server to get started")
+                        Text("Add a client to get started")
                     } actions: {
                         Button("Scan QR Code") {
                             showScanner = true
@@ -168,7 +168,7 @@ struct ServersView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Servers")
+            .navigationTitle("Clients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

@@ -63,13 +63,19 @@ struct SessionListView: View {
             } else {
                 List {
                     ForEach(Array(viewModel.sessions.enumerated()), id: \.element.id) { index, session in
-                        ZStack {
+                        ZStack(alignment: .leading) {
                             NavigationLink(value: session) {
                                 EmptyView()
                             }
                             .opacity(0)
 
-                            SessionRowView(session: session)
+                            HStack {
+                                SessionRowView(session: session)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color(.tertiaryLabel))
+                            }
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
@@ -227,7 +233,7 @@ enum ModelProvider {
         case .google: return Color(red: 0.26, green: 0.52, blue: 0.96)    // Blue
         case .meta: return Color(red: 0.0, green: 0.47, blue: 1.0)        // Facebook blue
         case .mistral: return Color(red: 1.0, green: 0.5, blue: 0.0)      // Orange
-        case .fireworks: return Color(red: 0.93, green: 0.26, blue: 0.21) // Red
+        case .fireworks: return Color(red: 0.6, green: 0.2, blue: 0.8)     // Purple
         case .deepseek: return Color(red: 0.4, green: 0.3, blue: 0.9)     // Purple
         case .other: return Color.gray
         }
@@ -269,12 +275,12 @@ struct SessionRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(spacing: 12) {
                 Text(session.displayTitle)
                     .font(.headline)
                     .lineLimit(1)
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 Text(session.shortID)
                     .font(.caption)

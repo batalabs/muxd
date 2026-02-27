@@ -32,28 +32,6 @@ struct ConfigView: View {
                     }
                 }
 
-                Section("Connection") {
-                    if appState.isConnected, let info = appState.connectionInfo {
-                        LabeledContent("Server", value: info.name)
-                        LabeledContent("Host", value: info.host)
-                        LabeledContent("Port", value: "\(info.port)")
-                        LabeledContent("Token", value: "••••••••")
-
-                        if appState.savedConnections.count > 1 {
-                            Button("Switch Server") {
-                                appState.disconnect()
-                            }
-                        } else {
-                            Button("Disconnect", role: .destructive) {
-                                appState.disconnect()
-                            }
-                        }
-                    } else {
-                        Text("Not connected")
-                            .foregroundColor(.secondary)
-                    }
-                }
-
                 if !config.isEmpty {
                     Section("Server Config") {
                         if let model = config["model"] as? String, !model.isEmpty {
