@@ -67,7 +67,7 @@ func TestSmsSendTool(t *testing.T) {
 			json.NewEncoder(w).Encode(textbeltSendResponse{
 				Success:        true,
 				QuotaRemaining: 40,
-				TextID:         12345,
+				TextID:         "12345",
 			})
 		}))
 		defer server.Close()

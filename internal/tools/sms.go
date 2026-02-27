@@ -61,10 +61,11 @@ func smsSendTool() ToolDef {
 }
 
 // textbeltSendResponse is the JSON response from the /text endpoint.
+// TextID is any because the API returns it as a string despite docs showing int.
 type textbeltSendResponse struct {
 	Success        bool   `json:"success"`
 	QuotaRemaining int    `json:"quotaRemaining"`
-	TextID         int    `json:"textId"`
+	TextID         any    `json:"textId"`
 	Error          string `json:"error"`
 }
 
@@ -100,7 +101,7 @@ func textbeltSend(phone, message, apiKey string) (string, error) {
 		return "", fmt.Errorf("SMS failed: %s", errMsg)
 	}
 
-	return fmt.Sprintf("SMS sent to %s (textId: %d, quota remaining: %d)", phone, result.TextID, result.QuotaRemaining), nil
+	return fmt.Sprintf("SMS sent to %s (textId: %v, quota remaining: %d)", phone, result.TextID, result.QuotaRemaining), nil
 }
 
 // ---------------------------------------------------------------------------
