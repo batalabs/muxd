@@ -101,9 +101,9 @@ struct ChatView: View {
                             .id("streaming")
                     }
 
-                    // Active tools
-                    ForEach(Array(viewModel.activeTools.values), id: \.name) { tool in
-                        ToolCallView(tool: tool)
+                    // Active tools (grouped by name+status)
+                    ForEach(groupActiveTools(Array(viewModel.activeTools.values)), id: \.tool.name) { group in
+                        ToolCallView(tool: group.tool, count: group.count)
                     }
                 }
                 .padding()
@@ -408,9 +408,9 @@ struct MessageBubbleView: View {
                     .foregroundColor(.secondary)
                 }
 
-                // Tool results with content
-                ForEach(message.toolResultBlocks) { block in
-                    ToolResultBlockView(block: block)
+                // Tool results with content (grouped when consecutive identical)
+                ForEach(groupToolResults(message.toolResultBlocks)) { group in
+                    ToolResultBlockView(block: group.block, count: group.count)
                 }
             }
             .frame(maxWidth: .infinity, alignment: isActualUserMessage ? .trailing : .leading)
@@ -418,8 +418,45 @@ struct MessageBubbleView: View {
     }
 }
 
+struct GroupedToolResult: Identifiable {
+    let block: ContentBlock
+    let count: Int
+    var id: String { block.id }
+}
+
+func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
+    guard !blocks.isEmpty else { return [] }
+
+    var groups: [GroupedToolResult] = []
+    var i = 0
+
+    while i < blocks.count {
+        let current = blocks[i]
+        var count = 1
+
+        // Count consecutive blocks with the same toolName and toolResult
+        while i + count < blocks.count {
+            let next = blocks[i + count]
+            let sameName = current.toolName == next.toolName
+            let sameResult = current.toolResult == next.toolResult
+            let sameError = current.isError == next.isError
+            if sameName && sameResult && sameError {
+                count += 1
+            } else {
+                break
+            }
+        }
+
+        groups.append(GroupedToolResult(block: current, count: count))
+        i += count
+    }
+
+    return groups
+}
+
 struct ToolResultBlockView: View {
     let block: ContentBlock
+    var count: Int = 1
 
     private var hasContent: Bool {
         if block.isImageResult && block.imageData != nil {
@@ -453,6 +490,11 @@ struct ToolResultBlockView: View {
                         Text("done")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        if count > 1 {
+                            Text("(\(count))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
 
                     Text(result)
@@ -538,8 +580,31 @@ struct StreamingTextView: View {
     }
 }
 
+struct GroupedActiveTool {
+    let tool: ChatViewModel.ToolStatus
+    let count: Int
+}
+
+func groupActiveTools(_ tools: [ChatViewModel.ToolStatus]) -> [GroupedActiveTool] {
+    var groups: [String: GroupedActiveTool] = [:]
+    var order: [String] = []
+
+    for tool in tools {
+        let key = "\(tool.name)_\(tool.status)"
+        if let existing = groups[key] {
+            groups[key] = GroupedActiveTool(tool: existing.tool, count: existing.count + 1)
+        } else {
+            groups[key] = GroupedActiveTool(tool: tool, count: 1)
+            order.append(key)
+        }
+    }
+
+    return order.compactMap { groups[$0] }
+}
+
 struct ToolCallView: View {
     let tool: ChatViewModel.ToolStatus
+    var count: Int = 1
 
     var body: some View {
         HStack {
@@ -561,6 +626,12 @@ struct ToolCallView: View {
                     Text(tool.status)
                         .font(.caption2)
                         .foregroundColor(.secondary)
+
+                    if count > 1 {
+                        Text("(\(count))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 if let result = tool.result, !result.isEmpty {

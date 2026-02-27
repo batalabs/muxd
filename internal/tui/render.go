@@ -690,9 +690,14 @@ func FormatBlockMessage(msg domain.TranscriptMessage, width int) string {
 		}
 
 	case "user":
+		firstResult := true
 		for _, block := range msg.Blocks {
 			if block.Type == "tool_result" {
+				if !firstResult {
+					b.WriteString("\n")
+				}
 				b.WriteString(FormatToolResult(block.ToolName, block.ToolResult, block.IsError, contentWidth))
+				firstResult = false
 			}
 		}
 
