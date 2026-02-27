@@ -22,11 +22,58 @@ struct GlassInputModifier: ViewModifier {
     }
 }
 
+struct ChatGlassModifier: ViewModifier {
+    var circular: Bool = false
+
+    func body(content: Content) -> some View {
+        if circular {
+            if #available(iOS 26.0, *) {
+                content
+                    .frame(width: 44, height: 44)
+                    .glassEffect(.regular, in: .circle)
+            } else {
+                content
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+        } else {
+            if #available(iOS 26.0, *) {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .glassEffect(.regular, in: .capsule)
+            } else {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+        }
+    }
+}
+
+struct ChatGlassButtonStyle: ButtonStyle {
+    var circular: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(ChatGlassModifier(circular: circular))
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ChatViewModel
     @State private var inputText = ""
     @State private var showModelPicker = false
+    @State private var showRenameSheet = false
+    @State private var showDeleteConfirmation = false
+    @State private var isStarred = false
+    @State private var sessionTitle: String
     @State private var isReady = false
     @FocusState private var inputFocused: Bool
 
@@ -35,6 +82,8 @@ struct ChatView: View {
     init(session: Session) {
         self.session = session
         _viewModel = StateObject(wrappedValue: ChatViewModel(sessionID: session.id))
+        _sessionTitle = State(initialValue: session.displayTitle)
+        _isStarred = State(initialValue: session.tags?.contains("starred") ?? false)
     }
 
     var body: some View {
@@ -128,9 +177,47 @@ struct ChatView: View {
                 .padding(.vertical, 10)
             }
         }
-        .navigationTitle(session.displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    Button {
+                        showRenameSheet = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+
+                    Button {
+                        isStarred.toggle()
+                        Task {
+                            await toggleStar()
+                        }
+                    } label: {
+                        Label(isStarred ? "Unstar" : "Star", systemImage: isStarred ? "star.fill" : "star")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isStarred {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                                .font(.system(size: 12))
+                        }
+                        Text(sessionTitle)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: 200)
+                    .modifier(ChatGlassModifier())
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button(action: {}) {
@@ -140,8 +227,10 @@ struct ChatView: View {
                         Label("Change Model", systemImage: "cpu")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
                 }
+                .buttonStyle(ChatGlassButtonStyle(circular: true))
             }
         }
         .sheet(isPresented: $showModelPicker) {
@@ -151,10 +240,27 @@ struct ChatView: View {
                 }
             }
         }
+        .sheet(isPresented: $showRenameSheet) {
+            ChatRenameView(title: sessionTitle) { newTitle in
+                Task {
+                    await renameSession(newTitle)
+                }
+            }
+        }
         .sheet(item: $viewModel.pendingAsk) { ask in
             AskUserView(prompt: ask.prompt) { answer in
                 viewModel.answerAsk(answer: answer)
             }
+        }
+        .alert("Delete Session?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteSession()
+                }
+            }
+        } message: {
+            Text("This will permanently delete this session and all its messages.")
         }
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
             Button("OK") { viewModel.error = nil }
@@ -183,6 +289,36 @@ struct ChatView: View {
         viewModel.cancel()
     }
 
+    private func renameSession(_ newTitle: String) async {
+        guard let client = appState.getClient() else { return }
+        do {
+            try await client.renameSession(sessionID: session.id, title: newTitle)
+            sessionTitle = newTitle
+        } catch {
+            viewModel.error = error
+        }
+    }
+
+    private func deleteSession() async {
+        guard let client = appState.getClient() else { return }
+        do {
+            try await client.deleteSession(id: session.id)
+            dismiss()
+        } catch {
+            viewModel.error = error
+        }
+    }
+
+    private func toggleStar() async {
+        guard let client = appState.getClient() else { return }
+        let newTags = isStarred ? "starred" : ""
+        do {
+            try await client.setTags(sessionID: session.id, tags: newTags)
+        } catch {
+            isStarred.toggle() // Revert on error
+            viewModel.error = error
+        }
+    }
 }
 
 struct MessageBubbleView: View {
@@ -421,6 +557,44 @@ struct ToolCallView: View {
             .cornerRadius(8)
 
             Spacer()
+        }
+    }
+}
+
+struct ChatRenameView: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let onRename: (String) -> Void
+
+    @State private var newTitle: String = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Title", text: $newTitle)
+                        .autocapitalization(.sentences)
+                } footer: {
+                    Text("Enter a new title for this session")
+                }
+            }
+            .navigationTitle("Rename Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onRename(newTitle)
+                        dismiss()
+                    }
+                    .disabled(newTitle.isEmpty)
+                }
+            }
+            .onAppear {
+                newTitle = title
+            }
         }
     }
 }

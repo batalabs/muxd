@@ -21,17 +21,20 @@ struct ContentView: View {
         TabView {
             HomeView()
                 .tabItem {
-                    Label("Home", systemImage: "house")
+                    Image(systemName: "house")
+                    Text("Home")
                 }
 
             ServersView()
                 .tabItem {
-                    Label("Servers", systemImage: "server.rack")
+                    Image(systemName: "server.rack")
+                    Text("Servers")
                 }
 
             ConfigView()
                 .tabItem {
-                    Label("Settings", systemImage: "gear")
+                    Image(systemName: "gear")
+                    Text("Settings")
                 }
         }
     }

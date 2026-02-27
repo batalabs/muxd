@@ -1,6 +1,48 @@
 import SwiftUI
 import Combine
 
+struct GlassModifier: ViewModifier {
+    var circular: Bool = false
+
+    func body(content: Content) -> some View {
+        if circular {
+            if #available(iOS 26.0, *) {
+                content
+                    .frame(width: 44, height: 44)
+                    .glassEffect(.regular, in: .circle)
+            } else {
+                content
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+        } else {
+            if #available(iOS 26.0, *) {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .glassEffect(.regular, in: .capsule)
+            } else {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+        }
+    }
+}
+
+struct GlassButtonStyle: ButtonStyle {
+    var circular: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(GlassModifier(circular: circular))
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
 struct SessionListView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = SessionListViewModel()
@@ -21,7 +63,12 @@ struct SessionListView: View {
             } else {
                 List {
                     ForEach(Array(viewModel.sessions.enumerated()), id: \.element.id) { index, session in
-                        NavigationLink(value: session) {
+                        ZStack {
+                            NavigationLink(value: session) {
+                                EmptyView()
+                            }
+                            .opacity(0)
+
                             SessionRowView(session: session)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -54,13 +101,51 @@ struct SessionListView: View {
                 }
             }
         }
-        .navigationTitle(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    if let info = appState.connectionInfo {
+                        Section("Connection Details") {
+                            Label(info.host, systemImage: "network")
+                            Label(String(info.port), systemImage: "number")
+                            Button {
+                                viewModel.showToken = true
+                            } label: {
+                                Label("View Token", systemImage: "key")
+                            }
+                        }
+
+                        Section {
+                            Button {
+                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
+                            } label: {
+                                Label("Copy Address", systemImage: "doc.on.doc")
+                            }
+                        }
+
+                        Section {
+                            Button(role: .destructive) {
+                                appState.disconnect()
+                            } label: {
+                                Label("Disconnect", systemImage: "xmark.circle")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "server.rack")
+                        Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
+                    }
+                    .modifier(GlassModifier())
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {
                     Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .semibold))
                 }
+                .buttonStyle(GlassButtonStyle(circular: true))
             }
         }
         .navigationDestination(for: Session.self) { session in
@@ -75,6 +160,9 @@ struct SessionListView: View {
             RenameSessionView(session: session) { newTitle in
                 await viewModel.renameSession(session, title: newTitle)
             }
+        }
+        .sheet(isPresented: $viewModel.showToken) {
+            TokenView(token: appState.connectionInfo?.token ?? "")
         }
         .overlay {
             if viewModel.isLoading {
@@ -221,6 +309,7 @@ class SessionListViewModel: ObservableObject {
     @Published var sessions: [Session] = []
     @Published var isLoading = false
     @Published var showNewSession = false
+    @Published var showToken = false
     @Published var sessionToRename: Session?
     @Published var error: String?
     @Published var needsReconnect = false
@@ -324,6 +413,67 @@ class SessionListViewModel: ObservableObject {
             sessionToRename = nil
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+}
+
+struct TokenView: View {
+    @Environment(\.dismiss) private var dismiss
+    let token: String
+    @State private var showFullToken = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Spacer()
+
+                Image(systemName: "key.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.accentColor)
+
+                Text("Connection Token")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                if showFullToken {
+                    Text(token)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .textSelection(.enabled)
+                        .padding(.horizontal)
+                } else {
+                    Button("Tap to reveal") {
+                        showFullToken = true
+                    }
+                    .foregroundColor(.accentColor)
+                }
+
+                if showFullToken {
+                    Button {
+                        UIPasteboard.general.string = token
+                    } label: {
+                        Label("Copy Token", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                Spacer()
+
+                Text("Keep this token secure. Anyone with access can connect to your server.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }

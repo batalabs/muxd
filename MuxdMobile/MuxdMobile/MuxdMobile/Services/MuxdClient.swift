@@ -209,6 +209,16 @@ actor MuxdClient {
         }
     }
 
+    func setTags(sessionID: String, tags: String) async throws {
+        let body = try JSONEncoder().encode(["tags": tags])
+        let request = try makeRequest(method: "POST", path: "/api/sessions/\(sessionID)/tags", body: body)
+        let (_, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw MuxdError.serverError("Failed to set tags")
+        }
+    }
+
     func branchSession(sessionID: String, atSequence: Int) async throws -> Session {
         let body = try JSONSerialization.data(withJSONObject: ["at_sequence": atSequence])
         let request = try makeRequest(method: "POST", path: "/api/sessions/\(sessionID)/branch", body: body)
