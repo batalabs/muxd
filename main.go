@@ -107,6 +107,7 @@ func main() {
 	// Daemon-only mode: start HTTP server, no TUI
 	if *daemonFlag {
 		srv := daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
+		saveAuthTokenIfNew(&prefs, srv.AuthToken())
 		srv.SetAgentFactory(agentFactory)
 		srv.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		srv.SetBindAddress(bindAddr)
@@ -152,6 +153,7 @@ func main() {
 	} else {
 		// Start embedded server
 		embeddedServer = daemon.NewServer(st, apiKey, modelID, modelLabel, prov, &prefs)
+		saveAuthTokenIfNew(&prefs, embeddedServer.AuthToken())
 		embeddedServer.SetAgentFactory(agentFactory)
 		embeddedServer.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		embeddedServer.SetQuiet(true)
@@ -243,4 +245,17 @@ func mustGetwd() string {
 		return "."
 	}
 	return wd
+}
+
+// saveAuthTokenIfNew persists the daemon auth token to preferences if it
+// wasn't already saved. This is called from main (not inside NewServer)
+// to avoid writing a partial prefs struct before the caller is ready.
+func saveAuthTokenIfNew(prefs *config.Preferences, token string) {
+	if prefs.DaemonAuthToken == token {
+		return
+	}
+	prefs.DaemonAuthToken = token
+	if err := config.SavePreferences(*prefs); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to save auth token: %v\n", err)
+	}
 }

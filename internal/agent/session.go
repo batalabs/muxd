@@ -177,6 +177,13 @@ func (a *Service) SetBraveAPIKey(key string) {
 	a.braveAPIKey = key
 }
 
+// SetTextbeltAPIKey sets the Textbelt SMS API key from preferences.
+func (a *Service) SetTextbeltAPIKey(key string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.textbeltAPIKey = key
+}
+
 // SetXOAuth configures X OAuth runtime credentials for this agent.
 func (a *Service) SetXOAuth(clientID, clientSecret, accessToken, refreshToken, tokenExpiry string, saver func(accessToken, refreshToken, tokenExpiry string) error) {
 	a.mu.Lock()

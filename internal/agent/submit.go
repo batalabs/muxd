@@ -85,6 +85,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 			PlanMode:         &a.planMode,
 			Disabled:         disabled,
 			BraveAPIKey:      a.braveAPIKey,
+			TextbeltAPIKey:   a.textbeltAPIKey,
 			XClientID:        a.xClientID,
 			XClientSecret:    a.xClientSecret,
 			XAccessToken:     a.xAccessToken,

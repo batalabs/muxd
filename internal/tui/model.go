@@ -2621,6 +2621,22 @@ func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
 		return m, PrintToScrollback(m.renderError("No daemon connection available."))
 	}
 
+	// /qr new — regenerate token before showing QR code
+	if len(args) > 0 && args[0] == "new" {
+		regenURL := fmt.Sprintf("http://localhost:%d/api/qrcode/regenerate", m.Daemon.Port())
+		req, err := http.NewRequest("POST", regenURL, nil)
+		if err != nil {
+			return m, PrintToScrollback(m.renderError("Failed to create request: " + err.Error()))
+		}
+		req.Header.Set("Authorization", "Bearer "+m.Daemon.AuthToken())
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return m, PrintToScrollback(m.renderError("Failed to regenerate token: " + err.Error()))
+		}
+		resp.Body.Close()
+	}
+
 	// Fetch QR code from daemon
 	qrURL := fmt.Sprintf("http://localhost:%d/api/qrcode?format=ascii", m.Daemon.Port())
 	req, err := http.NewRequest("GET", qrURL, nil)

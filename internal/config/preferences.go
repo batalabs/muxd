@@ -38,6 +38,7 @@ type Preferences struct {
 	XRefreshToken         string `json:"x_refresh_token,omitempty"`
 	XTokenExpiry          string `json:"x_token_expiry,omitempty"`
 	XRedirectURL          string `json:"x_redirect_url,omitempty"`
+	TextbeltAPIKey        string `json:"textbelt_api_key,omitempty"`
 	SchedulerAllowedTools string `json:"scheduler_allowed_tools,omitempty"`
 	ToolsDisabled         string `json:"tools_disabled,omitempty"`
 	OllamaURL             string `json:"ollama_url,omitempty"`
@@ -48,6 +49,7 @@ type Preferences struct {
 
 	// Daemon settings
 	DaemonBindAddress string `json:"daemon_bind_address,omitempty"`
+	DaemonAuthToken   string `json:"daemon_auth_token,omitempty"`
 }
 
 // PrefEntry holds a single key-value preference entry for display.
@@ -76,7 +78,7 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "tools",
-		Keys: []string{"brave.api_key", "x.client_id", "x.client_secret", "x.redirect_url", "scheduler.allowed_tools"},
+		Keys: []string{"brave.api_key", "x.client_id", "x.client_secret", "x.redirect_url", "textbelt.api_key", "scheduler.allowed_tools"},
 	},
 	{
 		Name: "messaging",
@@ -84,7 +86,7 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "daemon",
-		Keys: []string{"daemon.bind_address"},
+		Keys: []string{"daemon.bind_address", "daemon.auth_token"},
 	},
 	{
 		Name: "theme",
@@ -229,6 +231,9 @@ func mergePreferences(dst, src *Preferences) {
 	if src.XRedirectURL != "" {
 		dst.XRedirectURL = src.XRedirectURL
 	}
+	if src.TextbeltAPIKey != "" {
+		dst.TextbeltAPIKey = src.TextbeltAPIKey
+	}
 	if src.SchedulerAllowedTools != "" {
 		dst.SchedulerAllowedTools = src.SchedulerAllowedTools
 	}
@@ -246,6 +251,9 @@ func mergePreferences(dst, src *Preferences) {
 	}
 	if src.DaemonBindAddress != "" {
 		dst.DaemonBindAddress = src.DaemonBindAddress
+	}
+	if src.DaemonAuthToken != "" {
+		dst.DaemonAuthToken = src.DaemonAuthToken
 	}
 	// Booleans: copy from src (they represent the user's last settings)
 	dst.FooterTokens = src.FooterTokens
@@ -371,12 +379,14 @@ func (p Preferences) All() []PrefEntry {
 		{"x.client_id", p.XClientID},
 		{"x.client_secret", MaskKey(p.XClientSecret)},
 		{"x.redirect_url", p.XRedirectURL},
+		{"textbelt.api_key", MaskKey(p.TextbeltAPIKey)},
 		{"scheduler.allowed_tools", p.SchedulerAllowedTools},
 		{"tools.disabled", p.ToolsDisabled},
 		{"ollama.url", p.OllamaURL},
 		{"telegram.bot_token", MaskKey(p.TelegramBotToken)},
 		{"telegram.allowed_ids", allowedStr},
 		{"daemon.bind_address", p.DaemonBindAddress},
+		{"daemon.auth_token", MaskKey(p.DaemonAuthToken)},
 	}
 }
 
@@ -425,6 +435,8 @@ func (p Preferences) Get(key string) string {
 		return p.XTokenExpiry
 	case "x.redirect_url":
 		return p.XRedirectURL
+	case "textbelt.api_key":
+		return MaskKey(p.TextbeltAPIKey)
 	case "scheduler.allowed_tools":
 		return p.SchedulerAllowedTools
 	case "tools.disabled":
@@ -444,6 +456,8 @@ func (p Preferences) Get(key string) string {
 		return strings.Join(parts, ",")
 	case "daemon.bind_address":
 		return p.DaemonBindAddress
+	case "daemon.auth_token":
+		return MaskKey(p.DaemonAuthToken)
 	default:
 		return ""
 	}
@@ -515,6 +529,8 @@ func (p *Preferences) Set(key, value string) error {
 		p.XTokenExpiry = value
 	case "x.redirect_url":
 		p.XRedirectURL = value
+	case "textbelt.api_key":
+		p.TextbeltAPIKey = value
 	case "scheduler.allowed_tools":
 		p.SchedulerAllowedTools = value
 	case "tools.disabled":
@@ -531,6 +547,8 @@ func (p *Preferences) Set(key, value string) error {
 		p.TelegramAllowedIDs = ids
 	case "daemon.bind_address":
 		p.DaemonBindAddress = value
+	case "daemon.auth_token":
+		p.DaemonAuthToken = value
 	default:
 		return fmt.Errorf("unknown key: %s", key)
 	}
@@ -590,11 +608,13 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.XRefreshToken)
 	sanitize(&p.XRedirectURL)
 	sanitize(&p.XTokenExpiry)
+	sanitize(&p.TextbeltAPIKey)
 	sanitize(&p.SchedulerAllowedTools)
 	sanitize(&p.ToolsDisabled)
 	sanitize(&p.TelegramBotToken)
 	sanitize(&p.OllamaURL)
 	sanitize(&p.DaemonBindAddress)
+	sanitize(&p.DaemonAuthToken)
 	sanitize(&p.FooterEmoji)
 	return changed
 }

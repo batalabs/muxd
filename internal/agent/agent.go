@@ -142,13 +142,14 @@ type Service struct {
 	redoStack    []checkpoint.Checkpoint
 
 	// braveAPIKey is the Brave Search API key from preferences.
-	braveAPIKey   string
-	xClientID     string
-	xClientSecret string
-	xAccessToken  string
-	xRefreshToken string
-	xTokenExpiry  string
-	xTokenSaver   func(accessToken, refreshToken, tokenExpiry string) error
+	braveAPIKey    string
+	textbeltAPIKey string
+	xClientID      string
+	xClientSecret  string
+	xAccessToken   string
+	xRefreshToken  string
+	xTokenExpiry   string
+	xTokenSaver    func(accessToken, refreshToken, tokenExpiry string) error
 
 	// disabledTools are excluded from model tool specs and execution.
 	disabledTools map[string]bool

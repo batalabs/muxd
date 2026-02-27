@@ -620,7 +620,7 @@ func TestAllToolSpecs(t *testing.T) {
 	specs := AllToolSpecs()
 
 	t.Run("correct count", func(t *testing.T) {
-		expected := 27 // + git_status + x tools + x_search/mentions/reply + x_schedule_list/update/cancel + memory_read/write + schedule_task
+		expected := 30 // + git_status + x tools + x_search/mentions/reply + x_schedule_list/update/cancel + memory_read/write + schedule_task + sms_send/status/schedule
 		if len(specs) != expected {
 			t.Errorf("expected %d tools, got %d", expected, len(specs))
 		}

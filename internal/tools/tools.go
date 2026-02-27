@@ -66,6 +66,7 @@ type ToolContext struct {
 	CancelScheduledJob func(id string) error
 	UpdateScheduledJob func(id string, toolInput map[string]any, scheduledFor *time.Time, recurrence *string) error
 	BraveAPIKey        string
+	TextbeltAPIKey     string
 	XClientID          string
 	XClientSecret      string
 	XAccessToken       string
@@ -113,6 +114,9 @@ func AllTools() []ToolDef {
 		xScheduleListTool(),
 		xScheduleUpdateTool(),
 		xScheduleCancelTool(),
+		smsSendTool(),
+		smsStatusTool(),
+		smsScheduleTool(),
 		patchApplyTool(),
 		planEnterTool(),
 		planExitTool(),
@@ -193,6 +197,12 @@ func ToolRiskTags(name string) []string {
 		return []string{"network"}
 	case "x_schedule_update", "x_schedule_cancel":
 		return []string{"write"}
+	case "sms_send":
+		return []string{"network", "write"}
+	case "sms_schedule":
+		return []string{"write"}
+	case "sms_status":
+		return []string{"network"}
 	default:
 		return nil
 	}
@@ -215,6 +225,9 @@ func ToolProfileDisabledSet(profile string) map[string]bool {
 		disabled["x_schedule"] = true
 		disabled["x_schedule_update"] = true
 		disabled["x_schedule_cancel"] = true
+		disabled["sms_send"] = true
+		disabled["sms_status"] = true
+		disabled["sms_schedule"] = true
 	case "coder":
 		// Keep all enabled by default.
 	case "research":

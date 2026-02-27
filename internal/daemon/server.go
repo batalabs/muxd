@@ -57,7 +57,17 @@ type Server struct {
 }
 
 // NewServer creates a new daemon server.
+// If the preferences contain a saved auth token, it is reused so that
+// mobile clients can reconnect without scanning a new QR code.
+// Otherwise a fresh token is generated and saved to preferences.
 func NewServer(st *store.Store, apiKey, modelID, modelLabel string, prov provider.Provider, prefs *config.Preferences) *Server {
+	token := ""
+	if prefs != nil {
+		token = prefs.DaemonAuthToken
+	}
+	if token == "" {
+		token = generateAuthToken()
+	}
 	return &Server{
 		store:      st,
 		apiKey:     apiKey,
@@ -68,8 +78,22 @@ func NewServer(st *store.Store, apiKey, modelID, modelLabel string, prov provide
 		agents:     make(map[string]*agent.Service),
 		askChans:   make(map[string]chan<- string),
 		ready:      make(chan struct{}),
-		token:      generateAuthToken(),
+		token:      token,
 	}
+}
+
+// RegenerateToken creates a new auth token, updates the server, persists it
+// to preferences, and returns the new token. Existing mobile connections
+// using the old token will need to re-scan the QR code.
+func (s *Server) RegenerateToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.token = generateAuthToken()
+	if s.prefs != nil {
+		s.prefs.DaemonAuthToken = s.token
+		_ = config.SavePreferences(*s.prefs)
+	}
+	return s.token
 }
 
 func generateAuthToken() string {
@@ -387,6 +411,7 @@ func (s *Server) Port() int {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/qrcode", s.withAuth(s.handleQRCode))
+	mux.HandleFunc("POST /api/qrcode/regenerate", s.withAuth(s.handleRegenerateToken))
 	mux.HandleFunc("POST /api/sessions", s.withAuth(s.handleCreateSession))
 	mux.HandleFunc("GET /api/sessions/{id}", s.withAuth(s.handleGetSession))
 	mux.HandleFunc("DELETE /api/sessions/{id}", s.withAuth(s.handleDeleteSession))
@@ -489,6 +514,14 @@ func (s *Server) handleQRCode(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.WriteHeader(http.StatusOK)
 	w.Write(png)
+}
+
+func (s *Server) handleRegenerateToken(w http.ResponseWriter, r *http.Request) {
+	newToken := s.RegenerateToken()
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"token":  newToken,
+	})
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -874,6 +907,11 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 			ag.SetBraveAPIKey(req.Value)
 		}
 	}
+	if req.Key == "textbelt.api_key" {
+		for _, ag := range s.agents {
+			ag.SetTextbeltAPIKey(req.Value)
+		}
+	}
 	if strings.HasPrefix(req.Key, "x.") {
 		for _, ag := range s.agents {
 			ag.SetXOAuth(
@@ -971,6 +1009,9 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 func (s *Server) configureAgent(ag *agent.Service) {
 	if s.prefs != nil && s.prefs.BraveAPIKey != "" {
 		ag.SetBraveAPIKey(s.prefs.BraveAPIKey)
+	}
+	if s.prefs != nil && s.prefs.TextbeltAPIKey != "" {
+		ag.SetTextbeltAPIKey(s.prefs.TextbeltAPIKey)
 	}
 	if s.prefs != nil {
 		ag.SetXOAuth(
