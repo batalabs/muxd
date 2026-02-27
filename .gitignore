@@ -9,6 +9,10 @@ dist/
 .idea/
 .vscode/
 
+# Xcode user data
+xcuserdata/
+*.xcuserstate
+
 # Claude Code
 .claude/
 CLAUDE.md
