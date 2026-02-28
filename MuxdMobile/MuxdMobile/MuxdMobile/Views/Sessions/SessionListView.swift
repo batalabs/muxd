@@ -269,11 +269,15 @@ struct SessionListView: View {
 
                     Spacer()
                 }
-                .background(Color.black.opacity(0.3).onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        showServerPanel = false
-                    }
-                })
+                .background(
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                showServerPanel = false
+                            }
+                        }
+                )
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(10)
             }
