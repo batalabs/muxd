@@ -178,59 +178,30 @@ struct ClientsView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 } else {
-                    List {
-                        ForEach(appState.savedConnections) { connection in
-                            ClientRowView(
-                                connection: connection,
-                                isConnecting: connectingToID == connection.id
-                            )
-                            .opacity(connectingToID != nil && connectingToID != connection.id ? 0.5 : 1.0)
-                            .onTapGesture {
-                                if connectingToID == nil {
-                                    connectTo(connection)
-                                }
-                            }
-                            .listRowSeparator(connection.id == appState.savedConnections.first?.id ? .hidden : .visible, edges: .top)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    withAnimation {
-                                        appState.removeConnection(id: connection.id)
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 12) {
+                            ForEach(appState.savedConnections) { connection in
+                                ClientCardView(
+                                    connection: connection,
+                                    isConnecting: connectingToID == connection.id,
+                                    isDisabled: connectingToID != nil && connectingToID != connection.id,
+                                    onConnect: { connectTo(connection) },
+                                    onRename: { connectionToRename = connection },
+                                    onDelete: {
+                                        withAnimation {
+                                            appState.removeConnection(id: connection.id)
+                                        }
                                     }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    connectionToRename = connection
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button {
-                                    connectionToRename = connection
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) {
-                                    withAnimation {
-                                        appState.removeConnection(id: connection.id)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                                )
+                                .id(connection.id)
                             }
                         }
-                        .onDelete { indexSet in
-                            for index in indexSet {
-                                let connection = appState.savedConnections[index]
-                                appState.removeConnection(id: connection.id)
-                            }
-                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
                     }
-                    .listStyle(.plain)
                     .scrollIndicators(.hidden)
                 }
             }
@@ -297,6 +268,168 @@ struct ClientsView: View {
             if appState.isConnected {
                 navigationPath.append("sessions")
             }
+        }
+    }
+}
+
+struct ClientCardView: View {
+    let connection: ConnectionInfo
+    let isConnecting: Bool
+    let isDisabled: Bool
+    let onConnect: () -> Void
+    let onRename: () -> Void
+    let onDelete: () -> Void
+
+    @State private var showSpinner = false
+    @State private var spinnerTask: Task<Void, Never>?
+    @State private var sessionCount: Int?
+    @State private var latencyMs: Int?
+    @GestureState private var isPressed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "server.rack")
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+
+                Spacer()
+
+                if showSpinner {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(connection.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Text("\(connection.host):\(String(connection.port))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            HStack {
+                if let count = sessionCount {
+                    Text("\(count) sessions")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("—")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if let ms = latencyMs {
+                    HStack(spacing: 3) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 10))
+                        Text("\(ms)ms")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.green)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isPressed ? Color(.systemGray5) : Color(.systemGray6))
+        .cornerRadius(12)
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .contentShape(Rectangle())
+        .gesture(
+            LongPressGesture(minimumDuration: 0.01)
+                .updating($isPressed) { currentState, gestureState, _ in
+                    gestureState = currentState
+                }
+                .onEnded { _ in
+                    if !isDisabled {
+                        onConnect()
+                    }
+                }
+        )
+        .opacity(isDisabled ? 0.5 : 1.0)
+        .disabled(isDisabled)
+        .overlay(alignment: .topTrailing) {
+            if !showSpinner {
+                Menu {
+                    Button(action: onRename) {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                    Button(role: .destructive, action: onDelete) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color(.systemGray5))
+                        .clipShape(Circle())
+                }
+                .padding(12)
+            }
+        }
+        .task {
+            await loadServerInfo()
+        }
+        .onChange(of: isConnecting) { _, connecting in
+            spinnerTask?.cancel()
+            if connecting {
+                spinnerTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeIn(duration: 0.15)) {
+                        showSpinner = true
+                    }
+                }
+            } else {
+                withAnimation {
+                    showSpinner = false
+                }
+            }
+        }
+        .onDisappear {
+            spinnerTask?.cancel()
+            showSpinner = false
+        }
+    }
+
+    private func loadServerInfo() async {
+        guard let client = MuxdClient(host: connection.host, port: connection.port, token: connection.token) else {
+            return
+        }
+
+        // Measure latency with health check
+        let start = Date()
+        do {
+            _ = try await client.health()
+            let elapsed = Date().timeIntervalSince(start)
+            let ms = Int(elapsed * 1000)
+            await MainActor.run {
+                latencyMs = ms
+            }
+        } catch {
+            // Ignore - won't show latency
+        }
+
+        // Get session count
+        do {
+            let sessions = try await client.listSessions(project: nil, limit: 100)
+            await MainActor.run {
+                sessionCount = sessions.count
+            }
+        } catch {
+            // Ignore - will show dash
         }
     }
 }

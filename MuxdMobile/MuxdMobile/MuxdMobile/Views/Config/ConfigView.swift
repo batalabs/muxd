@@ -29,12 +29,8 @@ enum AppFontSize: String, CaseIterable {
 }
 
 struct ConfigView: View {
-    @EnvironmentObject var appState: AppState
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
-    @State private var config: [String: Any] = [:]
-    @State private var isLoading = false
-    @State private var error: String?
 
     var body: some View {
         NavigationStack {
@@ -53,28 +49,9 @@ struct ConfigView: View {
                     }
                 }
 
-                if !config.isEmpty {
-                    Section("Server Config") {
-                        if let model = config["model"] as? String, !model.isEmpty {
-                            LabeledContent("Model", value: model)
-                        }
-
-                        if let footerTokens = config["footer_tokens"] as? Bool {
-                            LabeledContent("Show Tokens", value: footerTokens ? "Yes" : "No")
-                        }
-
-                        if let footerCost = config["footer_cost"] as? Bool {
-                            LabeledContent("Show Cost", value: footerCost ? "Yes" : "No")
-                        }
-                    }
-                }
-
                 Section("About") {
                     LabeledContent("App Version", value: "1.0.0")
                     LabeledContent("muxd Mobile", value: "iOS Client")
-                }
-
-                Section("Support") {
                     Link(destination: URL(string: "https://www.muxd.sh/support")!) {
                         HStack {
                             Text("Get Help")
@@ -109,39 +86,8 @@ struct ConfigView: View {
                 }
             }
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("Settings")
-            .refreshable {
-                await loadConfig()
-            }
-            .overlay {
-                if isLoading {
-                    ProgressView()
-                }
-            }
-            .alert("Error", isPresented: Binding(
-                get: { error != nil },
-                set: { if !$0 { error = nil } }
-            )) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "Unknown error")
-            }
-            .task {
-                await loadConfig()
-            }
-        }
-    }
-
-    private func loadConfig() async {
-        guard let client = appState.getClient() else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            config = try await client.getConfig()
-        } catch {
-            // Silently fail - config is not critical
         }
     }
 }

@@ -43,22 +43,7 @@ struct GlassModifier: ViewModifier {
     }
 }
 
-struct ToolbarMenuLabelModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .frame(height: 44)
-                .padding(.horizontal, 12)
-                .glassEffect(.regular, in: .capsule)
-                .compositingGroup()
-        } else {
-            content
-                .frame(height: 44)
-                .padding(.horizontal, 12)
-                .background(.ultraThinMaterial, in: Capsule())
-        }
-    }
-}
+
 
 struct GlassButtonStyle: ButtonStyle {
     var circular: Bool = false
@@ -74,6 +59,28 @@ struct SessionListView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = SessionListViewModel()
     @State private var serverModel = ""
+    @State private var isHealthy = true
+    @State private var latencyMs: Int?
+
+    private var menuLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "server.rack")
+            if let info = appState.connectionInfo {
+                // If renamed, show just the name; otherwise show host:port
+                if info.name != info.host {
+                    Text(info.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                } else {
+                    Text("\(info.host):\(String(info.port))")
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            } else {
+                Text("Sessions")
+            }
+        }
+    }
 
     /// Extracts short model name from full path (e.g., "accounts/fireworks/models/gpt-4" → "gpt-4")
     private var shortModelName: String {
@@ -94,7 +101,9 @@ struct SessionListView: View {
                     Text("Create a new session to get started")
                 } actions: {
                     Button("New Session") {
-                        viewModel.showNewSession = true
+                        Task {
+                            await viewModel.createSession(projectPath: "", modelID: nil)
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -102,10 +111,11 @@ struct SessionListView: View {
                 List {
                     ForEach(viewModel.sessions) { session in
                         NavigationLink(value: session) {
-                            SessionRowView(session: session)
+                            SessionRowView(session: session, isNew: session.messageCount == 0)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(session.id == viewModel.sessions.first?.id ? .hidden : .visible, edges: .top)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                         .contextMenu {
                             Button {
                                 viewModel.sessionToRename = session
@@ -114,15 +124,20 @@ struct SessionListView: View {
                             }
 
                             Button(role: .destructive) {
-                                viewModel.sessionToDelete = session
+                                Task {
+                                    await viewModel.deleteSessionByID(session.id)
+                                }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
-                    }
-                    .onDelete { indexSet in
-                        if let index = indexSet.first {
-                            viewModel.sessionToDelete = viewModel.sessions[index]
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                Task {
+                                    await viewModel.deleteSessionByID(session.id)
+                                }
+                            }
+                            .labelStyle(.iconOnly)
                         }
                     }
                 }
@@ -135,21 +150,29 @@ struct SessionListView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     if let info = appState.connectionInfo {
                         Section {
                             Button {
                                 UIPasteboard.general.string = "\(info.host):\(String(info.port))"
                             } label: {
-                                Label("\(info.host):\(String(info.port))", systemImage: "network")
+                                Label("\(info.host):\(String(info.port))", systemImage: "server.rack")
                             }
+                            .task { await checkHealth() }
                             if !shortModelName.isEmpty {
                                 Button {
                                     UIPasteboard.general.string = serverModel
                                 } label: {
                                     Label(shortModelName, systemImage: "cpu")
                                 }
+                            }
+                        }
+
+                        Section {
+                            Label(isHealthy ? "Connected" : "Disconnected", systemImage: isHealthy ? "circle.fill" : "circle")
+                            if let ms = latencyMs {
+                                Label("\(ms)ms", systemImage: "clock")
                             }
                         }
 
@@ -170,33 +193,21 @@ struct SessionListView: View {
                         }
                     }
                 } label: {
-                    Label {
-                        Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: 180, alignment: .leading)
-                    } icon: {
-                        Image(systemName: "server.rack")
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .modifier(ToolbarMenuLabelModifier())
+                    menuLabel
                 }
-                .transaction { $0.animation = nil }
-                .buttonStyle(.plain)
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { viewModel.showNewSession = true }) {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task {
+                        await viewModel.createSession(projectPath: "", modelID: nil)
+                    }
+                } label: {
                     Image(systemName: "plus")
                 }
             }
         }
         .navigationDestination(for: Session.self) { session in
             ChatView(session: session)
-        }
-        .sheet(isPresented: $viewModel.showNewSession) {
-            NewSessionView { projectPath, modelID in
-                await viewModel.createSession(projectPath: projectPath, modelID: modelID)
-            }
         }
         .sheet(item: $viewModel.sessionToRename) { session in
             RenameSessionView(session: session) { newTitle in
@@ -210,23 +221,6 @@ struct SessionListView: View {
             if viewModel.isLoading {
                 ProgressView()
             }
-        }
-        .alert("Delete Session?", isPresented: Binding(
-            get: { viewModel.sessionToDelete != nil },
-            set: { if !$0 { viewModel.sessionToDelete = nil } }
-        )) {
-            Button("Cancel", role: .cancel) {
-                viewModel.sessionToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                if let session = viewModel.sessionToDelete {
-                    Task {
-                        await viewModel.deleteSession(session)
-                    }
-                }
-            }
-        } message: {
-            Text("This session and all its messages will be permanently deleted.")
         }
         .alert("Error", isPresented: Binding(
             get: { viewModel.error != nil },
@@ -259,15 +253,46 @@ struct SessionListView: View {
             // Ignore — model field will show "Not set"
         }
     }
+
+    private func checkHealth() async {
+        guard let client = appState.getClient() else {
+            await MainActor.run {
+                isHealthy = false
+                latencyMs = nil
+            }
+            return
+        }
+        do {
+            let start = Date()
+            let healthy = try await client.health()
+            let elapsed = Date().timeIntervalSince(start)
+            let ms = Int(elapsed * 1000)
+            await MainActor.run {
+                isHealthy = healthy
+                latencyMs = ms
+            }
+        } catch {
+            await MainActor.run {
+                isHealthy = false
+                latencyMs = nil
+            }
+        }
+    }
 }
 
 
 struct SessionRowView: View {
     let session: Session
+    var isNew: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
+                if isNew {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 8, height: 8)
+                }
                 Text(session.displayTitle)
                     .font(.headline)
                     .lineLimit(1)
@@ -281,7 +306,7 @@ struct SessionRowView: View {
             }
 
             HStack {
-                Text(session.updatedAt.relativeDisplay)
+                Text(session.createdAt.fullDisplay)
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -306,10 +331,9 @@ struct SessionRowView: View {
 class SessionListViewModel: ObservableObject {
     @Published var sessions: [Session] = []
     @Published var isLoading = false
-    @Published var showNewSession = false
     @Published var showToken = false
     @Published var sessionToRename: Session?
-    @Published var sessionToDelete: Session?
+    @Published var deleteSessionID: String?
     @Published var error: String?
     @Published var needsReconnect = false
 
@@ -350,7 +374,6 @@ class SessionListViewModel: ObservableObject {
         do {
             _ = try await client.createSession(projectPath: projectPath, modelID: modelID)
             await loadSessions()
-            showNewSession = false
         } catch {
             self.error = error.localizedDescription
         }
@@ -375,17 +398,19 @@ class SessionListViewModel: ObservableObject {
         sessions.remove(atOffsets: indexSet)
     }
 
-    func deleteSession(_ session: Session) async {
+    func deleteSessionByID(_ id: String) async {
         guard let client = client else {
             self.error = "Not connected to server"
             return
         }
 
         do {
-            try await client.deleteSession(id: session.id)
-            sessions.removeAll { $0.id == session.id }
+            try await client.deleteSession(id: id)
+            sessions.removeAll { $0.id == id }
+            deleteSessionID = nil
         } catch {
             self.error = error.localizedDescription
+            deleteSessionID = nil
         }
     }
 
@@ -397,9 +422,7 @@ class SessionListViewModel: ObservableObject {
 
         do {
             try await client.renameSession(sessionID: session.id, title: title)
-            if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-                sessions[index].title = title
-            }
+            await loadSessions()
             sessionToRename = nil
         } catch {
             self.error = error.localizedDescription
@@ -552,3 +575,4 @@ struct NewSessionView: View {
         }
     }
 }
+

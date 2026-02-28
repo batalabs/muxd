@@ -15,7 +15,7 @@ struct Session: Codable, Identifiable, Hashable, Equatable, Sendable {
     let createdAt: Date
     var updatedAt: Date
 
-    // Custom Hashable - only use id for navigation path matching
+    // Use only id for both hash and equality - SwiftUI needs consistency
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
@@ -60,5 +60,22 @@ extension Date {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: self, relativeTo: Date())
+    }
+
+    /// Short date format like "Feb 25" or "Feb 25, 2024" if different year
+    var shortDateDisplay: String {
+        let formatter = DateFormatter()
+        let calendar = Calendar.current
+        if calendar.component(.year, from: self) == calendar.component(.year, from: Date()) {
+            formatter.dateFormat = "MMM d"
+        } else {
+            formatter.dateFormat = "MMM d, yyyy"
+        }
+        return formatter.string(from: self)
+    }
+
+    /// Combined display: "Feb 25 · 1d ago"
+    var fullDisplay: String {
+        "\(shortDateDisplay) · \(relativeDisplay)"
     }
 }

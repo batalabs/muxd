@@ -62,59 +62,25 @@ struct ConnectionView: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 12)
 
-                        List {
-                            ForEach(appState.savedConnections) { connection in
-                                Button {
-                                    connectTo(connection)
-                                } label: {
-                                    SavedConnectionRowCompact(
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(appState.savedConnections) { connection in
+                                    ConnectionCard(
                                         connection: connection,
                                         isConnecting: connectingToID == connection.id,
-                                        isDisabled: connectingToID != nil && connectingToID != connection.id
+                                        isDisabled: connectingToID != nil && connectingToID != connection.id,
+                                        onConnect: { connectTo(connection) },
+                                        onRename: { connectionToRename = connection },
+                                        onDelete: {
+                                            withAnimation {
+                                                appState.removeConnection(id: connection.id)
+                                            }
+                                        }
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .id(connection.id)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        withAnimation {
-                                            appState.removeConnection(id: connection.id)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                                .swipeActions(edge: .leading) {
-                                    Button {
-                                        connectionToRename = connection
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
-                                    .tint(.blue)
-                                }
-                                .contextMenu {
-                                    Button {
-                                        connectionToRename = connection
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
-                                    Button(role: .destructive) {
-                                        withAnimation {
-                                            appState.removeConnection(id: connection.id)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
                             }
-                            .onDelete { indexSet in
-                                for index in indexSet {
-                                    let connection = appState.savedConnections[index]
-                                    appState.removeConnection(id: connection.id)
-                                }
-                            }
+                            .padding(.horizontal, 24)
                         }
-                        .listStyle(.plain)
                         .scrollIndicators(.hidden)
                     }
                 } else {
@@ -183,6 +149,63 @@ struct ConnectionView: View {
             connectingToID = nil
             if appState.isConnected {
                 selectedTab = 1 // Switch to Sessions tab
+            }
+        }
+    }
+}
+
+struct ConnectionCard: View {
+    let connection: ConnectionInfo
+    let isConnecting: Bool
+    let isDisabled: Bool
+    let onConnect: () -> Void
+    let onRename: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        Button(action: onConnect) {
+            HStack(spacing: 12) {
+                Image(systemName: "server.rack")
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(connection.name)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("\(connection.host):\(String(connection.port))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if isConnecting {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(isDisabled ? 0.5 : 1.0)
+        .disabled(isDisabled)
+        .contextMenu {
+            Button(action: onRename) {
+                Label("Rename", systemImage: "pencil")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
             }
         }
     }

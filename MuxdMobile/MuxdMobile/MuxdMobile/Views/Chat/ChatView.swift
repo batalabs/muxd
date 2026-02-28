@@ -64,6 +64,29 @@ struct ChatGlassButtonStyle: ButtonStyle {
     }
 }
 
+struct TintedGlassButtonStyle: ButtonStyle {
+    var tint: Color = .accentColor
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.title3.weight(.semibold))
+            .foregroundColor(.white)
+            .frame(width: 44, height: 44)
+            .background {
+                if #available(iOS 26.0, *) {
+                    Circle()
+                        .fill(tint.opacity(0.8))
+                        .glassEffect(.regular, in: .circle)
+                } else {
+                    Circle()
+                        .fill(tint)
+                        .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                }
+            }
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -78,6 +101,19 @@ struct ChatView: View {
     @FocusState private var inputFocused: Bool
 
     let session: Session
+
+    private var chatMenuLabel: some View {
+        HStack(spacing: 6) {
+            if isStarred {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.yellow)
+            }
+            Text(sessionTitle)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .frame(maxWidth: 200)
+    }
 
     init(session: Session) {
         self.session = session
@@ -143,13 +179,9 @@ struct ChatView: View {
                             }
 
                         Button(action: viewModel.isStreaming ? cancelMessage : sendMessage) {
-                            Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.up")
-                                .font(.title3.weight(.semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(viewModel.isStreaming ? Color.red : Color.accentColor)
-                                .cornerRadius(18)
+                            Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.right")
                         }
+                        .buttonStyle(TintedGlassButtonStyle(tint: viewModel.isStreaming ? .red : .accentColor))
                         .disabled(inputText.isEmpty && !viewModel.isStreaming)
                         .opacity(inputText.isEmpty && !viewModel.isStreaming ? 0.5 : 1)
                     }
@@ -180,7 +212,7 @@ struct ChatView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Button {
                         showRenameSheet = true
@@ -205,21 +237,8 @@ struct ChatView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 } label: {
-                    Label {
-                        Text(sessionTitle)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: 180, alignment: .leading)
-                    } icon: {
-                        if isStarred {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .modifier(ToolbarMenuLabelModifier())
+                    chatMenuLabel
                 }
-                .buttonStyle(.plain)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
