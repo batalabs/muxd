@@ -1,6 +1,16 @@
 import SwiftUI
 import Combine
 
+struct FlexibleMenuModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.buttonSizing(.flexible)
+        } else {
+            content
+        }
+    }
+}
+
 struct GlassModifier: ViewModifier {
     var circular: Bool = false
 
@@ -115,10 +125,8 @@ struct SessionListView: View {
                     if let info = appState.connectionInfo {
                         Section {
                             Label("\(info.host):\(String(info.port))", systemImage: "network")
-                                .frame(maxWidth: .infinity, alignment: .leading)
                             if !serverModel.isEmpty {
                                 Label(serverModel, systemImage: "cpu")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
 
@@ -127,14 +135,12 @@ struct SessionListView: View {
                                 viewModel.showToken = true
                             } label: {
                                 Label("View Token", systemImage: "key")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
                             Button {
                                 UIPasteboard.general.string = "\(info.host):\(String(info.port))"
                             } label: {
                                 Label("Copy Address", systemImage: "doc.on.doc")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
 
@@ -143,7 +149,6 @@ struct SessionListView: View {
                                 appState.disconnect()
                             } label: {
                                 Label("Disconnect", systemImage: "xmark.circle")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
                     }
@@ -156,13 +161,13 @@ struct SessionListView: View {
                     }
                     .modifier(GlassModifier())
                 }
+                .menuStyle(.borderlessButton)
+                .modifier(FlexibleMenuModifier())
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .semibold))
                 }
-                .buttonStyle(GlassButtonStyle(circular: true))
             }
         }
         .navigationDestination(for: Session.self) { session in
