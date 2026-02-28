@@ -64,20 +64,48 @@ struct ConnectionView: View {
 
                         List {
                             ForEach(appState.savedConnections) { connection in
-                                SavedConnectionRowCompact(
-                                    connection: connection,
-                                    isConnecting: connectingToID == connection.id,
-                                    isDisabled: connectingToID != nil && connectingToID != connection.id,
-                                    onConnect: { connectTo(connection) },
-                                    onRename: { connectionToRename = connection },
-                                    onDelete: {
+                                Button {
+                                    connectTo(connection)
+                                } label: {
+                                    SavedConnectionRowCompact(
+                                        connection: connection,
+                                        isConnecting: connectingToID == connection.id,
+                                        isDisabled: connectingToID != nil && connectingToID != connection.id
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .id(connection.id)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
                                         withAnimation {
                                             appState.removeConnection(id: connection.id)
                                         }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
-                                )
-                                .id(connection.id)
-                                .listRowBackground(Color.clear)
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        connectionToRename = connection
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                    .tint(.blue)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        connectionToRename = connection
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        withAnimation {
+                                            appState.removeConnection(id: connection.id)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                             }
                             .onDelete { indexSet in
                                 for index in indexSet {
@@ -164,66 +192,37 @@ struct SavedConnectionRowCompact: View {
     let connection: ConnectionInfo
     let isConnecting: Bool
     let isDisabled: Bool
-    let onConnect: () -> Void
-    let onRename: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
-        Button(action: {
-            if !isConnecting && !isDisabled {
-                onConnect()
+        HStack(spacing: 12) {
+            Image(systemName: "server.rack")
+                .font(.title2)
+                .foregroundColor(.accentColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(connection.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("\(connection.host):\(String(connection.port))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: "server.rack")
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 32)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+            Spacer()
 
-                    Text("\(connection.host):\(String(connection.port))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if isConnecting {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+            if isConnecting {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
+        .contentShape(Rectangle())
         .opacity(isDisabled ? 0.5 : 1.0)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .leading) {
-            Button(action: onRename) {
-                Label("Rename", systemImage: "pencil")
-            }
-            .tint(.blue)
-        }
-        .contextMenu {
-            Button(action: onRename) {
-                Label("Rename", systemImage: "pencil")
-            }
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
     }
 }
 

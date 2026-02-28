@@ -47,14 +47,14 @@ struct ToolbarMenuLabelModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .frame(height: 32)
-                .padding(.horizontal, 10)
+                .frame(height: 44)
+                .padding(.horizontal, 12)
                 .glassEffect(.regular, in: .capsule)
                 .compositingGroup()
         } else {
             content
-                .frame(height: 32)
-                .padding(.horizontal, 10)
+                .frame(height: 44)
+                .padding(.horizontal, 12)
                 .background(.ultraThinMaterial, in: Capsule())
         }
     }
