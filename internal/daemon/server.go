@@ -211,6 +211,7 @@ func (s *Server) Start(port int) error {
 			disabled := map[string]bool{}
 			allowed := map[string]bool{}
 			braveKey := ""
+			textbeltKey := ""
 			xClientID := ""
 			xClientSecret := ""
 			xAccessToken := ""
@@ -220,6 +221,7 @@ func (s *Server) Start(port int) error {
 				disabled = s.prefs.DisabledToolsSet()
 				allowed = s.prefs.ScheduledAllowedToolsSet()
 				braveKey = s.prefs.BraveAPIKey
+				textbeltKey = s.prefs.TextbeltAPIKey
 				xClientID = s.prefs.XClientID
 				xClientSecret = s.prefs.XClientSecret
 				xAccessToken = s.prefs.XAccessToken
@@ -233,6 +235,7 @@ func (s *Server) Start(port int) error {
 				Disabled:         disabled,
 				ScheduledAllowed: allowed,
 				BraveAPIKey:      braveKey,
+				TextbeltAPIKey:   textbeltKey,
 				XClientID:        xClientID,
 				XClientSecret:    xClientSecret,
 				XAccessToken:     xAccessToken,
