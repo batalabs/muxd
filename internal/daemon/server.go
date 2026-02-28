@@ -665,9 +665,10 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 			sendSSE("delta", map[string]string{"text": evt.DeltaText})
 
 		case agent.EventToolStart:
-			sendSSE("tool_start", map[string]string{
+			sendSSE("tool_start", map[string]any{
 				"tool_use_id": evt.ToolUseID,
 				"tool_name":   evt.ToolName,
+				"tool_input":  evt.ToolInput,
 			})
 
 		case agent.EventToolDone:

@@ -58,6 +58,16 @@ struct SessionListView: View {
     @StateObject private var viewModel = SessionListViewModel()
     @State private var serverModel = ""
 
+    /// Extracts short model name from full path (e.g., "accounts/fireworks/models/gpt-4" → "gpt-4")
+    private var shortModelName: String {
+        guard !serverModel.isEmpty else { return "" }
+        // Get last path component after "models/" or just last component
+        if let modelsRange = serverModel.range(of: "models/") {
+            return String(serverModel[modelsRange.upperBound...])
+        }
+        return serverModel.components(separatedBy: "/").last ?? serverModel
+    }
+
     var body: some View {
         Group {
             if viewModel.sessions.isEmpty && !viewModel.isLoading {
@@ -125,9 +135,17 @@ struct SessionListView: View {
                 Menu {
                     if let info = appState.connectionInfo {
                         Section {
-                            Label("\(info.host):\(String(info.port))", systemImage: "network")
-                            if !serverModel.isEmpty {
-                                Label(serverModel, systemImage: "cpu")
+                            Button {
+                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
+                            } label: {
+                                Label("\(info.host):\(String(info.port))", systemImage: "network")
+                            }
+                            if !shortModelName.isEmpty {
+                                Button {
+                                    UIPasteboard.general.string = serverModel
+                                } label: {
+                                    Label(shortModelName, systemImage: "cpu")
+                                }
                             }
                         }
 
@@ -136,12 +154,6 @@ struct SessionListView: View {
                                 viewModel.showToken = true
                             } label: {
                                 Label("View Token", systemImage: "key")
-                            }
-
-                            Button {
-                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
-                            } label: {
-                                Label("Copy Address", systemImage: "doc.on.doc")
                             }
                         }
 

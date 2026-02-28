@@ -323,6 +323,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 					Kind:      EventToolStart,
 					ToolUseID: b.ToolUseID,
 					ToolName:  b.ToolName,
+					ToolInput: b.ToolInput,
 				})
 
 				var result string
@@ -408,6 +409,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 						Kind:      EventToolStart,
 						ToolUseID: block.ToolUseID,
 						ToolName:  block.ToolName,
+						ToolInput: block.ToolInput,
 					})
 
 					result, isError := ExecuteToolCall(block, toolCtx)

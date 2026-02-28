@@ -218,9 +218,7 @@ struct ClientsView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { showScanner = true }) {
                         Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .semibold))
                     }
-                    .buttonStyle(AppGlassButtonStyle(circular: true))
                 }
             }
             .navigationDestination(for: String.self) { _ in

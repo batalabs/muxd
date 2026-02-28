@@ -48,6 +48,7 @@ struct ContentBlock: Codable, Identifiable, Sendable {
     let text: String?
     let toolUseID: String?
     let toolName: String?
+    var toolInputSummary: String?  // e.g., file path for Read, command for Bash (not persisted)
     let toolResult: String?
     let isError: Bool?
 
@@ -89,6 +90,7 @@ struct ContentBlock: Codable, Identifiable, Sendable {
         case type, text
         case toolUseID = "tool_use_id"
         case toolName = "tool_name"
+        case toolInputSummary = "tool_input_summary"
         case toolResult = "tool_result"
         case isError = "is_error"
     }

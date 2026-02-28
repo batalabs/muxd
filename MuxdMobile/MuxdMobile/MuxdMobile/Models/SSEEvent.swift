@@ -18,6 +18,7 @@ struct SSEEvent: Sendable {
     var deltaText: String?
     var toolUseID: String?
     var toolName: String?
+    var toolInputSummary: String?  // e.g., file path for Read, command for Bash
     var toolResult: String?
     var toolIsError: Bool?
     var inputTokens: Int?
@@ -56,6 +57,10 @@ struct SSEEvent: Sendable {
         case .toolStart:
             event.toolUseID = json["tool_use_id"] as? String
             event.toolName = json["tool_name"] as? String
+            // Extract a human-readable summary from tool_input
+            if let toolInput = json["tool_input"] as? [String: Any] {
+                event.toolInputSummary = Self.extractToolInputSummary(toolName: event.toolName, input: toolInput)
+            }
 
         case .toolDone:
             event.toolUseID = json["tool_use_id"] as? String
@@ -94,5 +99,29 @@ struct SSEEvent: Sendable {
         }
 
         return event
+    }
+
+    /// Extracts a human-readable summary from tool input based on tool type
+    private static func extractToolInputSummary(toolName: String?, input: [String: Any]) -> String? {
+        guard let name = toolName else { return nil }
+
+        switch name {
+        case "file_read", "Read":
+            return input["file_path"] as? String ?? input["path"] as? String
+        case "file_write", "Write":
+            return input["file_path"] as? String ?? input["path"] as? String
+        case "file_edit", "Edit":
+            return input["file_path"] as? String ?? input["path"] as? String
+        case "bash", "Bash":
+            return input["command"] as? String
+        case "grep", "Grep":
+            return input["pattern"] as? String
+        case "glob", "Glob":
+            return input["pattern"] as? String
+        case "list_files":
+            return input["path"] as? String
+        default:
+            return nil
+        }
     }
 }

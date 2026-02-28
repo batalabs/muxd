@@ -425,6 +425,24 @@ struct GroupedToolResult: Identifiable {
     var id: String { block.id }
 }
 
+/// Truncates text to a maximum number of lines, adding "... (truncated)" if truncated
+func truncateToLines(_ text: String, maxLines: Int) -> String {
+    let lines = text.components(separatedBy: .newlines)
+    if lines.count <= maxLines {
+        return text
+    }
+    return lines.prefix(maxLines).joined(separator: "\n") + "\n... (truncated)"
+}
+
+/// Truncates text in the middle, keeping start and end visible (e.g., for file paths)
+func truncateMiddle(_ text: String, maxLength: Int) -> String {
+    guard text.count > maxLength else { return text }
+    let keepChars = (maxLength - 3) / 2  // 3 for "..."
+    let start = text.prefix(keepChars)
+    let end = text.suffix(keepChars)
+    return "\(start)...\(end)"
+}
+
 func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
     guard !blocks.isEmpty else { return [] }
 
@@ -498,7 +516,7 @@ struct ToolResultBlockView: View {
                         }
                     }
 
-                    Text(result)
+                    Text(truncateToLines(result, maxLines: 5))
                         .font(.caption)
                         .padding(8)
                         .background(Color(.systemGray6))
@@ -623,6 +641,13 @@ struct ToolCallView: View {
                     Text(tool.name)
                         .font(.caption)
                         .fontWeight(.medium)
+
+                    if let summary = tool.inputSummary {
+                        Text(truncateMiddle(summary, maxLength: 40))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
 
                     Text(tool.status)
                         .font(.caption2)
@@ -805,6 +830,7 @@ class ChatViewModel: ObservableObject {
 
     struct ToolStatus {
         let name: String
+        var inputSummary: String?
         var status: String
         var result: String?
         var isError: Bool
@@ -901,7 +927,7 @@ class ChatViewModel: ObservableObject {
 
         case .toolStart:
             if let id = event.toolUseID, let name = event.toolName {
-                activeTools[id] = ToolStatus(name: name, status: "running", result: nil, isError: false)
+                activeTools[id] = ToolStatus(name: name, inputSummary: event.toolInputSummary, status: "running", result: nil, isError: false)
             }
 
         case .toolDone:
