@@ -84,19 +84,8 @@ struct SessionListView: View {
             } else {
                 List {
                     ForEach(viewModel.sessions) { session in
-                        ZStack(alignment: .leading) {
-                            NavigationLink(value: session) {
-                                EmptyView()
-                            }
-                            .opacity(0)
-
-                            HStack {
-                                SessionRowView(session: session)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(Color(.tertiaryLabel))
-                            }
+                        NavigationLink(value: session) {
+                            SessionRowView(session: session)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(session.id == viewModel.sessions.first?.id ? .hidden : .visible, edges: .top)
@@ -108,17 +97,15 @@ struct SessionListView: View {
                             }
 
                             Button(role: .destructive) {
-                                Task {
-                                    await viewModel.deleteSession(session)
-                                }
+                                viewModel.sessionToDelete = session
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
                     }
                     .onDelete { indexSet in
-                        Task {
-                            await viewModel.deleteSessions(at: indexSet)
+                        if let index = indexSet.first {
+                            viewModel.sessionToDelete = viewModel.sessions[index]
                         }
                     }
                 }
@@ -168,10 +155,14 @@ struct SessionListView: View {
                 } label: {
                     Label {
                         Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
+                            .lineLimit(1)
                     } icon: {
                         Image(systemName: "server.rack")
                     }
+                    .labelStyle(.titleAndIcon)
+                    .modifier(GlassModifier())
                 }
+                .transaction { $0.animation = nil }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {
@@ -199,6 +190,23 @@ struct SessionListView: View {
             if viewModel.isLoading {
                 ProgressView()
             }
+        }
+        .alert("Delete Session?", isPresented: Binding(
+            get: { viewModel.sessionToDelete != nil },
+            set: { if !$0 { viewModel.sessionToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) {
+                viewModel.sessionToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let session = viewModel.sessionToDelete {
+                    Task {
+                        await viewModel.deleteSession(session)
+                    }
+                }
+            }
+        } message: {
+            Text("This session and all its messages will be permanently deleted.")
         }
         .alert("Error", isPresented: Binding(
             get: { viewModel.error != nil },
@@ -281,6 +289,7 @@ class SessionListViewModel: ObservableObject {
     @Published var showNewSession = false
     @Published var showToken = false
     @Published var sessionToRename: Session?
+    @Published var sessionToDelete: Session?
     @Published var error: String?
     @Published var needsReconnect = false
 

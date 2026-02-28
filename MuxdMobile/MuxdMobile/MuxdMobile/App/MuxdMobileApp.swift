@@ -179,22 +179,49 @@ struct ClientsView: View {
                     }
                 } else {
                     List {
-                        ForEach(Array(appState.savedConnections.enumerated()), id: \.element.id) { index, connection in
+                        ForEach(appState.savedConnections) { connection in
                             ClientRowView(
                                 connection: connection,
-                                isConnecting: connectingToID == connection.id,
-                                isDisabled: connectingToID != nil && connectingToID != connection.id,
-                                onConnect: { connectTo(connection) },
-                                onRename: { connectionToRename = connection },
-                                onDelete: {
+                                isConnecting: connectingToID == connection.id
+                            )
+                            .opacity(connectingToID != nil && connectingToID != connection.id ? 0.5 : 1.0)
+                            .onTapGesture {
+                                if connectingToID == nil {
+                                    connectTo(connection)
+                                }
+                            }
+                            .listRowSeparator(connection.id == appState.savedConnections.first?.id ? .hidden : .visible, edges: .top)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
                                     withAnimation {
                                         appState.removeConnection(id: connection.id)
                                     }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
-                            )
-                            .id(connection.id)
-                            .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
-                            .listRowBackground(Color.clear)
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    connectionToRename = connection
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button {
+                                    connectionToRename = connection
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    withAnimation {
+                                        appState.removeConnection(id: connection.id)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                         .onDelete { indexSet in
                             for index in indexSet {
@@ -277,73 +304,43 @@ struct ClientsView: View {
 struct ClientRowView: View {
     let connection: ConnectionInfo
     let isConnecting: Bool
-    let isDisabled: Bool
-    let onConnect: () -> Void
-    let onRename: () -> Void
-    let onDelete: () -> Void
 
     @State private var showSpinner = false
     @State private var spinnerTask: Task<Void, Never>?
 
     var body: some View {
-        Button(action: {
-            if !isConnecting && !isDisabled {
-                onConnect()
+        HStack(spacing: 12) {
+            Image(systemName: "server.rack")
+                .font(.title2)
+                .foregroundColor(.accentColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(connection.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("\(connection.host):\(String(connection.port))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: "server.rack")
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 32)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+            Spacer()
 
-                    Text("\(connection.host):\(String(connection.port))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            ZStack {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Color(.tertiaryLabel))
+                    .opacity(showSpinner ? 0 : 1)
+
+                if showSpinner {
+                    ProgressView()
+                        .scaleEffect(0.8)
                 }
-
-                Spacer()
-
-                ZStack {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(.tertiaryLabel))
-                        .opacity(showSpinner ? 0 : 1)
-
-                    if showSpinner {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    }
-                }
-                .frame(width: 20, height: 20)
             }
+            .frame(width: 20, height: 20)
         }
-        .buttonStyle(.plain)
-        .opacity(isDisabled ? 0.5 : 1.0)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .leading) {
-            Button(action: onRename) {
-                Label("Rename", systemImage: "pencil")
-            }
-            .tint(.blue)
-        }
-        .contextMenu {
-            Button(action: onRename) {
-                Label("Rename", systemImage: "pencil")
-            }
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
+        .contentShape(Rectangle())
         .onChange(of: isConnecting) { _, connecting in
             spinnerTask?.cancel()
             if connecting {

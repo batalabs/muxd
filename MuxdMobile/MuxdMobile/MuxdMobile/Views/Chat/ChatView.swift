@@ -208,12 +208,15 @@ struct ChatView: View {
                     Label {
                         Text(sessionTitle)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     } icon: {
                         if isStarred {
                             Image(systemName: "star.fill")
                                 .foregroundColor(.yellow)
                         }
                     }
+                    .labelStyle(.titleAndIcon)
+                    .modifier(ChatGlassModifier())
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -905,20 +908,20 @@ class ChatViewModel: ObservableObject {
 
     private func setupSSEHandlers() {
         sseClient?.onEvent = { [weak self] event in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.handleEvent(event)
             }
         }
 
         sseClient?.onComplete = { [weak self] in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.isStreaming = false
                 await self?.loadMessages()
             }
         }
 
         sseClient?.onError = { [weak self] error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.error = error
                 self?.isStreaming = false
             }

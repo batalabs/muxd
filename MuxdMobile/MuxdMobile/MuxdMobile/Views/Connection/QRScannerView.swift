@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 
 struct QRScannerView: View {
@@ -105,7 +105,7 @@ class QRScannerViewModel: NSObject, ObservableObject {
             setupCamera()
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     if granted {
                         self?.setupCamera()
                     } else {
