@@ -46,6 +46,8 @@ struct GlassButtonStyle: ButtonStyle {
 struct SessionListView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = SessionListViewModel()
+    @State private var showServerPanel = false
+    @State private var serverModel = ""
 
     var body: some View {
         Group {
@@ -110,38 +112,21 @@ struct SessionListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Menu {
-                    if let info = appState.connectionInfo {
-                        Section("Connection Details") {
-                            Label(info.host, systemImage: "network")
-                            Label(String(info.port), systemImage: "number")
-                            Button {
-                                viewModel.showToken = true
-                            } label: {
-                                Label("View Token", systemImage: "key")
-                            }
-                        }
-
-                        Section {
-                            Button {
-                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
-                            } label: {
-                                Label("Copy Address", systemImage: "doc.on.doc")
-                            }
-                        }
-
-                        Section {
-                            Button(role: .destructive) {
-                                appState.disconnect()
-                            } label: {
-                                Label("Disconnect", systemImage: "xmark.circle")
-                            }
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        showServerPanel.toggle()
+                    }
+                    if showServerPanel {
+                        Task {
+                            await loadServerModel()
                         }
                     }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "server.rack")
                         Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
+                        Image(systemName: showServerPanel ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
                     }
                     .modifier(GlassModifier())
                 }
@@ -175,6 +160,123 @@ struct SessionListView: View {
                 ProgressView()
             }
         }
+        .overlay(alignment: .top) {
+            if showServerPanel, let info = appState.connectionInfo {
+                VStack(spacing: 0) {
+                    // Dismiss scrim
+                    Color.black.opacity(0.001)
+                        .frame(height: 0)
+
+                    VStack(spacing: 0) {
+                        // Header
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(info.name.isEmpty ? info.host : info.name)
+                                    .font(.headline)
+                                Text("\(info.host):\(String(info.port))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showServerPanel = false
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 12)
+
+                        Divider().padding(.horizontal, 16)
+
+                        // Model
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Model", systemImage: "cpu")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.secondary)
+                            Text(serverModel.isEmpty ? "Not set" : serverModel)
+                                .font(.body.monospaced())
+                                .foregroundColor(serverModel.isEmpty ? .secondary : .primary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+
+                        Divider().padding(.horizontal, 16)
+
+                        // Actions
+                        VStack(spacing: 0) {
+                            Button {
+                                viewModel.showToken = true
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showServerPanel = false
+                                }
+                            } label: {
+                                Label("View Token", systemImage: "key")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                            }
+                            .foregroundColor(.primary)
+
+                            Button {
+                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showServerPanel = false
+                                }
+                            } label: {
+                                Label("Copy Address", systemImage: "doc.on.doc")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                            }
+                            .foregroundColor(.primary)
+
+                            Divider().padding(.horizontal, 16)
+
+                            Button(role: .destructive) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showServerPanel = false
+                                }
+                                appState.disconnect()
+                            } label: {
+                                Label("Disconnect", systemImage: "xmark.circle")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                            }
+                        }
+                        .padding(.bottom, 8)
+                    }
+                    .background {
+                        if #available(iOS 26.0, *) {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.clear)
+                                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                        } else {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.ultraThinMaterial)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+
+                    Spacer()
+                }
+                .background(Color.black.opacity(0.3).onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        showServerPanel = false
+                    }
+                })
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(10)
+            }
+        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.error != nil },
             set: { if !$0 { viewModel.error = nil } }
@@ -186,6 +288,7 @@ struct SessionListView: View {
         .task {
             viewModel.client = appState.getClient()
             await viewModel.loadSessions()
+            await loadServerModel()
         }
         .onChange(of: viewModel.needsReconnect) { _, needsReconnect in
             if needsReconnect {
@@ -193,65 +296,20 @@ struct SessionListView: View {
             }
         }
     }
-}
 
-enum ModelProvider {
-    case anthropic
-    case openai
-    case google
-    case meta
-    case mistral
-    case fireworks
-    case deepseek
-    case other
-
-    init(model: String) {
-        let lowercased = model.lowercased()
-        if lowercased.contains("claude") || lowercased.contains("anthropic") {
-            self = .anthropic
-        } else if lowercased.contains("gpt") || lowercased.contains("openai") || lowercased.contains("o1") || lowercased.contains("o3") {
-            self = .openai
-        } else if lowercased.contains("gemini") || lowercased.contains("google") {
-            self = .google
-        } else if lowercased.contains("llama") || lowercased.contains("meta") {
-            self = .meta
-        } else if lowercased.contains("mistral") || lowercased.contains("mixtral") {
-            self = .mistral
-        } else if lowercased.contains("fireworks") || lowercased.contains("kimi") {
-            self = .fireworks
-        } else if lowercased.contains("deepseek") {
-            self = .deepseek
-        } else {
-            self = .other
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .anthropic: return Color(red: 0.85, green: 0.65, blue: 0.5)  // Tan/beige
-        case .openai: return Color(red: 0.0, green: 0.65, blue: 0.52)     // Teal green
-        case .google: return Color(red: 0.26, green: 0.52, blue: 0.96)    // Blue
-        case .meta: return Color(red: 0.0, green: 0.47, blue: 1.0)        // Facebook blue
-        case .mistral: return Color(red: 1.0, green: 0.5, blue: 0.0)      // Orange
-        case .fireworks: return Color(red: 0.6, green: 0.2, blue: 0.8)     // Purple
-        case .deepseek: return Color(red: 0.4, green: 0.3, blue: 0.9)     // Purple
-        case .other: return Color.gray
-        }
-    }
-
-    var shortName: String? {
-        switch self {
-        case .anthropic: return "Anthropic"
-        case .openai: return "OpenAI"
-        case .google: return "Google"
-        case .meta: return "Meta"
-        case .mistral: return "Mistral"
-        case .fireworks: return "Fireworks"
-        case .deepseek: return "DeepSeek"
-        case .other: return nil
+    private func loadServerModel() async {
+        guard let client = appState.getClient() else { return }
+        do {
+            let config = try await client.getConfig()
+            if let model = config["model"] as? String {
+                await MainActor.run { serverModel = model }
+            }
+        } catch {
+            // Ignore — model field will show "Not set"
         }
     }
 }
+
 
 struct SessionRowView: View {
     let session: Session
@@ -272,12 +330,9 @@ struct SessionRowView: View {
             }
 
             HStack {
-                if !session.model.isEmpty {
-                    Text(session.model)
-                        .font(.caption)
-                        .foregroundColor(ModelProvider(model: session.model).color)
-                        .lineLimit(1)
-                }
+                Text(session.updatedAt.relativeDisplay)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 Spacer()
 

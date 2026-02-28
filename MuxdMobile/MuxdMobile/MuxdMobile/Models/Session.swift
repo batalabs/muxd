@@ -53,3 +53,12 @@ struct Session: Codable, Identifiable, Hashable, Equatable, Sendable {
         return updatedAt.timeIntervalSince1970 > 0
     }
 }
+
+extension Date {
+    /// Relative display like "2 min ago", "Yesterday", "Feb 25".
+    var relativeDisplay: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: self, relativeTo: Date())
+    }
+}
