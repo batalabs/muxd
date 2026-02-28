@@ -133,57 +133,36 @@ struct SessionListView: View {
                 }
             }
         }
+        .navigationTitle(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Menu {
-                    if let info = appState.connectionInfo {
-                        Section {
-                            Button {
-                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
-                            } label: {
-                                Label("\(info.host):\(String(info.port))", systemImage: "network")
-                            }
-                            if !shortModelName.isEmpty {
-                                Button {
-                                    UIPasteboard.general.string = serverModel
-                                } label: {
-                                    Label(shortModelName, systemImage: "cpu")
-                                }
-                            }
-                        }
-
-                        Section {
-                            Button {
-                                viewModel.showToken = true
-                            } label: {
-                                Label("View Token", systemImage: "key")
-                            }
-                        }
-
-                        Section {
-                            Button(role: .destructive) {
-                                appState.disconnect()
-                            } label: {
-                                Label("Disconnect", systemImage: "xmark.circle")
-                            }
-                        }
-                    }
+        .toolbarTitleMenu {
+            if let info = appState.connectionInfo {
+                Button {
+                    UIPasteboard.general.string = "\(info.host):\(String(info.port))"
                 } label: {
-                    Label {
-                        Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: 180, alignment: .leading)
-                    } icon: {
-                        Image(systemName: "server.rack")
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .modifier(ToolbarMenuLabelModifier())
+                    Label("\(info.host):\(String(info.port))", systemImage: "network")
                 }
-                .transaction { $0.animation = nil }
-                .buttonStyle(.plain)
+                if !shortModelName.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = serverModel
+                    } label: {
+                        Label(shortModelName, systemImage: "cpu")
+                    }
+                }
+                Button {
+                    viewModel.showToken = true
+                } label: {
+                    Label("View Token", systemImage: "key")
+                }
+                Divider()
+                Button(role: .destructive) {
+                    appState.disconnect()
+                } label: {
+                    Label("Disconnect", systemImage: "xmark.circle")
+                }
             }
+        }
+        .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {
                     Image(systemName: "plus")
