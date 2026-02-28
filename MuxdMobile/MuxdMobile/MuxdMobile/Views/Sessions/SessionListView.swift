@@ -261,7 +261,8 @@ struct SessionListView: View {
                                 .glassEffect(.regular, in: .rect(cornerRadius: 20))
                         } else {
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(.ultraThinMaterial)
+                                .fill(Color(.secondarySystemGroupedBackground))
+                                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
                         }
                     }
                     .padding(.horizontal, 8)
