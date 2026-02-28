@@ -113,6 +113,7 @@ struct SessionListView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollIndicators(.hidden)
                 .refreshable {
                     await viewModel.loadSessions()
                 }

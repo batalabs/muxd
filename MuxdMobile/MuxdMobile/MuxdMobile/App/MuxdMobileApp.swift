@@ -202,6 +202,7 @@ struct ClientsView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollIndicators(.hidden)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

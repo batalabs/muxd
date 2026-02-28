@@ -85,6 +85,7 @@ struct ConnectionView: View {
                             }
                         }
                         .listStyle(.plain)
+                        .scrollIndicators(.hidden)
                     }
                 } else {
                     Spacer()

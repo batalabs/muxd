@@ -108,6 +108,7 @@ struct ConfigView: View {
                     }
                 }
             }
+            .scrollIndicators(.hidden)
             .navigationTitle("Settings")
             .refreshable {
                 await loadConfig()

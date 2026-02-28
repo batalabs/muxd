@@ -108,6 +108,7 @@ struct ChatView: View {
                 }
                 .padding()
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
             .opacity(isReady ? 1 : 0)
@@ -774,6 +775,7 @@ struct ModelPickerView: View {
                     .disabled(customModelID.isEmpty)
                 }
             }
+            .scrollIndicators(.hidden)
             .navigationTitle("Change Model")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
