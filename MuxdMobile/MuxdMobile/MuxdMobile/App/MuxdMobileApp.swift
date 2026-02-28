@@ -192,7 +192,9 @@ struct ClientsView: View {
                                     }
                                 }
                             )
+                            .id(connection.id)
                             .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
+                            .listRowBackground(Color.clear)
                         }
                         .onDelete { indexSet in
                             for index in indexSet {

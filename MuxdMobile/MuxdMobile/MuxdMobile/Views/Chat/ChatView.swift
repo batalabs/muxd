@@ -91,7 +91,7 @@ struct ChatView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(viewModel.messages.enumerated()), id: \.offset) { index, message in
-                        MessageBubbleView(message: message)
+                        MessageBubbleView(message: message, allMessages: viewModel.messages)
                             .id(index)
                     }
 
@@ -205,18 +205,15 @@ struct ChatView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    Label {
+                        Text(sessionTitle)
+                            .lineLimit(1)
+                    } icon: {
                         if isStarred {
                             Image(systemName: "star.fill")
                                 .foregroundColor(.yellow)
-                                .font(.system(size: 12))
                         }
-                        Text(sessionTitle)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
                     }
-                    .frame(maxWidth: 200)
-                    .modifier(ChatGlassModifier())
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -228,10 +225,9 @@ struct ChatView: View {
                         Label("Change Model", systemImage: "cpu")
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .semibold))
+                    Label("More", systemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
                 }
-                .buttonStyle(ChatGlassButtonStyle(circular: true))
             }
         }
         .sheet(isPresented: $showModelPicker) {
@@ -324,7 +320,12 @@ struct ChatView: View {
 
 struct MessageBubbleView: View {
     let message: TranscriptMessage
+    let allMessages: [TranscriptMessage]
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
+
+    private var enrichedToolResultBlocks: [ContentBlock] {
+        message.toolResultBlocksWithInput(from: allMessages)
+    }
 
     private var hasVisibleContent: Bool {
         // Has text content
@@ -410,7 +411,7 @@ struct MessageBubbleView: View {
                 }
 
                 // Tool results with content (grouped when consecutive identical)
-                ForEach(groupToolResults(message.toolResultBlocks)) { group in
+                ForEach(groupToolResults(enrichedToolResultBlocks)) { group in
                     ToolResultBlockView(block: group.block, count: group.count)
                 }
             }
@@ -434,13 +435,11 @@ func truncateToLines(_ text: String, maxLines: Int) -> String {
     return lines.prefix(maxLines).joined(separator: "\n") + "\n... (truncated)"
 }
 
-/// Truncates text in the middle, keeping start and end visible (e.g., for file paths)
-func truncateMiddle(_ text: String, maxLength: Int) -> String {
-    guard text.count > maxLength else { return text }
-    let keepChars = (maxLength - 3) / 2  // 3 for "..."
-    let start = text.prefix(keepChars)
-    let end = text.suffix(keepChars)
-    return "\(start)...\(end)"
+/// Truncates path from the front, keeping the filename visible (e.g., "...internal/tools/tools.go")
+func truncatePath(_ path: String, maxLength: Int) -> String {
+    guard path.count > maxLength else { return path }
+    let keepChars = maxLength - 3  // 3 for "..."
+    return "..." + path.suffix(keepChars)
 }
 
 func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
@@ -506,6 +505,12 @@ struct ToolResultBlockView: View {
                         Text(block.toolName ?? "Result")
                             .font(.caption)
                             .fontWeight(.medium)
+                        if let summary = block.toolInputSummary {
+                            Text(truncatePath(summary, maxLength: 30))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
                         Text("done")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -518,11 +523,13 @@ struct ToolResultBlockView: View {
 
                     Text(truncateToLines(result, maxLines: 5))
                         .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -643,7 +650,7 @@ struct ToolCallView: View {
                         .fontWeight(.medium)
 
                     if let summary = tool.inputSummary {
-                        Text(truncateMiddle(summary, maxLength: 40))
+                        Text(truncatePath(summary, maxLength: 40))
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)

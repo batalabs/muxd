@@ -166,16 +166,12 @@ struct SessionListView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "server.rack")
+                    Label {
                         Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
+                    } icon: {
+                        Image(systemName: "server.rack")
                     }
-                    .modifier(GlassModifier())
                 }
-                .menuStyle(.borderlessButton)
-                .modifier(FlexibleMenuModifier())
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {

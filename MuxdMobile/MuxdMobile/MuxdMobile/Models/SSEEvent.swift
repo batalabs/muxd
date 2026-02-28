@@ -106,17 +106,13 @@ struct SSEEvent: Sendable {
         guard let name = toolName else { return nil }
 
         switch name {
-        case "file_read", "Read":
-            return input["file_path"] as? String ?? input["path"] as? String
-        case "file_write", "Write":
-            return input["file_path"] as? String ?? input["path"] as? String
-        case "file_edit", "Edit":
-            return input["file_path"] as? String ?? input["path"] as? String
-        case "bash", "Bash":
+        case "file_read":
+            return input["path"] as? String
+        case "file_write", "file_edit":
+            return input["path"] as? String
+        case "bash":
             return input["command"] as? String
-        case "grep", "Grep":
-            return input["pattern"] as? String
-        case "glob", "Glob":
+        case "grep":
             return input["pattern"] as? String
         case "list_files":
             return input["path"] as? String
