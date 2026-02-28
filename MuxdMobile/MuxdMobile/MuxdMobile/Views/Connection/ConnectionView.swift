@@ -54,7 +54,7 @@ struct ConnectionView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
 
-                // Saved connections (ScrollView avoids List cell reuse / wrong-row highlight bug)
+                // Saved connections (scrollable)
                 if !appState.savedConnections.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Saved Servers")
@@ -62,40 +62,59 @@ struct ConnectionView: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 12)
 
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(appState.savedConnections) { connection in
-                                    Button {
-                                        connectTo(connection)
+                        List {
+                            ForEach(appState.savedConnections) { connection in
+                                Button {
+                                    connectTo(connection)
+                                } label: {
+                                    SavedConnectionRowCompact(
+                                        connection: connection,
+                                        isConnecting: connectingToID == connection.id,
+                                        isDisabled: connectingToID != nil && connectingToID != connection.id
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .id(connection.id)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        withAnimation {
+                                            appState.removeConnection(id: connection.id)
+                                        }
                                     } label: {
-                                        SavedConnectionRowCompact(
-                                            connection: connection,
-                                            isConnecting: connectingToID == connection.id,
-                                            isDisabled: connectingToID != nil && connectingToID != connection.id
-                                        )
+                                        Label("Delete", systemImage: "trash")
                                     }
-                                    .buttonStyle(.plain)
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 4)
-                                    .contentShape(Rectangle())
-                                    .contextMenu {
-                                        Button {
-                                            connectionToRename = connection
-                                        } label: {
-                                            Label("Rename", systemImage: "pencil")
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        connectionToRename = connection
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                    .tint(.blue)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        connectionToRename = connection
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        withAnimation {
+                                            appState.removeConnection(id: connection.id)
                                         }
-                                        Button(role: .destructive) {
-                                            withAnimation {
-                                                appState.removeConnection(id: connection.id)
-                                            }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
                                 }
                             }
-                            .padding(.horizontal, 24)
+                            .onDelete { indexSet in
+                                for index in indexSet {
+                                    let connection = appState.savedConnections[index]
+                                    appState.removeConnection(id: connection.id)
+                                }
+                            }
                         }
+                        .listStyle(.plain)
                         .scrollIndicators(.hidden)
                     }
                 } else {

@@ -178,30 +178,49 @@ struct ChatView: View {
                 .padding(.vertical, 10)
             }
         }
-        .navigationTitle(sessionTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarTitleMenu {
-            Button {
-                showRenameSheet = true
-            } label: {
-                Label("Rename", systemImage: "pencil")
-            }
-            Button {
-                isStarred.toggle()
-                Task {
-                    await toggleStar()
-                }
-            } label: {
-                Label(isStarred ? "Unstar" : "Star", systemImage: isStarred ? "star.fill" : "star")
-            }
-            Divider()
-            Button(role: .destructive) {
-                showDeleteConfirmation = true
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    Button {
+                        showRenameSheet = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+
+                    Button {
+                        isStarred.toggle()
+                        Task {
+                            await toggleStar()
+                        }
+                    } label: {
+                        Label(isStarred ? "Unstar" : "Star", systemImage: isStarred ? "star.fill" : "star")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Label {
+                        Text(sessionTitle)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: 180, alignment: .leading)
+                    } icon: {
+                        if isStarred {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                    .labelStyle(.titleAndIcon)
+                    .modifier(ToolbarMenuLabelModifier())
+                }
+                .buttonStyle(.plain)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button(action: {}) {
