@@ -113,13 +113,11 @@ struct SessionListView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                         showServerPanel.toggle()
                     }
                     if showServerPanel {
-                        Task {
-                            await loadServerModel()
-                        }
+                        Task { await loadServerModel() }
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -160,125 +158,110 @@ struct SessionListView: View {
                 ProgressView()
             }
         }
+        .overlay {
+            // Invisible full-screen tap target to dismiss — no darkening
+            if showServerPanel {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showServerPanel = false
+                        }
+                    }
+            }
+        }
         .overlay(alignment: .top) {
             if showServerPanel, let info = appState.connectionInfo {
                 VStack(spacing: 0) {
-                    // Dismiss scrim
-                    Color.black.opacity(0.001)
-                        .frame(height: 0)
-
-                    VStack(spacing: 0) {
-                        // Header
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(info.name.isEmpty ? info.host : info.name)
-                                    .font(.headline)
-                                Text("\(info.host):\(String(info.port))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Button {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    showServerPanel = false
-                                }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, 12)
-
-                        Divider().padding(.horizontal, 16)
-
-                        // Model
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Model", systemImage: "cpu")
-                                .font(.subheadline.weight(.medium))
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(info.name.isEmpty ? info.host : info.name)
+                                .font(.headline)
+                            Text("\(info.host):\(String(info.port))")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text(serverModel.isEmpty ? "Not set" : serverModel)
-                                .font(.body.monospaced())
-                                .foregroundColor(serverModel.isEmpty ? .secondary : .primary)
-                                .lineLimit(1)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-
-                        Divider().padding(.horizontal, 16)
-
-                        // Actions
-                        VStack(spacing: 0) {
-                            Button {
-                                viewModel.showToken = true
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    showServerPanel = false
-                                }
-                            } label: {
-                                Label("View Token", systemImage: "key")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                            }
-                            .foregroundColor(.primary)
-
-                            Button {
-                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    showServerPanel = false
-                                }
-                            } label: {
-                                Label("Copy Address", systemImage: "doc.on.doc")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                            }
-                            .foregroundColor(.primary)
-
-                            Divider().padding(.horizontal, 16)
-
-                            Button(role: .destructive) {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    showServerPanel = false
-                                }
-                                appState.disconnect()
-                            } label: {
-                                Label("Disconnect", systemImage: "xmark.circle")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                            }
-                        }
-                        .padding(.bottom, 8)
+                        Spacer()
                     }
-                    .background {
-                        if #available(iOS 26.0, *) {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(.clear)
-                                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-                        } else {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color(.secondarySystemGroupedBackground))
-                                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-                        }
-                    }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
 
-                    Spacer()
+                    Divider().padding(.horizontal, 16)
+
+                    // Model
+                    HStack(spacing: 8) {
+                        Image(systemName: "cpu")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(serverModel.isEmpty ? "No model set" : serverModel)
+                            .font(.subheadline.monospaced())
+                            .foregroundColor(serverModel.isEmpty ? .secondary : .primary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+
+                    Divider().padding(.horizontal, 16)
+
+                    // Actions
+                    Button {
+                        viewModel.showToken = true
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showServerPanel = false
+                        }
+                    } label: {
+                        Label("View Token", systemImage: "key")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                    }
+                    .foregroundColor(.primary)
+
+                    Button {
+                        UIPasteboard.general.string = "\(info.host):\(String(info.port))"
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showServerPanel = false
+                        }
+                    } label: {
+                        Label("Copy Address", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                    }
+                    .foregroundColor(.primary)
+
+                    Divider().padding(.horizontal, 16)
+
+                    Button(role: .destructive) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showServerPanel = false
+                        }
+                        appState.disconnect()
+                    } label: {
+                        Label("Disconnect", systemImage: "xmark.circle")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                    }
                 }
-                .background(
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                showServerPanel = false
-                            }
-                        }
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .padding(.bottom, 8)
+                .background {
+                    if #available(iOS 26.0, *) {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.clear)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    } else {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.secondarySystemGroupedBackground))
+                            .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
                 .zIndex(10)
             }
         }
