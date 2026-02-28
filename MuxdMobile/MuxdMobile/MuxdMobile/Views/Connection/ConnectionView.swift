@@ -76,6 +76,8 @@ struct ConnectionView: View {
                                         }
                                     }
                                 )
+                                .id(connection.id)
+                                .listRowBackground(Color.clear)
                             }
                             .onDelete { indexSet in
                                 for index in indexSet {
@@ -199,8 +201,9 @@ struct SavedConnectionRowCompact: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.borderless)
         .opacity(isDisabled ? 0.5 : 1.0)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive, action: onDelete) {
@@ -234,42 +237,44 @@ struct SavedConnectionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: "server.rack")
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 40)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    Text("\(connection.host):\(String(connection.port))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if isConnecting {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .contentShape(Rectangle())
-            .onTapGesture {
+            Button(action: {
                 if !isConnecting && !isDisabled {
                     onConnect()
                 }
+            }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "server.rack")
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                        .frame(width: 40)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(connection.name)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("\(connection.host):\(String(connection.port))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    if isConnecting {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
             .opacity(isDisabled ? 0.5 : 1.0)
             .contextMenu {
                 Button(action: onRename) {

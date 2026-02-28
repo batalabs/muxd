@@ -209,6 +209,7 @@ struct ChatView: View {
                         Text(sessionTitle)
                             .lineLimit(1)
                             .truncationMode(.tail)
+                            .frame(maxWidth: 180, alignment: .leading)
                     } icon: {
                         if isStarred {
                             Image(systemName: "star.fill")
@@ -216,8 +217,9 @@ struct ChatView: View {
                         }
                     }
                     .labelStyle(.titleAndIcon)
-                    .modifier(ChatGlassModifier())
+                    .modifier(ToolbarMenuLabelModifier())
                 }
+                .buttonStyle(.plain)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {

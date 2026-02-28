@@ -43,6 +43,23 @@ struct GlassModifier: ViewModifier {
     }
 }
 
+struct ToolbarMenuLabelModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .frame(height: 32)
+                .padding(.horizontal, 10)
+                .glassEffect(.regular, in: .capsule)
+                .compositingGroup()
+        } else {
+            content
+                .frame(height: 32)
+                .padding(.horizontal, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+}
+
 struct GlassButtonStyle: ButtonStyle {
     var circular: Bool = false
 
@@ -156,13 +173,16 @@ struct SessionListView: View {
                     Label {
                         Text(appState.connectionInfo?.name ?? appState.connectionInfo?.host ?? "Sessions")
                             .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: 180, alignment: .leading)
                     } icon: {
                         Image(systemName: "server.rack")
                     }
                     .labelStyle(.titleAndIcon)
-                    .modifier(GlassModifier())
+                    .modifier(ToolbarMenuLabelModifier())
                 }
                 .transaction { $0.animation = nil }
+                .buttonStyle(.plain)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { viewModel.showNewSession = true }) {
