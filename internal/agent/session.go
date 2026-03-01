@@ -287,6 +287,18 @@ func (a *Service) SetXOAuth(clientID, clientSecret, accessToken, refreshToken, t
 	a.xTokenSaver = saver
 }
 
+// UpdateXTokens updates the cached access/refresh tokens and expiry
+// without changing client credentials or the saver callback.
+// Called after a successful token refresh so subsequent agent loop
+// iterations use the new tokens.
+func (a *Service) UpdateXTokens(accessToken, refreshToken, tokenExpiry string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.xAccessToken = accessToken
+	a.xRefreshToken = refreshToken
+	a.xTokenExpiry = tokenExpiry
+}
+
 // SetMCPManager sets the MCP server manager for tool routing.
 func (a *Service) SetMCPManager(m *mcp.Manager) {
 	a.mu.Lock()

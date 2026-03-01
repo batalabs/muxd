@@ -839,17 +839,7 @@ func (ta *Adapter) newServiceForSession(sess *domain.Session) *agent.Service {
 			ta.Prefs.XAccessToken,
 			ta.Prefs.XRefreshToken,
 			ta.Prefs.XTokenExpiry,
-			func(accessToken, refreshToken, tokenExpiry string) error {
-				ta.mu.Lock()
-				defer ta.mu.Unlock()
-				if ta.Prefs == nil {
-					return nil
-				}
-				ta.Prefs.XAccessToken = accessToken
-				ta.Prefs.XRefreshToken = refreshToken
-				ta.Prefs.XTokenExpiry = tokenExpiry
-				return config.SavePreferences(*ta.Prefs)
-			},
+			ta.xTokenSaverFor(svc),
 		)
 	}
 
@@ -917,21 +907,28 @@ func (ta *Adapter) applyXOAuthFromPrefs() {
 			ta.Prefs.XAccessToken,
 			ta.Prefs.XRefreshToken,
 			ta.Prefs.XTokenExpiry,
-			func(accessToken, refreshToken, tokenExpiry string) error {
-				ta.mu.Lock()
-				defer ta.mu.Unlock()
-				if ta.Prefs == nil {
-					return nil
-				}
-				ta.Prefs.XAccessToken = accessToken
-				ta.Prefs.XRefreshToken = refreshToken
-				ta.Prefs.XTokenExpiry = tokenExpiry
-				return config.SavePreferences(*ta.Prefs)
-			},
+			ta.xTokenSaverFor(svc),
 		)
 	}
 	ta.mu.Unlock()
 	ta.logf("telegram: X oauth updated")
+}
+
+// xTokenSaverFor returns a token-save callback that persists refreshed
+// tokens to disk, updates ta.Prefs, and updates the agent's cached tokens.
+func (ta *Adapter) xTokenSaverFor(svc *agent.Service) func(string, string, string) error {
+	return func(accessToken, refreshToken, tokenExpiry string) error {
+		ta.mu.Lock()
+		defer ta.mu.Unlock()
+		if ta.Prefs == nil {
+			return nil
+		}
+		ta.Prefs.XAccessToken = accessToken
+		ta.Prefs.XRefreshToken = refreshToken
+		ta.Prefs.XTokenExpiry = tokenExpiry
+		svc.UpdateXTokens(accessToken, refreshToken, tokenExpiry)
+		return config.SavePreferences(*ta.Prefs)
+	}
 }
 
 func disabledToolsCSV(disabled map[string]bool) string {

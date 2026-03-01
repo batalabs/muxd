@@ -954,14 +954,7 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 				s.prefs.XAccessToken,
 				s.prefs.XRefreshToken,
 				s.prefs.XTokenExpiry,
-				func(accessToken, refreshToken, tokenExpiry string) error {
-					s.mu.Lock()
-					defer s.mu.Unlock()
-					s.prefs.XAccessToken = accessToken
-					s.prefs.XRefreshToken = refreshToken
-					s.prefs.XTokenExpiry = tokenExpiry
-					return config.SavePreferences(*s.prefs)
-				},
+				s.xTokenSaverFor(ag),
 			)
 		}
 	}
@@ -1056,6 +1049,21 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	return ag, nil
 }
 
+// xTokenSaverFor returns a token-save callback for the given agent.
+// On refresh, it persists to disk, updates s.prefs, and updates the
+// agent's cached tokens so subsequent loop iterations use the new values.
+func (s *Server) xTokenSaverFor(ag *agent.Service) func(string, string, string) error {
+	return func(accessToken, refreshToken, tokenExpiry string) error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.prefs.XAccessToken = accessToken
+		s.prefs.XRefreshToken = refreshToken
+		s.prefs.XTokenExpiry = tokenExpiry
+		ag.UpdateXTokens(accessToken, refreshToken, tokenExpiry)
+		return config.SavePreferences(*s.prefs)
+	}
+}
+
 // configureAgent sets up credentials, disabled tools, MCP, git, and memory
 // on an agent. Must be called with s.mu held.
 func (s *Server) configureAgent(ag *agent.Service) {
@@ -1072,14 +1080,7 @@ func (s *Server) configureAgent(ag *agent.Service) {
 			s.prefs.XAccessToken,
 			s.prefs.XRefreshToken,
 			s.prefs.XTokenExpiry,
-			func(accessToken, refreshToken, tokenExpiry string) error {
-				s.mu.Lock()
-				defer s.mu.Unlock()
-				s.prefs.XAccessToken = accessToken
-				s.prefs.XRefreshToken = refreshToken
-				s.prefs.XTokenExpiry = tokenExpiry
-				return config.SavePreferences(*s.prefs)
-			},
+			s.xTokenSaverFor(ag),
 		)
 	}
 	if s.prefs != nil {

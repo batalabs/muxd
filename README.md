@@ -42,17 +42,18 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 
 ## Features
 
-### 30 Built-in Tools
+### 33 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
 | **File ops** | `file_read`, `file_write`, `file_edit`, `list_files`, `patch_apply` |
-| **Code search** | `grep`, `bash`, `git_status` |
-| **Web** | `web_search`, `web_fetch` |
+| **Code search** | `grep`, `glob`, `bash`, `git_status` |
+| **Web & HTTP** | `web_search`, `web_fetch`, `http_request` |
 | **X / Twitter** | `x_post`, `x_search`, `x_mentions`, `x_reply`, `x_schedule` + management |
 | **SMS** | `sms_send`, `sms_status`, `sms_schedule` |
 | **Workflow** | `todo_read`, `todo_write`, `ask_user`, `plan_enter`, `plan_exit`, `task` |
 | **Memory** | `memory_read`, `memory_write` |
+| **Logging** | `log_read` — read recent daemon log entries |
 | **Scheduling** | `schedule_task` — schedule multi-step agent tasks for future execution |
 
 ### 9 LLM Providers
