@@ -3,7 +3,7 @@ import SwiftUI
 struct AppGlassModifier: ViewModifier {
     var circular: Bool = false
 
-    func body(content: Content) -> some View {
+    func body(content: View) -> some View {
         if circular {
             if #available(iOS 26.0, *) {
                 content
@@ -348,7 +348,8 @@ struct ClientCardView: View {
         .contentShape(Rectangle())
         .gesture(
             LongPressGesture(minimumDuration: 0.01)
-                .updating($isPressed) { currentState, gestureState, _ in
+                .updating($isPressed) { currentState, gestureState, transaction in
+                    transaction.animation = nil
                     gestureState = currentState
                 }
                 .onEnded { _ in
@@ -429,70 +430,133 @@ struct ClientCardView: View {
                 sessionCount = sessions.count
             }
         } catch {
-            // Ignore - will show dash
+            // Ignore - won't show session count
         }
     }
 }
 
-struct ClientRowView: View {
-    let connection: ConnectionInfo
-    let isConnecting: Bool
+struct AppTheme: RawRepresentable, Equatable, CaseIterable {
+    var rawValue: String
+    static let system = AppTheme(rawValue: "system")
+    static let light = AppTheme(rawValue: "light")
+    static let dark = AppTheme(rawValue: "dark")
 
-    @State private var showSpinner = false
-    @State private var spinnerTask: Task<Void, Never>?
+    static var allCases: [AppTheme] = [.system, .light, .dark]
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        default: return nil
+        }
+    }
+}
+
+struct RenameConnectionView: View {
+    @Environment(\.dismiss) private var dismiss
+    let connection: ConnectionInfo
+    let onRename: (String) -> Void
+
+    @State private var name: String = ""
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "server.rack")
-                .font(.title2)
-                .foregroundColor(.accentColor)
-                .frame(width: 32)
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Server Name", text: $name)
+                        .autocapitalization(.words)
+                } header: {
+                    Text("Name")
+                } footer: {
+                    Text("Enter a friendly name for this server")
+                }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(connection.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-
-                Text("\(connection.host):\(String(connection.port))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            ZStack {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color(.tertiaryLabel))
-                    .opacity(showSpinner ? 0 : 1)
-
-                if showSpinner {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                Section {
+                    LabeledContent("Host", value: connection.host)
+                    LabeledContent("Port", value: "\(connection.port)")
                 }
             }
-            .frame(width: 20, height: 20)
+            .navigationTitle("Rename Server")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onRename(name)
+                        dismiss()
+                    }
+                    .disabled(name.isEmpty)
+                }
+            }
+            .onAppear {
+                name = connection.name
+            }
         }
-        .contentShape(Rectangle())
-        .onChange(of: isConnecting) { _, connecting in
-            spinnerTask?.cancel()
-            if connecting {
-                spinnerTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    guard !Task.isCancelled else { return }
-                    withAnimation(.easeIn(duration: 0.15)) {
-                        showSpinner = true
+    }
+}
+
+struct ConfigView: View {
+    @EnvironmentObject var appState: AppState
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
+    @State private var showDisconnectConfirm = false
+    @State private var showDeleteConfirm = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Appearance", selection: $appTheme) {
+                        Label("System", systemImage: "circle.lefthalf.filled").tag(AppTheme.system)
+                        Label("Light", systemImage: "sun.max.fill").tag(AppTheme.light)
+                        Label("Dark", systemImage: "moon.fill").tag(AppTheme.dark)
                     }
                 }
-            } else {
-                withAnimation {
-                    showSpinner = false
+
+                if appState.isConnected, let info = appState.connectionInfo {
+                    Section("Current Connection") {
+                        LabeledContent("Name", value: info.name)
+                        LabeledContent("Host", value: info.host)
+                        LabeledContent("Port", value: "\(info.port)")
+
+                        Button(role: .destructive) {
+                            showDisconnectConfirm = true
+                        } label: {
+                            Label("Disconnect", systemImage: "xmark.circle.fill")
+                        }
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete All Saved Clients", systemImage: "trash.fill")
+                    }
+                    .disabled(appState.savedConnections.isEmpty)
                 }
             }
-        }
-        .onDisappear {
-            spinnerTask?.cancel()
-            showSpinner = false
+            .navigationTitle("Settings")
+            .confirmationDialog("Disconnect from server?", isPresented: $showDisconnectConfirm, titleVisibility: .visible) {
+                Button("Disconnect", role: .destructive) {
+                    appState.disconnect()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You will need to reconnect to access your sessions.")
+            }
+            .confirmationDialog("Delete all saved clients?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete All", role: .destructive) {
+                    for connection in appState.savedConnections {
+                        appState.removeConnection(id: connection.id)
+                    }
+                    appState.disconnect()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will remove all saved client connections from this device.")
+            }
         }
     }
 }
