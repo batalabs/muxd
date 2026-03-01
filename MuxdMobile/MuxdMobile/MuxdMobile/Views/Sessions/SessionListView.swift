@@ -179,6 +179,11 @@ struct SessionListView: View {
                         }
 
                         Section {
+                            Button {
+                                viewModel.showRenameConnection = true
+                            } label: {
+                                Label("Rename", systemImage: "character.cursor.ibeam")
+                            }
                             Button(role: .destructive) {
                                 appState.disconnect()
                             } label: {
@@ -210,6 +215,13 @@ struct SessionListView: View {
         }
         .sheet(isPresented: $viewModel.showToken) {
             TokenView(token: appState.connectionInfo?.token ?? "")
+        }
+        .sheet(isPresented: $viewModel.showRenameConnection) {
+            if let info = appState.connectionInfo {
+                RenameConnectionView(connection: info) { newName in
+                    appState.renameConnection(id: info.id, name: newName)
+                }
+            }
         }
         .overlay {
             if viewModel.isLoading {
@@ -326,6 +338,7 @@ class SessionListViewModel: ObservableObject {
     @Published var sessions: [Session] = []
     @Published var isLoading = false
     @Published var showToken = false
+    @Published var showRenameConnection = false
     @Published var sessionToRename: Session?
     @Published var deleteSessionID: String?
     @Published var error: String?

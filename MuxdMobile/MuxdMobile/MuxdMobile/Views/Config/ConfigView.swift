@@ -50,7 +50,7 @@ struct ConfigView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App Version", value: "1.0.0")
+                    LabeledContent("App Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                     LabeledContent("muxd Mobile", value: "iOS Client")
                     Link(destination: URL(string: "https://www.muxd.sh/support")!) {
                         HStack {

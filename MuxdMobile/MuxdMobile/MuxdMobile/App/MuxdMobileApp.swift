@@ -207,6 +207,10 @@ struct ClientsView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                     }
+                    .refreshable {
+                        // Trigger a re-render by briefly toggling state
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                    }
                     .scrollIndicators(.hidden)
                 }
             }

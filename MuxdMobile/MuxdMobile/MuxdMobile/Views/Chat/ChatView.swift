@@ -92,8 +92,7 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ChatViewModel
     @State private var inputText = ""
-    @State private var showModelPicker = false
-    @State private var showRenameSheet = false
+        @State private var showRenameSheet = false
     @State private var showDeleteConfirmation = false
     @State private var isStarred = false
     @State private var sessionTitle: String
@@ -240,27 +239,7 @@ struct ChatView: View {
                     chatMenuLabel
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button(action: {}) {
-                        Label("Branch", systemImage: "arrow.triangle.branch")
                     }
-                    Button(action: { showModelPicker = true }) {
-                        Label("Change Model", systemImage: "cpu")
-                    }
-                } label: {
-                    Label("More", systemImage: "ellipsis")
-                        .labelStyle(.iconOnly)
-                }
-            }
-        }
-        .sheet(isPresented: $showModelPicker) {
-            ModelPickerView(currentModel: session.model) { modelID in
-                Task {
-                    await viewModel.setModel(modelID: modelID)
-                }
-            }
-        }
         .sheet(isPresented: $showRenameSheet) {
             ChatRenameView(title: sessionTitle) { newTitle in
                 Task {
@@ -780,63 +759,6 @@ struct AskUserView: View {
                         dismiss()
                     }
                     .disabled(answer.isEmpty)
-                }
-            }
-        }
-    }
-}
-
-struct ModelPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    let currentModel: String
-    let onSelect: (String) -> Void
-
-    @State private var customModelID = ""
-
-    private let commonModels = [
-        ("Kimi K2.5", "accounts/fireworks/models/kimi-k2p5"),
-    ]
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Common Models") {
-                    ForEach(commonModels, id: \.1) { name, modelID in
-                        Button(action: {
-                            onSelect(modelID)
-                            dismiss()
-                        }) {
-                            HStack {
-                                Text(name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if currentModel == modelID {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Custom Model") {
-                    TextField("Model ID", text: $customModelID)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-
-                    Button("Use Custom Model") {
-                        onSelect(customModelID)
-                        dismiss()
-                    }
-                    .disabled(customModelID.isEmpty)
-                }
-            }
-            .scrollIndicators(.hidden)
-            .navigationTitle("Change Model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
         }

@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 class AppState: ObservableObject {
@@ -16,12 +17,30 @@ class AppState: ObservableObject {
         loadSavedConnections()
     }
 
+    // MARK: - Haptics
+
+    private func hapticSuccess() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+
+    private func hapticError() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.error)
+    }
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
     // MARK: - Connection
 
     func connect(with info: ConnectionInfo, silent: Bool = false) async {
         guard let newClient = MuxdClient(host: info.host, port: info.port, token: info.token) else {
             if !silent {
                 error = .connectionFailed("Invalid server address: \(info.host):\(info.port)")
+                hapticError()
             }
             return
         }
@@ -39,6 +58,7 @@ class AppState: ObservableObject {
                 isConnected = true
                 KeychainHelper.save(connectionInfo: info)
                 loadSavedConnections()
+                hapticSuccess()
             } else {
                 connectionInfo = nil
                 isConnected = false
@@ -46,6 +66,7 @@ class AppState: ObservableObject {
                 sseClient = nil
                 if !silent {
                     error = .connectionFailed("Server not responding")
+                    hapticError()
                 }
             }
         } catch MuxdError.unauthorized {
@@ -56,6 +77,7 @@ class AppState: ObservableObject {
             KeychainHelper.deleteConnectionInfo()
             if !silent {
                 error = .connectionFailed("Invalid or expired token")
+                hapticError()
             }
         } catch {
             connectionInfo = nil
@@ -64,6 +86,7 @@ class AppState: ObservableObject {
             sseClient = nil
             if !silent {
                 self.error = .connectionFailed(error.localizedDescription)
+                hapticError()
             }
         }
     }
@@ -75,6 +98,7 @@ class AppState: ObservableObject {
         sseClient = nil
         currentSession = nil
         KeychainHelper.deleteConnectionInfo()
+        hapticLight()
     }
 
     func restoreConnection() async {
