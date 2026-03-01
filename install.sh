@@ -49,11 +49,15 @@ TMP="$(mktemp)"
 curl -fsSL "$URL" -o "$TMP"
 chmod +x "$TMP"
 
-# Install (may need sudo)
+# Ensure install directory exists, then install (may need sudo)
 if [ -w "$INSTALL_DIR" ]; then
   mv "$TMP" "${INSTALL_DIR}/muxd"
-else
+elif [ -d "$INSTALL_DIR" ]; then
   echo "Need elevated permissions to install to ${INSTALL_DIR}"
+  sudo mv "$TMP" "${INSTALL_DIR}/muxd"
+else
+  echo "Creating ${INSTALL_DIR} (requires elevated permissions)"
+  sudo mkdir -p "$INSTALL_DIR"
   sudo mv "$TMP" "${INSTALL_DIR}/muxd"
 fi
 
