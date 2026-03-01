@@ -811,6 +811,10 @@ class ChatViewModel: ObservableObject {
     func submit(text: String) {
         guard let sseClient = sseClient else { return }
 
+        // Add user message immediately so it appears right away
+        let userMessage = TranscriptMessage(role: "user", content: text, blocks: nil)
+        messages.append(userMessage)
+
         streamingText = ""
         isStreaming = true
         activeTools = [:]

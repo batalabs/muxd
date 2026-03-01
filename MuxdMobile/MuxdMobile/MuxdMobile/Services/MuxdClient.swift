@@ -212,10 +212,15 @@ actor MuxdClient {
     func setTags(sessionID: String, tags: String) async throws {
         let body = try JSONEncoder().encode(["tags": tags])
         let request = try makeRequest(method: "POST", path: "/api/sessions/\(sessionID)/tags", body: body)
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw MuxdError.serverError("Failed to set tags")
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MuxdError.serverError("Failed to set tags: no response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw MuxdError.serverError("Failed to set tags (\(httpResponse.statusCode)): \(errorMsg)")
         }
     }
 

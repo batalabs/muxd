@@ -111,6 +111,15 @@ struct SessionListView: View {
                         .listRowBackground(Color.clear)
                         .contextMenu {
                             Button {
+                                Task {
+                                    await viewModel.toggleStar(session)
+                                }
+                            } label: {
+                                let isStarred = session.tags?.contains("starred") ?? false
+                                Label(isStarred ? "Unstar" : "Star", systemImage: isStarred ? "star.fill" : "star")
+                            }
+
+                            Button {
                                 viewModel.sessionToRename = session
                             } label: {
                                 Label("Rename", systemImage: "pencil")
@@ -291,10 +300,18 @@ struct SessionRowView: View {
     let session: Session
     var isNew: Bool = false
 
+    private var isStarred: Bool {
+        session.tags?.contains("starred") ?? false
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
-                if isNew {
+            HStack(spacing: 8) {
+                if isStarred {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.yellow)
+                } else if isNew {
                     Circle()
                         .fill(Color.accentColor)
                         .frame(width: 8, height: 8)
@@ -321,12 +338,6 @@ struct SessionRowView: View {
                 Text("\(session.messageCount) messages")
                     .font(.caption)
                     .foregroundColor(.secondary)
-            }
-
-            if let tags = session.tags, !tags.isEmpty {
-                Text(tags)
-                    .font(.caption2)
-                    .foregroundColor(.accentColor)
             }
         }
         .padding(.vertical, 4)
@@ -355,7 +366,16 @@ class SessionListViewModel: ObservableObject {
         // Retry up to 3 times with delay for server restarts
         for attempt in 1...3 {
             do {
-                sessions = try await client.listSessions(project: nil, limit: 50)
+                let fetchedSessions = try await client.listSessions(project: nil, limit: 50)
+                // Sort with starred sessions at the top
+                sessions = fetchedSessions.sorted { s1, s2 in
+                    let s1Starred = s1.tags?.contains("starred") ?? false
+                    let s2Starred = s2.tags?.contains("starred") ?? false
+                    if s1Starred != s2Starred {
+                        return s1Starred // starred sessions come first
+                    }
+                    return s1.updatedAt > s2.updatedAt // then by most recent
+                }
                 return
             } catch MuxdError.unauthorized {
                 // Token is invalid - need to reconnect with new QR code
@@ -431,6 +451,23 @@ class SessionListViewModel: ObservableObject {
             try await client.renameSession(sessionID: session.id, title: title)
             await loadSessions()
             sessionToRename = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func toggleStar(_ session: Session) async {
+        guard let client = client else {
+            self.error = "Not connected to server"
+            return
+        }
+
+        let isCurrentlyStarred = session.tags?.contains("starred") ?? false
+        let newTags = isCurrentlyStarred ? "" : "starred"
+
+        do {
+            try await client.setTags(sessionID: session.id, tags: newTags)
+            await loadSessions()
         } catch {
             self.error = error.localizedDescription
         }

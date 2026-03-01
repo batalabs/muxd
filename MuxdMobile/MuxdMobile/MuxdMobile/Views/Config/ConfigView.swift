@@ -50,13 +50,25 @@ struct ConfigView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
-                    LabeledContent("muxd Mobile", value: "iOS Client")
+                    LabeledContent("Version", value: {
+                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+                        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+                        return "\(version) (\(build))"
+                    }())
                     Link(destination: URL(string: "https://www.muxd.sh/support")!) {
                         HStack {
                             Text("Get Help")
                             Spacer()
                             Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    ShareLink(item: URL(string: "https://apps.apple.com/app/muxd/id123456789")!) {
+                        HStack {
+                            Text("Share App")
+                            Spacer()
+                            Image(systemName: "square.and.arrow.up")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
