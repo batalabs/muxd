@@ -100,6 +100,7 @@ func AllTools() []ToolDef {
 		fileEditTool(),
 		bashTool(),
 		grepTool(),
+		globTool(),
 		listFilesTool(),
 		askUserTool(),
 		todoReadTool(),
