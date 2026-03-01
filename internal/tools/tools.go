@@ -107,6 +107,7 @@ func AllTools() []ToolDef {
 		todoWriteTool(),
 		webSearchTool(),
 		webFetchTool(),
+		httpRequestTool(),
 		xPostTool(),
 		xSearchTool(),
 		xMentionsTool(),
@@ -191,6 +192,8 @@ func ToolRiskTags(name string) []string {
 		return []string{"shell", "write"}
 	case "file_write", "file_edit", "patch_apply":
 		return []string{"write"}
+	case "http_request":
+		return []string{"network", "write"}
 	case "web_fetch", "web_search":
 		return []string{"network"}
 	case "x_post", "x_schedule", "x_reply":
@@ -230,6 +233,7 @@ func ToolProfileDisabledSet(profile string) map[string]bool {
 		disabled["sms_send"] = true
 		disabled["sms_status"] = true
 		disabled["sms_schedule"] = true
+		disabled["http_request"] = true
 	case "coder":
 		// Keep all enabled by default.
 	case "research":

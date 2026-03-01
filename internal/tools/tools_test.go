@@ -620,7 +620,7 @@ func TestAllToolSpecs(t *testing.T) {
 	specs := AllToolSpecs()
 
 	t.Run("correct count", func(t *testing.T) {
-		expected := 32 // + glob + git_status + x tools + x_search/mentions/reply + x_schedule_list/update/cancel + memory_read/write + schedule_task + sms_send/status/schedule + log_read
+		expected := 33 // + glob + git_status + x tools + x_search/mentions/reply + x_schedule_list/update/cancel + memory_read/write + schedule_task + sms_send/status/schedule + log_read + http_request
 		if len(specs) != expected {
 			t.Errorf("expected %d tools, got %d", expected, len(specs))
 		}
@@ -739,6 +739,7 @@ func TestToolRiskTags(t *testing.T) {
 		{"x_reply", []string{"network", "write"}},
 		{"x_schedule_update", []string{"write"}},
 		{"x_schedule_cancel", []string{"write"}},
+		{"http_request", []string{"network", "write"}},
 		{"mcp__server__tool", []string{"mcp"}},
 		{"file_read", nil},
 		{"grep", nil},
@@ -766,7 +767,7 @@ func TestToolRiskTags(t *testing.T) {
 func TestToolProfileDisabledSet(t *testing.T) {
 	t.Run("safe profile disables dangerous tools", func(t *testing.T) {
 		disabled := ToolProfileDisabledSet("safe")
-		for _, name := range []string{"bash", "web_fetch", "web_search", "x_post", "x_search", "x_mentions", "x_reply", "x_schedule", "x_schedule_update", "x_schedule_cancel"} {
+		for _, name := range []string{"bash", "web_fetch", "web_search", "http_request", "x_post", "x_search", "x_mentions", "x_reply", "x_schedule", "x_schedule_update", "x_schedule_cancel"} {
 			if !disabled[name] {
 				t.Errorf("expected %q disabled in safe profile", name)
 			}
