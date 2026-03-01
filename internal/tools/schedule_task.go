@@ -3,9 +3,30 @@ package tools
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/batalabs/muxd/internal/provider"
 )
+
+// ParseScheduleTime parses a time string for scheduling. Accepts RFC3339 or
+// HH:MM (resolved to the next occurrence relative to now).
+func ParseScheduleTime(raw string, now time.Time) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, fmt.Errorf("time is required")
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t.UTC(), nil
+	}
+	if t, err := time.Parse("15:04", raw); err == nil {
+		candidate := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), 0, 0, now.Location())
+		if !candidate.After(now) {
+			candidate = candidate.Add(24 * time.Hour)
+		}
+		return candidate.UTC(), nil
+	}
+	return time.Time{}, fmt.Errorf("invalid time %q (use RFC3339 or HH:MM)", raw)
+}
 
 // ---------------------------------------------------------------------------
 // schedule_task — schedule a full agent loop for future execution
@@ -34,7 +55,7 @@ func scheduleTaskTool() ToolDef {
 				return "", fmt.Errorf("time is required")
 			}
 
-			scheduledFor, err := ParseTweetScheduleTime(rawTime, nowFunc())
+			scheduledFor, err := ParseScheduleTime(rawTime, nowFunc())
 			if err != nil {
 				return "", fmt.Errorf("invalid time: %w", err)
 			}

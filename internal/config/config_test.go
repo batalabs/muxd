@@ -85,8 +85,6 @@ func TestPreferences_SetGet_newKeys(t *testing.T) {
 		{"openai.api_key", "sk-openai-test5678", "****5678"},
 		{"google.api_key", "AIza-test-key-9012", "****9012"},
 		{"ollama.url", "http://localhost:11434", "http://localhost:11434"},
-		{"telegram.bot_token", "123456:ABC-DEF", "****-DEF"},
-		{"telegram.allowed_ids", "123,456", "123,456"},
 	}
 
 	for _, tt := range tests {
@@ -100,14 +98,6 @@ func TestPreferences_SetGet_newKeys(t *testing.T) {
 				t.Errorf("Get(%q) = %q, want %q", tt.key, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestPreferences_Set_invalidAllowedIDs(t *testing.T) {
-	p := DefaultPreferences()
-	err := p.Set("telegram.allowed_ids", "abc,def")
-	if err == nil {
-		t.Fatal("expected error for non-numeric allowed IDs")
 	}
 }
 
@@ -134,7 +124,6 @@ func TestPreferences_All_masksKeys(t *testing.T) {
 func TestPreferences_Grouped(t *testing.T) {
 	p := DefaultPreferences()
 	p.AnthropicAPIKey = "sk-ant-api03-long-key-1234"
-	p.TelegramBotToken = "123456:ABC-DEF"
 
 	groups := p.Grouped()
 	if len(groups) != 5 {
@@ -142,7 +131,7 @@ func TestPreferences_Grouped(t *testing.T) {
 	}
 
 	// Verify group names
-	wantNames := []string{"models", "tools", "messaging", "daemon", "theme"}
+	wantNames := []string{"models", "tools", "daemon", "hub", "theme"}
 	for i, g := range groups {
 		if g.Name != wantNames[i] {
 			t.Errorf("group %d name = %q, want %q", i, g.Name, wantNames[i])
@@ -160,16 +149,6 @@ func TestPreferences_Grouped(t *testing.T) {
 		if e.Key == "openai.api_key" {
 			if e.Value != "(not set)" {
 				t.Errorf("openai.api_key = %q, want %q", e.Value, "(not set)")
-			}
-		}
-	}
-
-	// Messaging group should have masked bot token
-	messaging := groups[2]
-	for _, e := range messaging.Entries {
-		if e.Key == "telegram.bot_token" {
-			if e.Value != "****-DEF" {
-				t.Errorf("telegram.bot_token not masked in group: %q", e.Value)
 			}
 		}
 	}
@@ -357,35 +336,6 @@ func TestSavePreferences_filePermissions(t *testing.T) {
 	}
 }
 
-func TestLoadTelegramConfigFromPrefs(t *testing.T) {
-	t.Run("from preferences", func(t *testing.T) {
-		prefs := DefaultPreferences()
-		prefs.TelegramBotToken = "123456:test-token"
-		prefs.TelegramAllowedIDs = []int64{111, 222}
-
-		cfg, err := LoadTelegramConfigFromPrefs(prefs)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if cfg.BotToken != "123456:test-token" {
-			t.Errorf("expected bot token from prefs, got %q", cfg.BotToken)
-		}
-		if len(cfg.AllowedIDs) != 2 {
-			t.Errorf("expected 2 allowed IDs, got %d", len(cfg.AllowedIDs))
-		}
-	})
-
-	t.Run("empty token returns error", func(t *testing.T) {
-		prefs := DefaultPreferences()
-		prefs.TelegramBotToken = ""
-
-		_, err := LoadTelegramConfigFromPrefs(prefs)
-		if err == nil {
-			t.Fatal("expected error when no telegram bot token set")
-		}
-	})
-}
-
 func TestValidConfigKeys(t *testing.T) {
 	keys := ValidConfigKeys()
 	if len(keys) == 0 {
@@ -453,10 +403,7 @@ func TestSet_sanitizesAPIKeys(t *testing.T) {
 	}{
 		{"anthropic.api_key", "\x00sk-ant-test1234", "sk-ant-test1234"},
 		{"fireworks.api_key", "fw-\x00key\x00-5678", "fw-key-5678"},
-		{"x.client_secret", "cs-\x01\x02value", "cs-value"},
-		{"x.access_token", "\x00access-tok", "access-tok"},
-		{"x.refresh_token", "refresh\x00tok", "refreshtok"},
-		{"telegram.bot_token", "\x00123456:ABC", "123456:ABC"},
+		{"textbelt.api_key", "\x00tb-key", "tb-key"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
@@ -471,14 +418,8 @@ func TestSet_sanitizesAPIKeys(t *testing.T) {
 				got = p.AnthropicAPIKey
 			case "fireworks.api_key":
 				got = p.FireworksAPIKey
-			case "x.client_secret":
-				got = p.XClientSecret
-			case "x.access_token":
-				got = p.XAccessToken
-			case "x.refresh_token":
-				got = p.XRefreshToken
-			case "telegram.bot_token":
-				got = p.TelegramBotToken
+			case "textbelt.api_key":
+				got = p.TextbeltAPIKey
 			}
 			if got != tt.want {
 				t.Errorf("after Set(%q, %q): raw value = %q, want %q", tt.key, tt.input, got, tt.want)
@@ -500,10 +441,9 @@ func TestSet_doesNotSanitizeNonSensitiveKeys(t *testing.T) {
 
 func TestSanitizePreferences(t *testing.T) {
 	p := Preferences{
-		AnthropicAPIKey:  "\x00sk-ant-test",
-		FireworksAPIKey:  "fw-\x00key",
-		XClientSecret:    "cs\x00val",
-		TelegramBotToken: "\x00tok",
+		AnthropicAPIKey: "\x00sk-ant-test",
+		FireworksAPIKey: "fw-\x00key",
+		TextbeltAPIKey:  "tb\x00val",
 	}
 	changed := sanitizePreferences(&p)
 	if !changed {
@@ -515,11 +455,8 @@ func TestSanitizePreferences(t *testing.T) {
 	if p.FireworksAPIKey != "fw-key" {
 		t.Errorf("FireworksAPIKey = %q, want %q", p.FireworksAPIKey, "fw-key")
 	}
-	if p.XClientSecret != "csval" {
-		t.Errorf("XClientSecret = %q, want %q", p.XClientSecret, "csval")
-	}
-	if p.TelegramBotToken != "tok" {
-		t.Errorf("TelegramBotToken = %q, want %q", p.TelegramBotToken, "tok")
+	if p.TextbeltAPIKey != "tbval" {
+		t.Errorf("TextbeltAPIKey = %q, want %q", p.TextbeltAPIKey, "tbval")
 	}
 
 	// Clean preferences should return false.

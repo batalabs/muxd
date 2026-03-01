@@ -132,3 +132,75 @@ func TestDaemonLogPath_containsDir(t *testing.T) {
 		t.Errorf("path = %q, expected an absolute path", path)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Hub platform paths
+// ---------------------------------------------------------------------------
+
+func TestHubLaunchdPlistPath(t *testing.T) {
+	path, err := HubLaunchdPlistPath()
+	if err != nil {
+		t.Fatalf("HubLaunchdPlistPath() error: %v", err)
+	}
+	if !strings.Contains(path, "com.muxd.hub.plist") {
+		t.Errorf("path = %q, expected to contain com.muxd.hub.plist", path)
+	}
+	if !strings.Contains(path, "LaunchAgents") {
+		t.Errorf("path = %q, expected to contain LaunchAgents", path)
+	}
+}
+
+func TestHubSystemdUnitPath(t *testing.T) {
+	path, err := HubSystemdUnitPath()
+	if err != nil {
+		t.Fatalf("HubSystemdUnitPath() error: %v", err)
+	}
+	if !strings.Contains(path, "muxd-hub.service") {
+		t.Errorf("path = %q, expected to contain muxd-hub.service", path)
+	}
+	if !strings.Contains(path, "systemd") {
+		t.Errorf("path = %q, expected to contain systemd", path)
+	}
+}
+
+func TestHubLogPath(t *testing.T) {
+	path := HubLogPath()
+	if path == "" {
+		t.Error("expected non-empty log path")
+	}
+	if !strings.Contains(path, "hub.log") {
+		t.Errorf("path = %q, expected to contain hub.log", path)
+	}
+}
+
+func TestHandleCommand_hubActionsRecognized(t *testing.T) {
+	// status-hub and stop-hub are safe to call — they just read state / fail fast.
+	for _, action := range []string{"status-hub", "stop-hub"} {
+		t.Run(action, func(t *testing.T) {
+			err := HandleCommand(action)
+			if err != nil && strings.Contains(err.Error(), "unknown service action") {
+				t.Errorf("HandleCommand(%q) not recognized", action)
+			}
+		})
+	}
+}
+
+func TestHandleCommand_statusHub(t *testing.T) {
+	err := HandleCommand("status-hub")
+	if err != nil {
+		t.Errorf("HandleCommand(status-hub) = %v, want nil", err)
+	}
+}
+
+func TestHandleCommand_stopHub_noLockfile(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific stop-hub path")
+	}
+	err := HandleCommand("stop-hub")
+	if err == nil {
+		t.Fatal("expected error when no hub is running")
+	}
+	if !strings.Contains(err.Error(), "lockfile") && !strings.Contains(err.Error(), "hub") {
+		t.Errorf("error = %q, expected lockfile/hub related error", err)
+	}
+}

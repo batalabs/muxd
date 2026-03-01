@@ -19,6 +19,7 @@ import (
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/daemon"
 	"github.com/batalabs/muxd/internal/domain"
+	"github.com/batalabs/muxd/internal/hub"
 	"github.com/batalabs/muxd/internal/provider"
 	"github.com/batalabs/muxd/internal/service"
 	"github.com/batalabs/muxd/internal/store"
@@ -42,6 +43,11 @@ func main() {
 	continueFlag := flag.String("c", "", "Resume a session (latest for cwd, or pass a session ID)")
 	daemonFlag := flag.Bool("daemon", false, "Run in daemon mode (no TUI)")
 	bindFlag := flag.String("bind", "", "Network interface to bind (localhost, 0.0.0.0, or specific IP)")
+	hubFlag := flag.Bool("hub", false, "Run as hub coordinator (no agent/session machinery)")
+	hubBindFlag := flag.String("hub-bind", "", "Hub bind address (default: localhost)")
+	hubInfoFlag := flag.Bool("hub-info", false, "Print hub connection info (token, address, QR) and exit")
+	remoteFlag := flag.String("remote", "", "Connect to remote daemon or hub (host:port)")
+	tokenFlag := flag.String("token", "", "Auth token for remote connection")
 	serviceCmd := flag.String("service", "", "Service management: install|uninstall|status|start|stop")
 	flag.Parse()
 
@@ -51,6 +57,12 @@ func main() {
 
 	if *versionFlag {
 		fmt.Printf("muxd %s\n", version)
+		return
+	}
+
+	// Print hub connection info from lockfile
+	if *hubInfoFlag {
+		printHubInfo()
 		return
 	}
 
@@ -64,6 +76,104 @@ func main() {
 	}
 
 	prefs := config.LoadPreferences()
+
+	// Hub-only mode: start hub server, no agent/session machinery
+	if *hubFlag {
+		hubDB, err := hub.OpenHubStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error opening hub database: %v\n", err)
+			os.Exit(1)
+		}
+		defer hubDB.Close()
+
+		h := hub.NewHub(hubDB, &prefs, logger)
+		saveHubTokenIfNew(&prefs, h.AuthToken())
+
+		hubBind := *hubBindFlag
+		if hubBind == "" {
+			hubBind = prefs.HubBindAddress
+		}
+		if hubBind != "" {
+			h.SetBindAddress(hubBind)
+		}
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		go func() {
+			<-ctx.Done()
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+			if err := h.Shutdown(shutdownCtx); err != nil {
+				fmt.Fprintf(os.Stderr, "hub: shutdown: %v\n", err)
+			}
+		}()
+
+		if err := h.Start(4097); err != nil {
+			fmt.Fprintf(os.Stderr, "hub error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Remote TUI mode: connect to a remote daemon or hub
+	if *remoteFlag != "" {
+		baseURL := "http://" + *remoteFlag
+		dc := daemon.NewDaemonClient(0)
+		dc.SetBaseURL(baseURL)
+		dc.SetAuthToken(*tokenFlag)
+
+		info, err := dc.HealthCheck()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot reach remote %s: %v\n", *remoteFlag, err)
+			os.Exit(1)
+		}
+
+		modelLabel := *modelFlag
+		if modelLabel == "" {
+			modelLabel = prefs.Model
+		}
+		var modelID string
+		if modelLabel != "" {
+			_, modelID = provider.ResolveProviderAndModel(modelLabel, prefs.Provider)
+		}
+
+		resetTerminalForTUI()
+
+		if info.Mode == "hub" {
+			// Hub mode: launch TUI with node picker, no session yet
+			fmt.Fprintf(os.Stderr, "Connected to hub on %s\n", *remoteFlag)
+			m := tui.InitialModel(dc, version, modelLabel, modelID, nil, nil, false, nil, prefs, "")
+			m.SetHubConnection(baseURL, *tokenFlag)
+			p := tea.NewProgram(m)
+			tui.SetProgram(p)
+			if _, err := p.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "muxd failed: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Direct daemon: create/resume session remotely
+			fmt.Fprintf(os.Stderr, "Connected to remote daemon on %s (%s/%s)\n", *remoteFlag, info.Provider, info.Model)
+			cwd := mustGetwd()
+			sessionID, createErr := dc.CreateSession(cwd, modelID)
+			if createErr != nil {
+				fmt.Fprintf(os.Stderr, "error creating session: %v\n", createErr)
+				os.Exit(1)
+			}
+			session, err := dc.GetSession(sessionID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error loading session: %v\n", err)
+				os.Exit(1)
+			}
+			p := tea.NewProgram(tui.InitialModel(dc, version, modelLabel, modelID, nil, session, false, nil, prefs, ""))
+			tui.SetProgram(p)
+			if _, err := p.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "muxd failed: %v\n", err)
+				os.Exit(1)
+			}
+		}
+		return
+	}
+
 	provider.SetOllamaBaseURL(prefs.OllamaURL)
 
 	// Resolve provider and model (no hardcoded default — user must configure)
@@ -120,8 +230,52 @@ func main() {
 		// Handle graceful shutdown
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
+
+		// Node auto-registration with hub (if configured)
+		var hubClient *hub.NodeClient
+		var hubNodeID string
+		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
+			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, srv.AuthToken())
+			go func() {
+				port := srv.Port() // blocks until listener is bound
+				name := prefs.HubNodeName
+				if name == "" {
+					hostname, _ := os.Hostname()
+					name = hostname
+				}
+				nodeID, err := hubClient.Register(name, bindAddr, port, version)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
+					return
+				}
+				hubNodeID = nodeID
+				saveHubNodeIDIfNew(&prefs, nodeID)
+				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
+
+				// Start heartbeat loop
+				ticker := time.NewTicker(30 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						if err := hubClient.Heartbeat(nodeID); err != nil {
+							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+						}
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+
 		go func() {
 			<-ctx.Done()
+			// Deregister from hub before shutting down
+			if hubClient != nil && hubNodeID != "" {
+				if err := hubClient.Deregister(hubNodeID); err != nil {
+					fmt.Fprintf(os.Stderr, "hub: deregister failed: %v\n", err)
+				}
+			}
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer shutdownCancel()
 			if err := srv.Shutdown(shutdownCtx); err != nil {
@@ -264,4 +418,54 @@ func saveAuthTokenIfNew(prefs *config.Preferences, token string) {
 	if err := config.SavePreferences(*prefs); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to save auth token: %v\n", err)
 	}
+}
+
+// saveHubTokenIfNew persists the hub auth token to preferences.
+func saveHubTokenIfNew(prefs *config.Preferences, token string) {
+	if prefs.HubAuthToken == token {
+		return
+	}
+	prefs.HubAuthToken = token
+	if err := config.SavePreferences(*prefs); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to save hub auth token: %v\n", err)
+	}
+}
+
+// saveHubNodeIDIfNew persists the hub-assigned node ID to preferences.
+func saveHubNodeIDIfNew(prefs *config.Preferences, nodeID string) {
+	if prefs.HubNodeID == nodeID {
+		return
+	}
+	prefs.HubNodeID = nodeID
+	if err := config.SavePreferences(*prefs); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to save hub node ID: %v\n", err)
+	}
+}
+
+// printHubInfo reads the hub lockfile and prints connection info + QR code.
+func printHubInfo() {
+	lf, err := hub.ReadHubLockfile()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "No running hub found: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Determine display host — use LAN IP when bound to all interfaces
+	host := lf.BindAddr
+	if host == "0.0.0.0" || host == "" || host == "localhost" {
+		if ips := daemon.GetLocalIPs(); len(ips) > 0 {
+			host = ips[0]
+		}
+	}
+
+	ascii, err := daemon.GenerateQRCodeASCII(host, lf.Port, lf.Token)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "QR generation failed: %v\n", err)
+	} else {
+		fmt.Printf("\n%s\n", ascii)
+	}
+
+	fmt.Printf("  hub:   %s:%d\n", host, lf.Port)
+	fmt.Printf("  token: %s\n", lf.Token)
+	fmt.Printf("\n  connect: muxd --remote %s:%d --token %s\n\n", host, lf.Port, lf.Token)
 }

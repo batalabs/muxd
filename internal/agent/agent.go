@@ -42,10 +42,10 @@ type Event struct {
 	OutputTokens             int                   // EventStreamDone
 	CacheCreationInputTokens int                   // EventStreamDone
 	CacheReadInputTokens     int                   // EventStreamDone
-	ToolUseID                string                 // EventToolStart / EventToolDone
-	ToolName                 string                 // EventToolStart / EventToolDone
-	ToolInput                map[string]any         // EventToolStart: tool input parameters
-	ToolResult               string                 // EventToolDone
+	ToolUseID                string                // EventToolStart / EventToolDone
+	ToolName                 string                // EventToolStart / EventToolDone
+	ToolInput                map[string]any        // EventToolStart: tool input parameters
+	ToolResult               string                // EventToolDone
 	ToolIsError              bool                  // EventToolDone
 	Err                      error                 // EventError
 	AskPrompt                string                // EventAskUser: question text
@@ -152,13 +152,6 @@ type Service struct {
 	modelCompact string // for compaction summaries
 	modelTitle   string // for auto-title generation
 	modelTags    string // for auto-tag generation
-
-	xClientID     string
-	xClientSecret string
-	xAccessToken  string
-	xRefreshToken string
-	xTokenExpiry  string
-	xTokenSaver   func(accessToken, refreshToken, tokenExpiry string) error
 
 	// disabledTools are excluded from model tool specs and execution.
 	disabledTools map[string]bool

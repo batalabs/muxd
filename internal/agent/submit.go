@@ -79,20 +79,14 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 			mcpMgr = a.mcpManager
 		}
 		toolCtx := &tools.ToolContext{
-			Cwd:              cwd,
-			Todos:            &a.todos,
-			Memory:           a.memory,
-			PlanMode:         &a.planMode,
-			Disabled:         disabled,
-			BraveAPIKey:      a.braveAPIKey,
-			TextbeltAPIKey:   a.textbeltAPIKey,
-			XClientID:        a.xClientID,
-			XClientSecret:    a.xClientSecret,
-			XAccessToken:     a.xAccessToken,
-			XRefreshToken:    a.xRefreshToken,
-			XTokenExpiry:     a.xTokenExpiry,
-			SaveXOAuthTokens: a.xTokenSaver,
-			MCP:              mcpMgr,
+			Cwd:            cwd,
+			Todos:          &a.todos,
+			Memory:         a.memory,
+			PlanMode:       &a.planMode,
+			Disabled:       disabled,
+			BraveAPIKey:    a.braveAPIKey,
+			TextbeltAPIKey: a.textbeltAPIKey,
+			MCP:            mcpMgr,
 		}
 		if schedStore, ok := a.store.(ScheduledToolJobStore); ok {
 			toolCtx.ScheduleTool = schedStore.CreateScheduledToolJob

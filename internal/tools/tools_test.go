@@ -620,7 +620,7 @@ func TestAllToolSpecs(t *testing.T) {
 	specs := AllToolSpecs()
 
 	t.Run("correct count", func(t *testing.T) {
-		expected := 33 // + glob + git_status + x tools + x_search/mentions/reply + x_schedule_list/update/cancel + memory_read/write + schedule_task + sms_send/status/schedule + log_read + http_request
+		expected := 25 // glob + git_status + memory_read/write + schedule_task + sms_send/status/schedule + log_read + http_request + core tools
 		if len(specs) != expected {
 			t.Errorf("expected %d tools, got %d", expected, len(specs))
 		}
@@ -659,7 +659,7 @@ func TestToolNames(t *testing.T) {
 	for _, n := range names {
 		nameSet[n] = true
 	}
-	for _, want := range []string{"file_read", "bash", "grep", "x_post"} {
+	for _, want := range []string{"file_read", "bash", "grep", "sms_send"} {
 		if !nameSet[want] {
 			t.Errorf("expected %q in tool names", want)
 		}
@@ -732,13 +732,6 @@ func TestToolRiskTags(t *testing.T) {
 		{"patch_apply", []string{"write"}},
 		{"web_fetch", []string{"network"}},
 		{"web_search", []string{"network"}},
-		{"x_post", []string{"network", "write"}},
-		{"x_search", []string{"network"}},
-		{"x_mentions", []string{"network"}},
-		{"x_schedule", []string{"network", "write"}},
-		{"x_reply", []string{"network", "write"}},
-		{"x_schedule_update", []string{"write"}},
-		{"x_schedule_cancel", []string{"write"}},
 		{"http_request", []string{"network", "write"}},
 		{"mcp__server__tool", []string{"mcp"}},
 		{"file_read", nil},
@@ -767,7 +760,7 @@ func TestToolRiskTags(t *testing.T) {
 func TestToolProfileDisabledSet(t *testing.T) {
 	t.Run("safe profile disables dangerous tools", func(t *testing.T) {
 		disabled := ToolProfileDisabledSet("safe")
-		for _, name := range []string{"bash", "web_fetch", "web_search", "http_request", "x_post", "x_search", "x_mentions", "x_reply", "x_schedule", "x_schedule_update", "x_schedule_cancel"} {
+		for _, name := range []string{"bash", "web_fetch", "web_search", "http_request"} {
 			if !disabled[name] {
 				t.Errorf("expected %q disabled in safe profile", name)
 			}

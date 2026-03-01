@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,10 +21,10 @@ import (
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/daemon"
 	"github.com/batalabs/muxd/internal/domain"
+	"github.com/batalabs/muxd/internal/hub"
 	"github.com/batalabs/muxd/internal/mcp"
 	"github.com/batalabs/muxd/internal/provider"
 	"github.com/batalabs/muxd/internal/store"
-	"github.com/batalabs/muxd/internal/telegram"
 	"github.com/batalabs/muxd/internal/tools"
 )
 
@@ -207,6 +206,8 @@ type Model struct {
 
 	// Session picker overlay
 	picker *SessionPicker
+	// Node picker overlay (hub connections)
+	nodePicker *NodePicker
 	// Tool picker overlay
 	toolPicker *ToolPicker
 	// Config picker overlay
@@ -217,11 +218,12 @@ type Model struct {
 	// MCP tool names (fetched from daemon at startup)
 	mcpToolNames []string
 
+	// Hub connection state (non-empty when connected via --remote to a hub)
+	hubBaseURL string
+	hubToken   string
+
 	// Rendered message blocks displayed in the View (replaces Prog.Println scrollback)
 	viewLines []string
-
-	// Telegram bot state
-	telegramCancel context.CancelFunc
 
 	// Runtime diagnostics log path (best effort, may be empty).
 	runtimeLogPath string
@@ -254,18 +256,28 @@ func InitialModel(d *daemon.DaemonClient, version, modelLabel, modelID string, s
 		Store:          st,
 		Session:        session,
 		resuming:       resuming,
-		inputTokens:    session.InputTokens,
-		outputTokens:   session.OutputTokens,
 		Prefs:          prefs,
 		Provider:       prov,
 		APIKey:         apiKey,
 		runtimeLogPath: defaultRuntimeLogPath(),
+	}
+	if session != nil {
+		m.inputTokens = session.InputTokens
+		m.outputTokens = session.OutputTokens
 	}
 	if !resuming {
 		m.viewLines = []string{WelcomeStyle.Render("Welcome to muxd. One prompt away from wizardry.")}
 	}
 	m.appendRuntimeLog("tui initialized")
 	return m
+}
+
+// SetHubConnection configures the model for hub mode, enabling the node
+// picker on startup. Call this before passing the model to tea.NewProgram.
+func (m *Model) SetHubConnection(baseURL, token string) {
+	m.hubBaseURL = baseURL
+	m.hubToken = token
+	m.viewLines = []string{WelcomeStyle.Render("Connecting to hub...")}
 }
 
 // Init initializes the Bubble Tea model.
@@ -276,8 +288,13 @@ func (m Model) Init() tea.Cmd {
 		cmds = append(cmds, m.loadSessionHistory())
 	}
 
+	// If connected to a hub without a session, fetch nodes on startup.
+	if m.hubBaseURL != "" && m.Session == nil {
+		cmds = append(cmds, m.openNodePicker())
+	}
+
 	// Fetch MCP tool names from daemon in background.
-	if m.Daemon != nil {
+	if m.Daemon != nil && m.Session != nil {
 		d := m.Daemon
 		cmds = append(cmds, func() tea.Msg {
 			resp, err := d.GetMCPTools()
@@ -441,30 +458,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.picker = NewSessionPicker(msg.Sessions)
 		return m, nil
 
+	case NodePickerMsg:
+		if msg.Err != nil {
+			return m, PrintToScrollback(m.renderError("Failed to load nodes: " + msg.Err.Error()))
+		}
+		if len(msg.Nodes) == 0 {
+			return m, PrintToScrollback(FooterMeta.Render("No nodes registered with hub."))
+		}
+		m.nodePicker = NewNodePicker(msg.Nodes)
+		return m, nil
+
 	case BranchDoneMsg:
 		return m.handleBranchDone(msg)
-
-	case TelegramStartedMsg:
-		return m, PrintToScrollback(WelcomeStyle.Render(fmt.Sprintf("Telegram bot @%s started.", msg.BotName)))
-
-	case TelegramErrorMsg:
-		m.telegramCancel = nil
-		return m, PrintToScrollback(m.renderError("Telegram error: " + msg.Err.Error()))
-
-	case XAuthDoneMsg:
-		if msg.Err != nil {
-			return m, PrintToScrollback(m.renderError("X auth failed: " + msg.Err.Error()))
-		}
-		m.Prefs.XAccessToken = msg.Token.AccessToken
-		m.Prefs.XRefreshToken = msg.Token.RefreshToken
-		m.Prefs.XTokenExpiry = msg.Token.ExpiresAt.UTC().Format(time.RFC3339)
-		if err := config.SavePreferences(m.Prefs); err != nil {
-			return m, PrintToScrollback(m.renderError("X auth saved token but failed to persist config: " + err.Error()))
-		}
-		m.applyConfigSetting("x.access_token", m.Prefs.XAccessToken)
-		m.applyConfigSetting("x.refresh_token", m.Prefs.XRefreshToken)
-		m.applyConfigSetting("x.token_expiry", m.Prefs.XTokenExpiry)
-		return m, PrintToScrollback(WelcomeStyle.Render("X auth connected successfully."))
 
 	default:
 		return m, nil
@@ -644,6 +649,11 @@ func shellGitInfo(cwd string) string {
 func (m Model) View() string {
 	var b strings.Builder
 
+	// Render node picker overlay if active (hub connections)
+	if m.nodePicker.IsActive() {
+		b.WriteString(m.nodePicker.View(m.width))
+		return b.String()
+	}
 	// Render session picker overlay if active
 	if m.picker.IsActive() {
 		b.WriteString(m.picker.View(m.width))
@@ -806,7 +816,7 @@ func (m Model) View() string {
 		b.WriteString("\n")
 		b.WriteString(FooterMeta.Render(fmt.Sprintf("%scwd: %s", indent, MustGetwd())))
 	}
-	if m.Prefs.FooterSession {
+	if m.Prefs.FooterSession && m.Session != nil {
 		b.WriteString("\n")
 		sessionLine := fmt.Sprintf("%ssession: %s", indent, m.Session.ID[:8])
 		if m.Session.Title != "New Session" {
@@ -824,6 +834,10 @@ func (m Model) View() string {
 // ---------------------------------------------------------------------------
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Route to node picker when active (hub connections).
+	if m.nodePicker.IsActive() {
+		return m.handleNodePickerKey(msg)
+	}
 	// Route to picker when active.
 	if m.picker.IsActive() {
 		return m.handlePickerKey(msg)
@@ -1078,6 +1092,79 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleNodePickerKey intercepts all keys when the node picker is active.
+func (m Model) handleNodePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEscape, tea.KeyCtrlC:
+		m.nodePicker.Dismiss()
+		// If no session exists (initial hub connect), quit
+		if m.Session == nil {
+			return m, tea.Quit
+		}
+		return m, nil
+
+	case tea.KeyEnter:
+		node := m.nodePicker.SelectedNode()
+		if node == nil {
+			return m, nil
+		}
+		m.nodePicker.Dismiss()
+
+		// Set DaemonClient baseURL to proxy through hub
+		proxyURL := fmt.Sprintf("%s/api/hub/proxy/%s", m.hubBaseURL, node.ID)
+		m.Daemon.SetBaseURL(proxyURL)
+
+		// If no session yet, create one on the selected node
+		if m.Session == nil {
+			cwd, _ := os.Getwd()
+			sessionID, err := m.Daemon.CreateSession(cwd, m.modelID)
+			if err != nil {
+				return m, PrintToScrollback(m.renderError("Failed to create session on node: " + err.Error()))
+			}
+			sess, err := m.Daemon.GetSession(sessionID)
+			if err != nil {
+				return m, PrintToScrollback(m.renderError("Failed to load session: " + err.Error()))
+			}
+			m.Session = sess
+			m.viewLines = []string{WelcomeStyle.Render(fmt.Sprintf("Connected to node %s. One prompt away from wizardry.", node.Name))}
+		} else {
+			m.viewLines = append(m.viewLines, WelcomeStyle.Render(fmt.Sprintf("Switched to node %s.", node.Name)))
+		}
+		return m, nil
+
+	case tea.KeyUp:
+		m.nodePicker.MoveUp()
+		return m, nil
+
+	case tea.KeyDown:
+		m.nodePicker.MoveDown()
+		return m, nil
+
+	case tea.KeyBackspace, tea.KeyDelete:
+		m.nodePicker.BackspaceFilter()
+		return m, nil
+
+	default:
+		if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+			for _, r := range msg.Runes {
+				m.nodePicker.AppendFilter(r)
+			}
+		}
+		return m, nil
+	}
+}
+
+// openNodePicker fetches nodes from the hub and opens the picker.
+func (m Model) openNodePicker() tea.Cmd {
+	baseURL := m.hubBaseURL
+	token := m.hubToken
+	return func() tea.Msg {
+		hc := hub.NewHubClient(baseURL, token)
+		nodes, err := hc.ListNodes()
+		return NodePickerMsg{Nodes: nodes, Err: err}
+	}
+}
+
 // handlePickerKey intercepts all keys when the session picker is active.
 func (m Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.picker.Mode() {
@@ -1281,23 +1368,27 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 		return m.handleSlashCommand(trimmed)
 	}
 
-	// Require model selection before chatting
-	if m.Prefs.Model == "" {
-		return m, PrintToScrollback(m.renderError("No model selected. Use /config set model <name> (e.g. /config set model claude-sonnet)"))
-	}
-
-	// Check for API key before sending to the daemon
-	if m.APIKey == "" {
-		provName := ""
-		if m.Provider != nil {
-			provName = m.Provider.Name()
+	// Skip model/API key checks when connected to a remote daemon (it has its own config)
+	isRemote := m.hubBaseURL != "" || m.Store == nil
+	if !isRemote {
+		// Require model selection before chatting
+		if m.Prefs.Model == "" {
+			return m, PrintToScrollback(m.renderError("No model selected. Use /config set model <name> (e.g. /config set model claude-sonnet)"))
 		}
-		if provName != "ollama" {
-			if provName == "" {
-				provName = "your_provider"
+
+		// Check for API key before sending to the daemon
+		if m.APIKey == "" {
+			provName := ""
+			if m.Provider != nil {
+				provName = m.Provider.Name()
 			}
-			hint := fmt.Sprintf("No API key set. Use /config set %s.api_key <key>", provName)
-			return m, PrintToScrollback(m.renderError(hint))
+			if provName != "ollama" {
+				if provName == "" {
+					provName = "your_provider"
+				}
+				hint := fmt.Sprintf("No API key set. Use /config set %s.api_key <key>", provName)
+				return m, PrintToScrollback(m.renderError(hint))
+			}
 		}
 	}
 
@@ -1402,6 +1493,12 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 
 	case "/refresh":
 		return m.refreshCurrentSession()
+
+	case "/nodes":
+		if m.hubBaseURL == "" {
+			return m, PrintToScrollback(m.renderError("Not connected to a hub. Use --remote to connect."))
+		}
+		return m, m.openNodePicker()
 
 	case "/branch":
 		if m.thinking {
@@ -1557,9 +1654,6 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 		m.shellCwd = cwd
 		return m, PrintToScrollback(WelcomeStyle.Render("Entered muxd shell. Type commands directly. Use 'exit' to return."))
 
-	case "/telegram":
-		return m.handleTelegram(parts[1:])
-
 	case "/qr":
 		return m.handleQRCommand(parts[1:])
 
@@ -1573,15 +1667,11 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 	case "/tools":
 		return m.handleToolsCommand(parts[1:])
 
-	case "/tweet":
-		return m.handleTweetCommand(parts[1:])
 	case "/schedule":
 		return m.handleScheduleCommand(parts[1:])
-	case "/x":
-		return m.handleXCommand(parts[1:])
 
 	case "/help":
-		cmds := domain.CommandHelp(false)
+		cmds := domain.CommandHelp()
 		grouped := make(map[string][]domain.CommandDef)
 		for _, c := range cmds {
 			grouped[c.Group] = append(grouped[c.Group], c)
@@ -1731,114 +1821,6 @@ func (m Model) handleToolsCommand(args []string) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleTweetCommand(args []string) (tea.Model, tea.Cmd) {
-	if m.Store == nil {
-		return m, PrintToScrollback(m.renderError("Tweet scheduler unavailable: no store configured."))
-	}
-	if len(args) == 0 {
-		return m, PrintToScrollback(m.renderError("Usage: /tweet <text> | /tweet --schedule <HH:MM|RFC3339> [--daily|--hourly] <text> | /tweet --list | /tweet --cancel <id>"))
-	}
-
-	if args[0] == "--list" {
-		items, err := m.Store.ListScheduledToolJobs(100)
-		if err != nil {
-			return m, PrintToScrollback(m.renderError("Failed to list scheduled tweets: " + err.Error()))
-		}
-		var xJobs []store.ScheduledToolJob
-		for _, it := range items {
-			if it.ToolName == "x_post" {
-				xJobs = append(xJobs, it)
-			}
-		}
-		if len(xJobs) == 0 {
-			return m, PrintToScrollback(WelcomeStyle.Render("No scheduled tweets."))
-		}
-		var lines []string
-		lines = append(lines, FooterHead.Render("Scheduled tweets"))
-		for _, it := range xJobs {
-			id := it.ID
-			if len(id) > 8 {
-				id = id[:8]
-			}
-			text := ""
-			if v, ok := it.ToolInput["text"].(string); ok {
-				text = v
-			}
-			line := fmt.Sprintf("  %-8s %-9s %-9s %s", id, it.ScheduledFor.Local().Format("2006-01-02 15:04"), it.Status, summarizeForLog(text))
-			lines = append(lines, FooterMeta.Render(line))
-		}
-		return m, PrintToScrollback(strings.Join(lines, "\n"))
-	}
-
-	if args[0] == "--cancel" {
-		if len(args) < 2 {
-			return m, PrintToScrollback(m.renderError("Usage: /tweet --cancel <id>"))
-		}
-		if err := m.Store.CancelScheduledToolJob(args[1]); err != nil {
-			return m, PrintToScrollback(m.renderError("Failed to cancel scheduled tweet: " + err.Error()))
-		}
-		return m, PrintToScrollback(WelcomeStyle.Render("Cancelled scheduled tweet: " + args[1]))
-	}
-
-	recurrence := "once"
-	scheduleRaw := ""
-	i := 0
-	for i < len(args) && strings.HasPrefix(args[i], "--") {
-		switch args[i] {
-		case "--schedule":
-			if i+1 >= len(args) {
-				return m, PrintToScrollback(m.renderError("Usage: /tweet --schedule <HH:MM|RFC3339> [--daily|--hourly] <text>"))
-			}
-			scheduleRaw = args[i+1]
-			i += 2
-		case "--daily":
-			recurrence = "daily"
-			i++
-		case "--hourly":
-			recurrence = "hourly"
-			i++
-		default:
-			return m, PrintToScrollback(m.renderError("Unknown flag: " + args[i]))
-		}
-	}
-
-	text := strings.TrimSpace(strings.Join(args[i:], " "))
-	if text == "" {
-		return m, PrintToScrollback(m.renderError("Tweet text cannot be empty."))
-	}
-
-	if scheduleRaw == "" {
-		token, refreshed, err := tools.ResolveXPostTokenFromPrefs(&m.Prefs)
-		if err != nil {
-			return m, PrintToScrollback(m.renderError("Tweet failed: " + err.Error()))
-		}
-		if refreshed {
-			if saveErr := config.SavePreferences(m.Prefs); saveErr == nil {
-				m.applyConfigSetting("x.access_token", m.Prefs.XAccessToken)
-				m.applyConfigSetting("x.refresh_token", m.Prefs.XRefreshToken)
-				m.applyConfigSetting("x.token_expiry", m.Prefs.XTokenExpiry)
-			}
-		}
-		id, url, err := tools.PostXTweet(text, token)
-		if err != nil {
-			return m, PrintToScrollback(m.renderError("Tweet failed: " + err.Error()))
-		}
-		return m, PrintToScrollback(WelcomeStyle.Render(fmt.Sprintf("Posted tweet %s\n%s", id, url)))
-	}
-
-	scheduledFor, err := tools.ParseTweetScheduleTime(scheduleRaw, time.Now())
-	if err != nil {
-		return m, PrintToScrollback(m.renderError(err.Error()))
-	}
-	id, err := m.Store.CreateScheduledToolJob("x_post", map[string]any{"text": text}, scheduledFor, recurrence)
-	if err != nil {
-		return m, PrintToScrollback(m.renderError("Failed to schedule tweet: " + err.Error()))
-	}
-	return m, PrintToScrollback(WelcomeStyle.Render(
-		fmt.Sprintf("Scheduled tweet %s for %s (%s)", id[:8], scheduledFor.Local().Format("2006-01-02 15:04"), recurrence),
-	))
-}
-
 func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 	if m.Store == nil {
 		return m, PrintToScrollback(m.renderError("Scheduler unavailable: no store configured."))
@@ -1892,7 +1874,7 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		if _, ok := tools.FindTool(toolName); !ok {
 			return m, PrintToScrollback(m.renderError("Unknown tool: " + toolName))
 		}
-		scheduledFor, err := tools.ParseTweetScheduleTime(args[2], time.Now())
+		scheduledFor, err := tools.ParseScheduleTime(args[2], time.Now())
 		if err != nil {
 			return m, PrintToScrollback(m.renderError(err.Error()))
 		}
@@ -1920,7 +1902,7 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		if len(args) < 3 {
 			return m, PrintToScrollback(m.renderError("Usage: /schedule add-task <HH:MM|RFC3339> <prompt> [--daily|--hourly]"))
 		}
-		scheduledFor, err := tools.ParseTweetScheduleTime(args[1], time.Now())
+		scheduledFor, err := tools.ParseScheduleTime(args[1], time.Now())
 		if err != nil {
 			return m, PrintToScrollback(m.renderError(err.Error()))
 		}
@@ -1946,75 +1928,6 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		))
 	default:
 		return m, PrintToScrollback(m.renderError("Usage: /schedule [add|add-task|list|cancel]"))
-	}
-}
-
-func (m Model) handleXCommand(args []string) (tea.Model, tea.Cmd) {
-	sub := "status"
-	if len(args) > 0 {
-		sub = strings.ToLower(strings.TrimSpace(args[0]))
-	}
-	switch sub {
-	case "status":
-		expiry := strings.TrimSpace(m.Prefs.XTokenExpiry)
-		if strings.TrimSpace(m.Prefs.XAccessToken) == "" {
-			return m, PrintToScrollback(WelcomeStyle.Render("X auth: not connected. Run /x auth"))
-		}
-		msg := "X auth: connected"
-		if expiry != "" {
-			msg += " (expires " + expiry + ")"
-		}
-		return m, PrintToScrollback(WelcomeStyle.Render(msg))
-	case "logout":
-		m.Prefs.XAccessToken = ""
-		m.Prefs.XRefreshToken = ""
-		m.Prefs.XTokenExpiry = ""
-		if err := config.SavePreferences(m.Prefs); err != nil {
-			return m, PrintToScrollback(m.renderError("Failed to save config: " + err.Error()))
-		}
-		m.applyConfigSetting("x.access_token", "")
-		m.applyConfigSetting("x.refresh_token", "")
-		m.applyConfigSetting("x.token_expiry", "")
-		return m, PrintToScrollback(WelcomeStyle.Render("X auth cleared."))
-	case "auth":
-		scopes := []string{"tweet.read", "tweet.write", "users.read", "offline.access"}
-		authURL, waitCode, closeFn, err := tools.StartXOAuthLocal(m.Prefs.XClientID, scopes, m.Prefs.XRedirectURL)
-		if err != nil {
-			return m, PrintToScrollback(m.renderError("X auth setup failed: " + err.Error()))
-		}
-		if err := tools.OpenBrowser(authURL); err != nil {
-			fmt.Fprintf(os.Stderr, "tui: open browser: %v\n", err)
-		}
-		cmd := func() tea.Msg {
-			defer closeFn()
-			payload, waitErr := waitCode(5 * time.Minute)
-			if waitErr != nil {
-				return XAuthDoneMsg{Err: waitErr}
-			}
-			parts := strings.SplitN(payload, "|", 3)
-			if len(parts) != 3 {
-				return XAuthDoneMsg{Err: fmt.Errorf("invalid callback payload")}
-			}
-			code, redirectURL, verifier := parts[0], parts[1], parts[2]
-			tok, exchErr := tools.ExchangeXOAuthCode(
-				m.Prefs.XClientID,
-				m.Prefs.XClientSecret,
-				code,
-				redirectURL,
-				verifier,
-			)
-			if exchErr != nil {
-				return XAuthDoneMsg{Err: exchErr}
-			}
-			return XAuthDoneMsg{Token: tok}
-		}
-		return m, tea.Batch(
-			PrintToScrollback(WelcomeStyle.Render("Opening browser for X auth...")),
-			PrintToScrollback(FooterMeta.Render("If browser did not open, visit:\n"+authURL)),
-			cmd,
-		)
-	default:
-		return m, PrintToScrollback(m.renderError("Usage: /x [auth|status|logout]"))
 	}
 }
 
@@ -2233,10 +2146,6 @@ func (m Model) validateConfigInput(key, value string) error {
 					value, resolvedProv, resolvedProv, value)
 			}
 		}
-	case "telegram.allowed_ids":
-		if _, err := config.ParseAllowedIDs(value); err != nil {
-			return err
-		}
 	case "tools.disabled":
 		disabled := config.Preferences{ToolsDisabled: value}.DisabledToolsSet()
 		for name := range disabled {
@@ -2266,7 +2175,7 @@ func isBoolConfigKey(key string) bool {
 
 func (m Model) configEditInitialValue(key string) string {
 	switch key {
-	case "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "brave.api_key", "fireworks.api_key", "x.client_secret", "x.access_token", "x.refresh_token", "telegram.bot_token":
+	case "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "brave.api_key", "fireworks.api_key", "textbelt.api_key":
 		return ""
 	default:
 		return m.Prefs.Get(key)
@@ -2551,22 +2460,16 @@ type SessionPickerMsg struct {
 	Err      error
 }
 
+// NodePickerMsg carries nodes for the node picker overlay.
+type NodePickerMsg struct {
+	Nodes []*hub.Node
+	Err   error
+}
+
 // BranchDoneMsg signals that a session branch completed.
 type BranchDoneMsg struct {
 	Session *domain.Session
 	Err     error
-}
-
-// TelegramStartedMsg signals that the Telegram bot started successfully.
-type TelegramStartedMsg struct{ BotName string }
-
-// TelegramErrorMsg signals a Telegram bot error.
-type TelegramErrorMsg struct{ Err error }
-
-// XAuthDoneMsg signals completion of /x auth flow.
-type XAuthDoneMsg struct {
-	Token tools.XOAuthToken
-	Err   error
 }
 
 func (m Model) handleBranchDone(msg BranchDoneMsg) (tea.Model, tea.Cmd) {
@@ -2594,38 +2497,6 @@ func (m Model) handleBranchDone(msg BranchDoneMsg) (tea.Model, tea.Cmd) {
 		PrintToScrollback(WelcomeStyle.Render(fmt.Sprintf("Branched to new session %s", msg.Session.ID[:8]))),
 		m.loadSessionHistory(),
 	)
-}
-
-func (m Model) handleTelegram(args []string) (tea.Model, tea.Cmd) {
-	sub := "status"
-	if len(args) > 0 {
-		sub = strings.ToLower(args[0])
-	}
-
-	switch sub {
-	case "start":
-		if m.telegramCancel != nil {
-			return m, PrintToScrollback(WelcomeStyle.Render("Telegram bot is already running. Use /telegram stop first."))
-		}
-		return m, m.startTelegramBot()
-
-	case "stop":
-		if m.telegramCancel == nil {
-			return m, PrintToScrollback(WelcomeStyle.Render("Telegram bot is not running."))
-		}
-		m.telegramCancel()
-		m.telegramCancel = nil
-		return m, PrintToScrollback(WelcomeStyle.Render("Telegram bot stopped."))
-
-	case "status":
-		if m.telegramCancel != nil {
-			return m, PrintToScrollback(WelcomeStyle.Render("Telegram bot is running."))
-		}
-		return m, PrintToScrollback(WelcomeStyle.Render("Telegram bot is not running. Use /telegram start"))
-
-	default:
-		return m, PrintToScrollback(m.renderError("Usage: /telegram [start|stop|status]"))
-	}
 }
 
 func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
@@ -2698,44 +2569,6 @@ func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
 	}
 
 	return m, PrintToScrollback(strings.Join(lines, "\n"))
-}
-
-func (m *Model) startTelegramBot() tea.Cmd {
-	cfg, err := config.LoadTelegramConfigFromPrefs(m.Prefs)
-	if err != nil {
-		return PrintToScrollback(m.renderError(err.Error()))
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	m.telegramCancel = cancel
-
-	st := m.Store
-	apiKey := m.APIKey
-	modelID := m.modelID
-	modelLabel := m.modelLabel
-	prov := m.Provider
-	prefs := m.Prefs
-
-	return func() tea.Msg {
-		adapter, err := telegram.NewAdapter(cfg, st, apiKey, modelID, modelLabel, prov, &prefs)
-		if err != nil {
-			cancel()
-			return TelegramErrorMsg{Err: err}
-		}
-
-		botName := adapter.BotName()
-
-		// Run in background — errors come back as messages
-		go func() {
-			if err := adapter.Run(ctx); err != nil && err != context.Canceled {
-				if Prog != nil {
-					Prog.Send(TelegramErrorMsg{Err: err})
-				}
-			}
-		}()
-
-		return TelegramStartedMsg{BotName: botName}
-	}
 }
 
 // ---------------------------------------------------------------------------
