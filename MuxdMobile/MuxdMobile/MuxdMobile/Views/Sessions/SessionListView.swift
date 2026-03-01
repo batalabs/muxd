@@ -153,7 +153,7 @@ struct SessionListView: View {
                                 Label(info.host, systemImage: "server.rack")
                             }
                             .task { await checkHealth() }
-                            Label(":\(String(info.port))", systemImage: "network")
+                            Label("\(String(info.port))", systemImage: "number")
                             if !shortModelName.isEmpty {
                                 Button {
                                     UIPasteboard.general.string = serverModel

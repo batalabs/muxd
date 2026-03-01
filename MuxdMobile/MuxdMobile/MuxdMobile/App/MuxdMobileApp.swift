@@ -3,7 +3,7 @@ import SwiftUI
 struct AppGlassModifier: ViewModifier {
     var circular: Bool = false
 
-    func body(content: View) -> some View {
+    func body(content: Content) -> some View {
         if circular {
             if #available(iOS 26.0, *) {
                 content
@@ -378,7 +378,7 @@ struct ClientCardView: View {
                 Menu {
                     Section {
                         Label(connection.host, systemImage: "server.rack")
-                        Label(":\(String(connection.port))", systemImage: "network")
+                        Label("\(String(connection.port))", systemImage: "number")
                     }
 
                     Section {
@@ -398,10 +398,10 @@ struct ClientCardView: View {
 
                     Section {
                         Button(action: onRename) {
-                            Label("Rename", systemImage: "pencil")
+                            Label("Rename", systemImage: "character.cursor.ibeam")
                         }
                         Button(role: .destructive, action: onDelete) {
-                            Label("Delete", systemImage: "trash")
+                            Label("Disconnect", systemImage: "xmark.circle")
                         }
                     }
                 } label: {
@@ -469,132 +469,6 @@ struct ClientCardView: View {
             }
         } catch {
             // Ignore - won't show session count
-        }
-    }
-}
-
-struct AppTheme: RawRepresentable, Equatable, CaseIterable {
-    var rawValue: String
-    static let system = AppTheme(rawValue: "system")
-    static let light = AppTheme(rawValue: "light")
-    static let dark = AppTheme(rawValue: "dark")
-
-    static var allCases: [AppTheme] = [.system, .light, .dark]
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .light: return .light
-        case .dark: return .dark
-        default: return nil
-        }
-    }
-}
-
-struct RenameConnectionView: View {
-    @Environment(\.dismiss) private var dismiss
-    let connection: ConnectionInfo
-    let onRename: (String) -> Void
-
-    @State private var name: String = ""
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Server Name", text: $name)
-                        .autocapitalization(.words)
-                } header: {
-                    Text("Name")
-                } footer: {
-                    Text("Enter a friendly name for this server")
-                }
-
-                Section {
-                    LabeledContent("Host", value: connection.host)
-                    LabeledContent("Port", value: "\(connection.port)")
-                }
-            }
-            .navigationTitle("Rename Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onRename(name)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
-            }
-            .onAppear {
-                name = connection.name
-            }
-        }
-    }
-}
-
-struct ConfigView: View {
-    @EnvironmentObject var appState: AppState
-    @AppStorage("appTheme") private var appTheme: AppTheme = .system
-    @State private var showDisconnectConfirm = false
-    @State private var showDeleteConfirm = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker("Appearance", selection: $appTheme) {
-                        Label("System", systemImage: "circle.lefthalf.filled").tag(AppTheme.system)
-                        Label("Light", systemImage: "sun.max.fill").tag(AppTheme.light)
-                        Label("Dark", systemImage: "moon.fill").tag(AppTheme.dark)
-                    }
-                }
-
-                if appState.isConnected, let info = appState.connectionInfo {
-                    Section("Current Connection") {
-                        LabeledContent("Name", value: info.name)
-                        LabeledContent("Host", value: info.host)
-                        LabeledContent("Port", value: "\(info.port)")
-
-                        Button(role: .destructive) {
-                            showDisconnectConfirm = true
-                        } label: {
-                            Label("Disconnect", systemImage: "xmark.circle.fill")
-                        }
-                    }
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        showDeleteConfirm = true
-                    } label: {
-                        Label("Delete All Saved Clients", systemImage: "trash.fill")
-                    }
-                    .disabled(appState.savedConnections.isEmpty)
-                }
-            }
-            .navigationTitle("Settings")
-            .confirmationDialog("Disconnect from server?", isPresented: $showDisconnectConfirm, titleVisibility: .visible) {
-                Button("Disconnect", role: .destructive) {
-                    appState.disconnect()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("You will need to reconnect to access your sessions.")
-            }
-            .confirmationDialog("Delete all saved clients?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                Button("Delete All", role: .destructive) {
-                    for connection in appState.savedConnections {
-                        appState.removeConnection(id: connection.id)
-                    }
-                    appState.disconnect()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will remove all saved client connections from this device.")
-            }
         }
     }
 }
