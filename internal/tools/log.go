@@ -14,7 +14,7 @@ func logReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "log_read",
-			Description: "Read recent muxd daemon log entries. Returns the last N lines from the log file. Useful for debugging errors, checking scheduler activity, and reviewing system behavior.",
+			Description: "Read recent muxd daemon log entries. Returns the last N lines from the log file. Useful for debugging errors, checking scheduler activity, and reviewing system behavior. Only call once per conversation turn — do not repeat if you already have the result.",
 			Properties: map[string]provider.ToolProp{
 				"lines": {Type: "string", Description: "Number of lines to return from the end of the log (default: 50, max: 500)"},
 			},

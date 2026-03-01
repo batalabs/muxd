@@ -38,7 +38,7 @@ func xPostTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_post",
-			Description: "Post a tweet via X API v2. Input text must be 1-280 characters.",
+			Description: "Post a tweet to X/Twitter. Text must be 1-280 characters. Always confirm with the user before posting unless they explicitly asked you to post.",
 			Properties: map[string]provider.ToolProp{
 				"text": {Type: "string", Description: "Tweet text, maximum 280 characters"},
 			},
@@ -67,7 +67,7 @@ func xScheduleTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_schedule",
-			Description: "Schedule a tweet for later posting. Requires scheduler support and a valid time.",
+			Description: "Schedule a tweet for later posting. Time format: RFC3339 (e.g. '2026-03-01T14:00:00Z') or HH:MM for today/tomorrow. Recurrence: once, daily, or hourly.",
 			Properties: map[string]provider.ToolProp{
 				"text":       {Type: "string", Description: "Tweet text, maximum 280 characters"},
 				"time":       {Type: "string", Description: "Schedule time: RFC3339 or HH:MM (local time)"},
@@ -365,7 +365,7 @@ func xScheduleCancelTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_schedule_cancel",
-			Description: "Cancel a scheduled X post by ID.",
+			Description: "Cancel a scheduled X post by its job ID (or 8-character prefix). Use x_schedule_list to find the ID first.",
 			Properties: map[string]provider.ToolProp{
 				"id": {Type: "string", Description: "Scheduled job ID (or 8-char prefix)"},
 			},
@@ -395,7 +395,7 @@ func xSearchTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_search",
-			Description: "Search recent tweets on X/Twitter. Returns matching tweets with author, text, date, URL, and engagement metrics.",
+			Description: "Search recent tweets on X/Twitter. Returns tweets with author, text, date, URL, and engagement metrics. Only call once per query — review results before refining.",
 			Properties: map[string]provider.ToolProp{
 				"query":       {Type: "string", Description: "Search query (X search syntax)"},
 				"max_results": {Type: "integer", Description: "Number of results to return (10-100, default 10)"},
@@ -481,7 +481,7 @@ func xMentionsTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_mentions",
-			Description: "Fetch recent mentions of the authenticated X/Twitter user. Returns tweets mentioning you with author, text, date, URL, and engagement metrics.",
+			Description: "Fetch recent mentions of the authenticated X/Twitter user. Returns tweets with author, text, date, URL, and metrics. Only call once per turn.",
 			Properties: map[string]provider.ToolProp{
 				"max_results": {Type: "integer", Description: "Number of results to return (5-100, default 10)"},
 			},
@@ -600,7 +600,7 @@ func xReplyTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "x_reply",
-			Description: "Reply to a tweet on X/Twitter. Posts a reply to the specified tweet ID.",
+			Description: "Reply to a specific tweet on X/Twitter. Requires the tweet ID to reply to. Text must be 1-280 characters. Confirm with the user before replying unless explicitly asked.",
 			Properties: map[string]provider.ToolProp{
 				"tweet_id": {Type: "string", Description: "The ID of the tweet to reply to"},
 				"text":     {Type: "string", Description: "Reply text, maximum 280 characters"},

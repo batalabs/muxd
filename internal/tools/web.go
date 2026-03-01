@@ -20,7 +20,7 @@ func webSearchTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "web_search",
-			Description: "Search the web using the Brave Search API. Returns a list of results with title, URL, and snippet. Requires the BRAVE_SEARCH_API_KEY environment variable. Use this to find current information, documentation, or answers to questions.",
+			Description: "Search the web and return results with title, URL, and snippet. Use to find current information, documentation, or answers. Only call once per query — review results before searching again with a different query.",
 			Properties: map[string]provider.ToolProp{
 				"query": {Type: "string", Description: "Search query"},
 				"count": {Type: "integer", Description: "Number of results to return (default: 5, max: 20)"},
@@ -135,7 +135,7 @@ func webFetchTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "web_fetch",
-			Description: "Fetch a URL and return the text content. HTML is stripped to plain text. Output is truncated at 50KB. Use this to read documentation pages, API responses, or any web content.",
+			Description: "Fetch a URL and return its text content (HTML is converted to plain text). Use to read documentation, articles, or public API responses. Does not work with authenticated or login-protected pages.",
 			Properties: map[string]provider.ToolProp{
 				"url": {Type: "string", Description: "URL to fetch"},
 			},

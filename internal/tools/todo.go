@@ -27,7 +27,7 @@ func todoReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "todo_read",
-			Description: "Read the current todo list. Returns all items with their ID, title, status, and description. Use this to check progress before planning next steps.",
+			Description: "Read the current todo list with IDs, titles, statuses, and descriptions. Use to check progress before planning next steps. Only call once per turn.",
 			Properties:  map[string]provider.ToolProp{},
 			Required:    []string{},
 		},

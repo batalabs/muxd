@@ -117,7 +117,7 @@ func memoryReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "memory_read",
-			Description: "Read all project memory facts. Returns key-value pairs persisted across sessions in .muxd/memory.json.",
+			Description: "Read all project memory facts that persist across sessions. Returns key-value pairs. Only call once per turn — do not repeat if you already have the result.",
 			Properties:  map[string]provider.ToolProp{},
 			Required:    []string{},
 		},
@@ -156,7 +156,7 @@ func memoryWriteTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "memory_write",
-			Description: "Write or remove a project memory fact. Facts persist across sessions in .muxd/memory.json. Use action 'set' to add/update, 'remove' to delete.",
+			Description: "Save or remove a project memory fact that persists across sessions. Use 'set' to store a key-value pair, 'remove' to delete one. Good for remembering project conventions, URLs, config details.",
 			Properties: map[string]provider.ToolProp{
 				"action": {Type: "string", Description: "Action to perform: 'set' or 'remove'"},
 				"key":    {Type: "string", Description: "Fact key (e.g. 'auth', 'database', 'test_patterns')"},

@@ -30,7 +30,7 @@ func smsSendTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "sms_send",
-			Description: "Send an SMS message via the Textbelt API. Requires a Textbelt API key configured via /config set textbelt.api_key <key>.",
+			Description: "Send an SMS message. Always confirm the phone number and message with the user before sending. Returns a text ID for status tracking.",
 			Properties: map[string]provider.ToolProp{
 				"phone":   {Type: "string", Description: "Phone number to send to. U.S./Canada: 10-digit with area code. International: E.164 format with country code (e.g. +44...)"},
 				"message": {Type: "string", Description: "The SMS message content"},
@@ -112,7 +112,7 @@ func smsStatusTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "sms_status",
-			Description: "Check the delivery status of a previously sent SMS using its text ID from sms_send.",
+			Description: "Check delivery status of a previously sent SMS using the text ID returned by sms_send. Returns DELIVERED, SENT, SENDING, FAILED, or UNKNOWN.",
 			Properties: map[string]provider.ToolProp{
 				"text_id": {Type: "string", Description: "The text ID returned by sms_send"},
 			},
@@ -165,7 +165,7 @@ func smsScheduleTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "sms_schedule",
-			Description: "Schedule an SMS for later sending. Requires scheduler support and a valid time.",
+			Description: "Schedule an SMS for later sending. Time format: RFC3339 (e.g. '2026-03-01T14:00:00Z') or HH:MM for today/tomorrow. Recurrence: once, daily, or hourly.",
 			Properties: map[string]provider.ToolProp{
 				"phone":      {Type: "string", Description: "Phone number to send to"},
 				"message":    {Type: "string", Description: "The SMS message content"},

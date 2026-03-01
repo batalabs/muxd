@@ -248,7 +248,7 @@ func fileReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "file_read",
-			Description: "Read the contents of a file. Returns the file content with line numbers. Use offset and limit to read specific line ranges for large files.",
+			Description: "Read a file's contents with line numbers. Use offset and limit for large files. Read before editing to get exact text.",
 			Properties: map[string]provider.ToolProp{
 				"path":   {Type: "string", Description: "Absolute or relative file path to read"},
 				"offset": {Type: "integer", Description: "Line number to start reading from (1-based, default: 1)"},
@@ -319,7 +319,7 @@ func fileWriteTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "file_write",
-			Description: "Write/overwrite file (auto-mkdirs). Prefer file_edit for mods.",
+			Description: "Create or overwrite a file. Parent directories are created automatically. Prefer file_edit for modifying existing files.",
 			Properties: map[string]provider.ToolProp{
 				"path":    {Type: "string", Description: "File path to write to"},
 				"content": {Type: "string", Description: "Content to write to the file"},
@@ -356,7 +356,7 @@ func fileEditTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "file_edit",
-			Description: "Edit a file by replacing an exact string match. The old_string must appear exactly once unless replace_all is true. Read the file first to ensure you have the exact text. Use replace_all for bulk renames or repeated patterns.",
+			Description: "Replace exact text in a file. old_string must match exactly once (or use replace_all for bulk changes). Always read the file first to get the exact text to match.",
 			Properties: map[string]provider.ToolProp{
 				"path":        {Type: "string", Description: "File path"},
 				"old_string":  {Type: "string", Description: "Exact text to find"},
@@ -419,7 +419,7 @@ func bashTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "bash",
-			Description: "Run a shell command and return the output. On Windows, uses bash/sh for POSIX-style commands when available, otherwise cmd /C. On Unix uses sh -c. Captures both stdout and stderr. Output is truncated at 50KB.",
+			Description: "Run a shell command and return stdout+stderr. Use for git, build commands, installers, and other CLI tools. Prefer file_read/file_edit/grep for file operations.",
 			Properties: map[string]provider.ToolProp{
 				"command": {Type: "string", Description: "Shell command to execute"},
 				"timeout": {Type: "integer", Description: "Timeout in seconds (default: 30, max: 120)"},
@@ -493,7 +493,7 @@ func grepTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "grep",
-			Description: "Search files for a regex pattern. Returns matching lines in file:line:content format. Skips hidden directories and binary files. Use include to filter by file extension for faster searches. Use context_lines to show surrounding lines.",
+			Description: "Search file contents for a regex pattern. Returns matching lines as file:line:content. Use include to filter by extension (e.g. '*.go'). Use context_lines for surrounding context. Only call once per query — do not repeat with the same pattern.",
 			Properties: map[string]provider.ToolProp{
 				"pattern":       {Type: "string", Description: "Regular expression pattern to search for"},
 				"path":          {Type: "string", Description: "Directory or file to search (default: current directory)"},
@@ -711,7 +711,7 @@ func listFilesTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "list_files",
-			Description: "List files and directories. Use to explore project structure before reading files. Returns entries with / suffix for directories. Skips hidden and common generated directories (.git, node_modules, etc.).",
+			Description: "List files and directories in a path. Use to explore project structure before reading files. Directories have a / suffix. Skips .git, node_modules, and other generated directories.",
 			Properties: map[string]provider.ToolProp{
 				"path":      {Type: "string", Description: "Directory path to list (default: current directory)"},
 				"recursive": {Type: "boolean", Description: "List files recursively (default: false)"},
