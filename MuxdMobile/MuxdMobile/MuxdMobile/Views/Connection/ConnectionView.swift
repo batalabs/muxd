@@ -145,7 +145,9 @@ struct ConnectionView: View {
         guard connectingToID == nil else { return }
         connectingToID = connection.id
         Task { @MainActor in
-            await appState.connect(with: connection)
+            async let connect: () = appState.connect(with: connection)
+            async let delay: () = Task.sleep(nanoseconds: 2_000_000_000)
+            _ = await (connect, try? delay)
             connectingToID = nil
             if appState.isConnected {
                 selectedTab = 1 // Switch to Sessions tab

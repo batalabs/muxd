@@ -54,6 +54,7 @@ type Server struct {
 	newAgent      AgentFactory
 	detectGitRepo DetectGitRepoFunc
 	mcpManager    *mcp.Manager
+	logger        *config.Logger
 }
 
 // NewServer creates a new daemon server.
@@ -126,6 +127,18 @@ func (s *Server) SetQuiet(quiet bool) {
 	s.quiet = quiet
 }
 
+// SetLogger sets the logger for the daemon server.
+func (s *Server) SetLogger(l *config.Logger) {
+	s.logger = l
+}
+
+// logf writes a timestamped log line if a logger is configured.
+func (s *Server) logf(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Printf(format, args...)
+	}
+}
+
 // SetBindAddress sets the network interface to bind to (e.g., "localhost", "0.0.0.0").
 // Must be called before Start(). Defaults to "localhost" if not set.
 func (s *Server) SetBindAddress(addr string) {
@@ -188,6 +201,7 @@ func (s *Server) Start(port int) error {
 		}
 	}
 	s.port = ln.Addr().(*net.TCPAddr).Port
+	s.logf("server starting on %s:%d", bindAddr, s.port)
 	if !s.quiet {
 		fmt.Fprintf(os.Stderr, "muxd server listening on %s:%d\n", bindAddr, s.port)
 	}
@@ -281,6 +295,7 @@ func (s *Server) Start(port int) error {
 			return ctx
 		},
 		func(call tools.ScheduledToolCall, ctx *tools.ToolContext) (string, bool, error) {
+			s.logf("scheduler executing tool=%s id=%s", call.ToolName, call.ID)
 			// Agent tasks spawn a full agent loop instead of a single tool call.
 			if call.ToolName == tools.AgentTaskToolName {
 				return s.executeScheduledAgentTask(call)
@@ -292,6 +307,9 @@ func (s *Server) Start(port int) error {
 				ToolInput: call.ToolInput,
 			}
 			result, isErr := agent.ExecuteToolCall(block, ctx)
+			if isErr {
+				s.logf("scheduler tool=%s failed: %s", call.ToolName, result)
+			}
 			return result, isErr, nil
 		},
 	)
@@ -309,6 +327,7 @@ func (s *Server) Start(port int) error {
 
 // Shutdown gracefully stops the server and removes the lockfile.
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.logf("server shutting down")
 	s.mu.Lock()
 	mgr := s.mcpManager
 	s.mu.Unlock()
@@ -545,6 +564,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	s.logf("session created id=%s model=%s", sess.ID, modelID)
 	writeJSON(w, http.StatusOK, map[string]string{"session_id": sess.ID})
 }
 
@@ -659,6 +679,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, flusher, event, data)
 	}
 
+	s.logf("submit session=%s len=%d", sessionID, len(req.Text))
 	ag.Submit(req.Text, func(evt agent.Event) {
 		switch evt.Kind {
 		case agent.EventDelta:
@@ -716,6 +737,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 			if evt.Err != nil {
 				errMsg = evt.Err.Error()
 			}
+			s.logf("error session=%s: %s", sessionID, errMsg)
 			sendSSE("error", map[string]string{"error": errMsg})
 
 		case agent.EventCompacted:

@@ -66,16 +66,9 @@ struct SessionListView: View {
         HStack(spacing: 6) {
             Image(systemName: "server.rack")
             if let info = appState.connectionInfo {
-                // If renamed, show just the name; otherwise show host:port
-                if info.name != info.host {
-                    Text(info.name)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                } else {
-                    Text("\(info.host):\(String(info.port))")
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
+                Text(info.name != info.host ? info.name : info.host)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             } else {
                 Text("Sessions")
             }
@@ -157,9 +150,10 @@ struct SessionListView: View {
                             Button {
                                 UIPasteboard.general.string = "\(info.host):\(String(info.port))"
                             } label: {
-                                Label("\(info.host):\(String(info.port))", systemImage: "server.rack")
+                                Label(info.host, systemImage: "server.rack")
                             }
                             .task { await checkHealth() }
+                            Label(":\(String(info.port))", systemImage: "network")
                             if !shortModelName.isEmpty {
                                 Button {
                                     UIPasteboard.general.string = serverModel

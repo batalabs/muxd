@@ -983,6 +983,13 @@ class ChatViewModel: ObservableObject {
 
         case .error:
             if let msg = event.errorMsg {
+                // "agent is already running" means another client is using this session —
+                // don't show an error, just reset streaming state and reload messages.
+                if msg.contains("already running") {
+                    isStreaming = false
+                    Task { await loadMessages() }
+                    return
+                }
                 error = MuxdError.serverError(msg)
             }
             isStreaming = false

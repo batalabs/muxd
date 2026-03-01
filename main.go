@@ -45,6 +45,10 @@ func main() {
 	serviceCmd := flag.String("service", "", "Service management: install|uninstall|status|start|stop")
 	flag.Parse()
 
+	// Set up log file — all stderr output is also written to ~/.local/share/muxd/muxd.log.
+	logger := config.NewLogger()
+	defer logger.Close()
+
 	if *versionFlag {
 		fmt.Printf("muxd %s\n", version)
 		return
@@ -111,6 +115,7 @@ func main() {
 		srv.SetAgentFactory(agentFactory)
 		srv.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		srv.SetBindAddress(bindAddr)
+		srv.SetLogger(logger)
 
 		// Handle graceful shutdown
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -158,6 +163,7 @@ func main() {
 		embeddedServer.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		embeddedServer.SetQuiet(true)
 		embeddedServer.SetBindAddress(bindAddr)
+		embeddedServer.SetLogger(logger)
 		go func() {
 			if err := embeddedServer.Start(4096); err != nil {
 				fmt.Fprintf(os.Stderr, "embedded server error: %v\n", err)

@@ -117,6 +117,7 @@ func AllTools() []ToolDef {
 		smsSendTool(),
 		smsStatusTool(),
 		smsScheduleTool(),
+		logReadTool(),
 		patchApplyTool(),
 		planEnterTool(),
 		planExitTool(),

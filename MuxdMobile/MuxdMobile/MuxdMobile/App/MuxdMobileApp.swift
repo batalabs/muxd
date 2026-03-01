@@ -162,6 +162,7 @@ struct ClientsView: View {
     @State private var showManual = false
     @State private var connectionToRename: ConnectionInfo?
     @State private var connectingToID: String? = nil
+    @State private var tokenToShow: ConnectionInfo?
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -194,6 +195,10 @@ struct ClientsView: View {
                                         withAnimation {
                                             appState.removeConnection(id: connection.id)
                                         }
+                                    },
+                                    onViewToken: { tokenToShow = connection },
+                                    onDisconnect: {
+                                        appState.removeConnection(id: connection.id)
                                     }
                                 )
                                 .id(connection.id)
@@ -250,6 +255,9 @@ struct ClientsView: View {
                 appState.renameConnection(id: connection.id, name: newName)
             }
         }
+        .sheet(item: $tokenToShow) { connection in
+            TokenView(token: connection.token)
+        }
         .alert(item: $appState.error) { error in
             Alert(
                 title: Text("Connection Error"),
@@ -263,7 +271,9 @@ struct ClientsView: View {
         guard connectingToID == nil else { return }
         connectingToID = connection.id
         Task { @MainActor in
-            await appState.connect(with: connection)
+            async let connect: () = appState.connect(with: connection)
+            async let delay: () = Task.sleep(nanoseconds: 2_000_000_000)
+            _ = await (connect, try? delay)
             connectingToID = nil
             if appState.isConnected {
                 navigationPath.append("sessions")
@@ -279,11 +289,14 @@ struct ClientCardView: View {
     let onConnect: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
+    let onViewToken: () -> Void
+    let onDisconnect: () -> Void
 
     @State private var showSpinner = false
     @State private var spinnerTask: Task<Void, Never>?
     @State private var sessionCount: Int?
     @State private var latencyMs: Int?
+    @State private var isHealthy: Bool?
     @GestureState private var isPressed = false
 
     var body: some View {
@@ -363,11 +376,33 @@ struct ClientCardView: View {
         .overlay(alignment: .topTrailing) {
             if !showSpinner {
                 Menu {
-                    Button(action: onRename) {
-                        Label("Rename", systemImage: "pencil")
+                    Section {
+                        Label(connection.host, systemImage: "server.rack")
+                        Label(":\(String(connection.port))", systemImage: "network")
                     }
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Delete", systemImage: "trash")
+
+                    Section {
+                        if let healthy = isHealthy {
+                            Label(healthy ? "Connected" : "Unreachable", systemImage: healthy ? "circle.fill" : "circle")
+                        }
+                        if let ms = latencyMs {
+                            Label("\(ms)ms", systemImage: "clock")
+                        }
+                    }
+
+                    Section {
+                        Button(action: onViewToken) {
+                            Label("View Token", systemImage: "key")
+                        }
+                    }
+
+                    Section {
+                        Button(action: onRename) {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button(role: .destructive, action: onDelete) {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -413,14 +448,17 @@ struct ClientCardView: View {
         // Measure latency with health check
         let start = Date()
         do {
-            _ = try await client.health()
+            let healthy = try await client.health()
             let elapsed = Date().timeIntervalSince(start)
             let ms = Int(elapsed * 1000)
             await MainActor.run {
+                isHealthy = healthy
                 latencyMs = ms
             }
         } catch {
-            // Ignore - won't show latency
+            await MainActor.run {
+                isHealthy = false
+            }
         }
 
         // Get session count
