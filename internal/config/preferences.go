@@ -87,7 +87,11 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "hub",
-		Keys: []string{"hub.bind_address", "hub.auth_token", "hub.url", "hub.node_token", "hub.node_id", "hub.node_name"},
+		Keys: []string{"hub.bind_address", "hub.auth_token"},
+	},
+	{
+		Name: "node",
+		Keys: []string{"hub.url", "hub.node_token", "hub.node_id", "hub.node_name"},
 	},
 	{
 		Name: "theme",
@@ -717,7 +721,7 @@ func ParseBoolish(s string) (bool, error) {
 }
 
 // DisabledToolsSet parses tools.disabled into a normalized set.
-// Format: comma-separated tool names (e.g. "x_post,web_fetch").
+// Format: comma-separated tool names (e.g. "sms_send,web_fetch").
 func (p Preferences) DisabledToolsSet() map[string]bool {
 	out := map[string]bool{}
 	raw := strings.TrimSpace(p.ToolsDisabled)
@@ -787,7 +791,7 @@ func PreferencesFilePath() string {
 // ---------------------------------------------------------------------------
 
 // ExecuteConfigAction handles /config subcommands and returns a plain-text
-// response. The caller (TUI or Telegram) applies its own formatting.
+// response. The caller (TUI or hub) applies its own formatting.
 func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	sub := "show"
 	if len(args) > 0 {
@@ -798,7 +802,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	case "show":
 		return FormatConfigGroups(prefs.Grouped()), nil
 
-	case "models", "tools", "daemon", "hub", "theme":
+	case "models", "tools", "daemon", "hub", "node", "theme":
 		group := prefs.GroupByName(sub)
 		if group == nil {
 			return "", fmt.Errorf("unknown config group: %s", sub)
@@ -827,7 +831,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 		return "Preferences reset to defaults.", nil
 
 	default:
-		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|theme|set <key> <value>|reset]")
+		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|node|theme|set <key> <value>|reset]")
 	}
 }
 

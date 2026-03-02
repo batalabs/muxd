@@ -126,12 +126,12 @@ func TestPreferences_Grouped(t *testing.T) {
 	p.AnthropicAPIKey = "sk-ant-api03-long-key-1234"
 
 	groups := p.Grouped()
-	if len(groups) != 5 {
-		t.Fatalf("expected 5 groups, got %d", len(groups))
+	if len(groups) != 6 {
+		t.Fatalf("expected 6 groups, got %d", len(groups))
 	}
 
 	// Verify group names
-	wantNames := []string{"models", "tools", "daemon", "hub", "theme"}
+	wantNames := []string{"models", "tools", "daemon", "hub", "node", "theme"}
 	for i, g := range groups {
 		if g.Name != wantNames[i] {
 			t.Errorf("group %d name = %q, want %q", i, g.Name, wantNames[i])
@@ -154,7 +154,7 @@ func TestPreferences_Grouped(t *testing.T) {
 	}
 
 	// Theme group: booleans should show "true", emoji is a string
-	theme := groups[4]
+	theme := groups[5]
 	for _, e := range theme.Entries {
 		if e.Key == "footer.emoji" {
 			continue // string field, not a boolean

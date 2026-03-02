@@ -883,7 +883,7 @@ func TestStore_ScheduledToolJobs(t *testing.T) {
 	s := testStore(t)
 
 	now := time.Now().UTC()
-	id, err := s.CreateScheduledToolJob("x_post", map[string]any{"text": "hello"}, now.Add(2*time.Minute), "once")
+	id, err := s.CreateScheduledToolJob("sms_send", map[string]any{"text": "hello"}, now.Add(2*time.Minute), "once")
 	if err != nil {
 		t.Fatalf("CreateScheduledToolJob: %v", err)
 	}
@@ -928,7 +928,7 @@ func TestStore_UpdateScheduledToolJob(t *testing.T) {
 	s := testStore(t)
 
 	now := time.Now().UTC()
-	id, err := s.CreateScheduledToolJob("x_post", map[string]any{"text": "original"}, now.Add(2*time.Minute), "once")
+	id, err := s.CreateScheduledToolJob("sms_send", map[string]any{"text": "original"}, now.Add(2*time.Minute), "once")
 	if err != nil {
 		t.Fatalf("CreateScheduledToolJob: %v", err)
 	}
@@ -1401,7 +1401,7 @@ func TestStore_SessionTitle_defaultTitle(t *testing.T) {
 
 func TestStore_CreateScheduledToolJob_normalizesName(t *testing.T) {
 	s := testStore(t)
-	id, err := s.CreateScheduledToolJob("  X_POST  ", map[string]any{}, time.Now().Add(time.Hour), "once")
+	id, err := s.CreateScheduledToolJob("  SMS_SEND  ", map[string]any{}, time.Now().Add(time.Hour), "once")
 	if err != nil {
 		t.Fatalf("CreateScheduledToolJob: %v", err)
 	}
@@ -1411,8 +1411,8 @@ func TestStore_CreateScheduledToolJob_normalizesName(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.ID == id {
-			if item.ToolName != "x_post" {
-				t.Errorf("ToolName = %q, want %q", item.ToolName, "x_post")
+			if item.ToolName != "sms_send" {
+				t.Errorf("ToolName = %q, want %q", item.ToolName, "sms_send")
 			}
 			return
 		}

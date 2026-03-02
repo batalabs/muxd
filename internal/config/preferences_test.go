@@ -59,7 +59,7 @@ func TestDataDir(t *testing.T) {
 
 func TestConfigGroupNames(t *testing.T) {
 	names := ConfigGroupNames()
-	want := []string{"models", "tools", "daemon", "hub", "theme"}
+	want := []string{"models", "tools", "daemon", "hub", "node", "theme"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d group names, got %d", len(want), len(names))
 	}
@@ -237,11 +237,11 @@ func TestDisabledToolsSet(t *testing.T) {
 		want  map[string]bool
 	}{
 		{"empty", "", map[string]bool{}},
-		{"single tool", "x_post", map[string]bool{"x_post": true}},
-		{"multiple tools", "x_post,web_fetch,bash", map[string]bool{"x_post": true, "web_fetch": true, "bash": true}},
-		{"with spaces", " x_post , web_fetch ", map[string]bool{"x_post": true, "web_fetch": true}},
-		{"trailing comma", "x_post,", map[string]bool{"x_post": true}},
-		{"uppercase normalized", "X_POST,WEB_FETCH", map[string]bool{"x_post": true, "web_fetch": true}},
+		{"single tool", "sms_send", map[string]bool{"sms_send": true}},
+		{"multiple tools", "sms_send,web_fetch,bash", map[string]bool{"sms_send": true, "web_fetch": true, "bash": true}},
+		{"with spaces", " sms_send , web_fetch ", map[string]bool{"sms_send": true, "web_fetch": true}},
+		{"trailing comma", "sms_send,", map[string]bool{"sms_send": true}},
+		{"uppercase normalized", "SMS_SEND,WEB_FETCH", map[string]bool{"sms_send": true, "web_fetch": true}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -280,7 +280,7 @@ func TestScheduledAllowedToolsSet(t *testing.T) {
 		if !got["bash"] || !got["file_write"] {
 			t.Error("expected custom tools to be allowed")
 		}
-		if got["x_post"] {
+		if got["sms_send"] {
 			t.Error("expected default tools to NOT be included when custom set")
 		}
 	})
