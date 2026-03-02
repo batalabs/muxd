@@ -48,6 +48,7 @@ func main() {
 	bindFlag := flag.String("bind", "", "Network interface to bind (localhost, 0.0.0.0, or specific IP)")
 	hubFlag := flag.Bool("hub", false, "Run as hub coordinator (no agent/session machinery)")
 	hubBindFlag := flag.String("hub-bind", "", "Hub bind address (default: localhost)")
+	hubTokenFlag := flag.String("hub-token", "", "Explicit hub auth token (overrides config and database)")
 	hubInfoFlag := flag.Bool("hub-info", false, "Print hub connection info (token, address, QR) and exit")
 	remoteFlag := flag.String("remote", "", "Connect to remote daemon or hub (host:port)")
 	tokenFlag := flag.String("token", "", "Auth token for remote connection")
@@ -89,7 +90,13 @@ func main() {
 		}
 		defer hubDB.Close()
 
-		h := hub.NewHub(hubDB, &prefs, logger)
+		// Resolve explicit hub token: flag > env var > (database/prefs/generate handled by NewHub)
+		explicitHubToken := *hubTokenFlag
+		if explicitHubToken == "" {
+			explicitHubToken = os.Getenv("MUXD_HUB_TOKEN")
+		}
+
+		h := hub.NewHub(hubDB, &prefs, logger, explicitHubToken)
 		saveHubTokenIfNew(&prefs, h.AuthToken())
 
 		hubBind := *hubBindFlag

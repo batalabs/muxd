@@ -57,16 +57,28 @@ type Hub struct {
 	logger    *config.Logger
 }
 
-// NewHub creates a new Hub instance. If prefs contains a saved hub auth token
-// it is reused; otherwise a fresh token is generated.
-func NewHub(db *sql.DB, prefs *config.Preferences, logger *config.Logger) *Hub {
-	token := ""
-	if prefs != nil {
+// NewHub creates a new Hub instance. Token resolution order:
+//  1. explicitToken (from --hub-token flag or MUXD_HUB_TOKEN env var)
+//  2. Token stored in the hub database (survives config.json loss)
+//  3. Token from preferences (config.json)
+//  4. Generate a fresh token
+//
+// The resolved token is always persisted back to the hub database so it
+// survives even if config.json is deleted during a rebuild.
+func NewHub(db *sql.DB, prefs *config.Preferences, logger *config.Logger, explicitToken string) *Hub {
+	token := explicitToken
+	if token == "" {
+		token = GetSetting(db, "hub_auth_token")
+	}
+	if token == "" && prefs != nil {
 		token = prefs.HubAuthToken
 	}
 	if token == "" {
 		token = generateHubToken()
 	}
+	// Always persist to database so the token survives config.json loss.
+	SetSetting(db, "hub_auth_token", token)
+
 	h := &Hub{
 		db:        db,
 		token:     token,
@@ -307,6 +319,15 @@ func (h *Hub) sweepOfflineNodes() {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) loadNodes() {
+	// Purge stale nodes on startup — nodes offline for over 1 hour.
+	purgeCutoff := time.Now().UTC().Add(-1 * time.Hour)
+	h.db.Exec(`DELETE FROM nodes WHERE status = ? AND last_seen_at < ?`,
+		string(StatusOffline), purgeCutoff.Format(time.RFC3339))
+
+	// Mark all remaining nodes as offline on startup — they must re-register
+	// or heartbeat to prove they're alive.
+	h.db.Exec(`UPDATE nodes SET status = ?`, string(StatusOffline))
+
 	rows, err := h.db.Query(`SELECT id, name, host, port, token, version, status, registered_at, last_seen_at FROM nodes`)
 	if err != nil {
 		h.logf("loading nodes: %v", err)
@@ -325,6 +346,7 @@ func (h *Hub) loadNodes() {
 		n.LastSeenAt, _ = time.Parse(time.RFC3339, seenAt)
 		h.nodes[n.ID] = &n
 	}
+	h.logf("loaded %d nodes from database", len(h.nodes))
 }
 
 // ---------------------------------------------------------------------------

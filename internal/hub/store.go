@@ -59,6 +59,25 @@ func migrateHub(db *sql.DB) error {
 			value TEXT NOT NULL,
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
+		CREATE TABLE IF NOT EXISTS settings (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		);
 	`)
 	return err
+}
+
+// GetSetting reads a single setting from the hub database.
+func GetSetting(db *sql.DB, key string) string {
+	var val string
+	if err := db.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&val); err != nil {
+		return ""
+	}
+	return val
+}
+
+// SetSetting writes a single setting to the hub database.
+func SetSetting(db *sql.DB, key, value string) {
+	db.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 }
