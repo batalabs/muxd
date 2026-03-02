@@ -3,6 +3,10 @@ import SwiftUI
 struct NodePickerView: View {
     @EnvironmentObject var appState: AppState
     @Binding var navigationPath: NavigationPath
+    @State private var isHealthy: Bool?
+    @State private var latencyMs: Int?
+    @State private var viewToken = false
+    @State private var renameConnection = false
 
     var body: some View {
         Group {
@@ -22,14 +26,14 @@ struct NodePickerView: View {
                     Section {
                         ForEach(appState.hubNodes) { node in
                             Button {
-                                if node.isOnline {
+                                if node.isOnline && !appState.isConnected {
                                     appState.selectNode(node)
                                     navigationPath.append("sessions")
                                 }
                             } label: {
                                 NodeRowView(node: node)
                             }
-                            .disabled(!node.isOnline)
+                            .disabled(!node.isOnline || appState.isConnected)
                         }
                     } header: {
                         HStack {
@@ -50,19 +54,80 @@ struct NodePickerView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                hubHeader
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(role: .destructive) {
-                    appState.disconnect()
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    if let info = appState.connectionInfo {
+                        Section("Hub") {
+                            Label(info.name != info.host ? info.name : info.host, systemImage: "point.3.connected.trianglepath.dotted")
+                            Label(info.host, systemImage: "network")
+                            Label("\(String(info.port))", systemImage: "number")
+                        }
+
+                        Section {
+                            if let healthy = isHealthy {
+                                Label(healthy ? "Connected" : "Unreachable", systemImage: healthy ? "circle.fill" : "circle")
+                            }
+                            if let ms = latencyMs {
+                                Label("\(ms)ms", systemImage: "clock")
+                            }
+                        }
+
+                        Section {
+                            Button {
+                                viewToken = true
+                            } label: {
+                                Label("View Token", systemImage: "key")
+                            }
+                        }
+
+                        Section {
+                            Button {
+                                renameConnection = true
+                            } label: {
+                                Label("Rename", systemImage: "character.cursor.ibeam")
+                            }
+                            Button(role: .destructive) {
+                                appState.disconnect()
+                            } label: {
+                                Label("Disconnect", systemImage: "xmark.circle")
+                            }
+                        }
+                    }
                 } label: {
-                    Image(systemName: "xmark.circle")
+                    hubHeader
+                }
+            }
+        }
+        .sheet(isPresented: $viewToken) {
+            TokenView(token: appState.connectionInfo?.token ?? "")
+        }
+        .sheet(isPresented: $renameConnection) {
+            if let info = appState.connectionInfo {
+                RenameConnectionView(connection: info) { newName in
+                    appState.renameConnection(id: info.id, name: newName)
                 }
             }
         }
         .task {
             await appState.refreshNodes()
+            await checkHealth()
+        }
+    }
+
+    private func checkHealth() async {
+        guard let info = appState.connectionInfo,
+              let client = MuxdClient(host: info.host, port: info.port, token: info.token) else {
+            isHealthy = false
+            return
+        }
+        do {
+            let start = Date()
+            let healthy = try await client.health()
+            let elapsed = Date().timeIntervalSince(start)
+            isHealthy = healthy
+            latencyMs = Int(elapsed * 1000)
+        } catch {
+            isHealthy = false
         }
     }
 
@@ -81,8 +146,8 @@ struct NodePickerView: View {
                 .fontWeight(.semibold)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.orange)
-                .foregroundColor(.white)
+                .background(Color.white)
+                .foregroundStyle(.black)
                 .clipShape(Capsule())
         }
     }
@@ -109,7 +174,7 @@ struct NodeRowView: View {
 
                 HStack(spacing: 8) {
                     if !node.version.isEmpty {
-                        Text("v\(node.version)")
+                        Text(node.version)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

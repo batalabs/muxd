@@ -129,7 +129,7 @@ struct ContentView: View {
             ClientsView()
                 .tabItem {
                     Image(systemName: "server.rack")
-                    Text("Clients")
+                    Text("Connections")
                 }
 
             ConfigView()
@@ -228,9 +228,9 @@ struct ClientsView: View {
             Group {
                 if appState.savedConnections.isEmpty {
                     ContentUnavailableView {
-                        Label("No Clients", systemImage: "server.rack")
+                        Label("No Connections", systemImage: "server.rack")
                     } description: {
-                        Text("Add a client to get started")
+                        Text("Add a connection to get started")
                     } actions: {
                         Button("Scan QR Code") {
                             showScanner = true
@@ -278,7 +278,7 @@ struct ClientsView: View {
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
                         Image(systemName: "server.rack")
-                        Text("Clients")
+                        Text("Connections")
                     }
                     .padding(.horizontal, 8)
                     .modifier(AppGlassModifier())
@@ -303,13 +303,12 @@ struct ClientsView: View {
         }
         .onChange(of: appState.isConnected) { _, connected in
             if !connected && appState.isHubConnected {
-                // Node deselected — pop back to node picker
-                // Path is ["nodePicker", "sessions"] or ["nodePicker", "sessions", Session...]
-                // Reset to just ["nodePicker"]
-                var newPath = NavigationPath()
-                newPath.append("nodePicker")
-                navigationPath = newPath
-            } else if !connected {
+                // Node deselected (Switch Node) — pop back to node picker
+                // Only pop if we're deeper than the node picker (path > 1)
+                while navigationPath.count > 1 {
+                    navigationPath.removeLast()
+                }
+            } else if !connected && !appState.isHubConnected {
                 // Fully disconnected — pop to root
                 navigationPath = NavigationPath()
             }
@@ -318,6 +317,7 @@ struct ClientsView: View {
             QRScannerView { info in
                 Task {
                     await appState.connect(with: info)
+                    navigationPath = NavigationPath()
                     if appState.connectionMode == .hub {
                         navigationPath.append("nodePicker")
                     } else if appState.isConnected {
@@ -330,6 +330,7 @@ struct ClientsView: View {
             ManualConnectionView { info in
                 Task {
                     await appState.connect(with: info)
+                    navigationPath = NavigationPath()
                     if appState.connectionMode == .hub {
                         navigationPath.append("nodePicker")
                     } else if appState.isConnected {
@@ -363,6 +364,7 @@ struct ClientsView: View {
             async let delay: () = Task.sleep(nanoseconds: 2_000_000_000)
             _ = await (connect, try? delay)
             connectingToID = nil
+            navigationPath = NavigationPath()
             if appState.connectionMode == .hub {
                 navigationPath.append("nodePicker")
             } else if appState.isConnected {
@@ -403,8 +405,8 @@ struct ClientCardView: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.orange)
-                        .foregroundColor(.white)
+                        .background(Color.white)
+                        .foregroundStyle(.black)
                         .clipShape(Capsule())
                 }
 
@@ -478,7 +480,7 @@ struct ClientCardView: View {
         .overlay(alignment: .topTrailing) {
             if !showSpinner {
                 Menu {
-                    Section {
+                    Section(detectedMode == .hub ? "Hub" : "Node") {
                         Label(connection.host, systemImage: "server.rack")
                         Label("\(String(connection.port))", systemImage: "number")
                     }
@@ -579,12 +581,9 @@ struct ClientCardView: View {
             // For hub mode, show node count instead
             do {
                 let nodes = try await client.listNodes()
-                await MainActor.run {
-                    sessionCount = nil // Will use node count display below
-                }
                 let onlineCount = nodes.filter(\.isOnline).count
                 await MainActor.run {
-                    sessionCount = onlineCount // Reuse field for display
+                    sessionCount = onlineCount
                 }
             } catch {
                 // Ignore

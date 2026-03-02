@@ -166,28 +166,37 @@ struct SessionListView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     if let info = appState.connectionInfo {
-                        Section {
-                            Button {
-                                UIPasteboard.general.string = "\(info.host):\(String(info.port))"
-                            } label: {
-                                Label(info.host, systemImage: "server.rack")
-                            }
-                            .task { await checkHealth() }
-                            Label("\(String(info.port))", systemImage: "number")
-                            if !shortModelName.isEmpty {
-                                Button {
-                                    UIPasteboard.general.string = serverModel
-                                } label: {
+                        if appState.connectionMode == .hub, let node = appState.selectedNode {
+                            Section("Node") {
+                                Label(node.name, systemImage: "server.rack")
+                                Label(node.host, systemImage: "network")
+                                Label("\(String(node.port))", systemImage: "number")
+                                if !shortModelName.isEmpty {
                                     Label(shortModelName, systemImage: "cpu")
                                 }
                             }
-                        }
+                            .task { await checkHealth() }
 
-                        if appState.connectionMode == .hub, let node = appState.selectedNode {
-                            Section("Node") {
-                                Label(node.name, systemImage: "point.3.connected.trianglepath.dotted")
-                                if !node.version.isEmpty {
-                                    Label("v\(node.version)", systemImage: "tag")
+                            Section("Hub") {
+                                Label(info.name != info.host ? info.name : info.host, systemImage: "point.3.connected.trianglepath.dotted")
+                                Label(info.host, systemImage: "network")
+                                Label("\(String(info.port))", systemImage: "number")
+                            }
+                        } else {
+                            Section {
+                                Button {
+                                    UIPasteboard.general.string = "\(info.host):\(String(info.port))"
+                                } label: {
+                                    Label(info.host, systemImage: "server.rack")
+                                }
+                                .task { await checkHealth() }
+                                Label("\(String(info.port))", systemImage: "number")
+                                if !shortModelName.isEmpty {
+                                    Button {
+                                        UIPasteboard.general.string = serverModel
+                                    } label: {
+                                        Label(shortModelName, systemImage: "cpu")
+                                    }
                                 }
                             }
                         }
@@ -199,31 +208,26 @@ struct SessionListView: View {
                             }
                         }
 
-                        Section {
-                            Button {
-                                viewModel.showToken = true
-                            } label: {
-                                Label("View Token", systemImage: "key")
-                            }
-                        }
-
-                        Section {
-                            if appState.connectionMode == .hub {
+                        if appState.connectionMode != .hub {
+                            Section {
                                 Button {
-                                    appState.deselectNode()
+                                    viewModel.showToken = true
                                 } label: {
-                                    Label("Switch Node", systemImage: "arrow.triangle.swap")
+                                    Label("View Token", systemImage: "key")
                                 }
                             }
-                            Button {
-                                viewModel.showRenameConnection = true
-                            } label: {
-                                Label("Rename", systemImage: "character.cursor.ibeam")
-                            }
-                            Button(role: .destructive) {
-                                appState.disconnect()
-                            } label: {
-                                Label("Disconnect", systemImage: "xmark.circle")
+
+                            Section {
+                                Button {
+                                    viewModel.showRenameConnection = true
+                                } label: {
+                                    Label("Rename", systemImage: "character.cursor.ibeam")
+                                }
+                                Button(role: .destructive) {
+                                    appState.disconnect()
+                                } label: {
+                                    Label("Disconnect", systemImage: "xmark.circle")
+                                }
                             }
                         }
                     }
