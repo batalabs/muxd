@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 enum AppTheme: String, CaseIterable {
     case system = "System"
@@ -31,10 +32,42 @@ enum AppFontSize: String, CaseIterable {
 struct ConfigView: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
+    @AppStorage("biometricLockEnabled") private var biometricEnabled = false
+    @State private var canUseBiometrics = false
+    @State private var biometricType: LABiometryType = .none
+
+    private var biometricIcon: String {
+        switch biometricType {
+        case .faceID: return "faceid"
+        case .touchID: return "touchid"
+        case .opticID: return "opticid"
+        default: return "lock.fill"
+        }
+    }
+
+    private var biometricName: String {
+        switch biometricType {
+        case .faceID: return "Face ID"
+        case .touchID: return "Touch ID"
+        case .opticID: return "Optic ID"
+        default: return "Biometrics"
+        }
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                Section("Security") {
+                    if canUseBiometrics {
+                        Toggle(isOn: $biometricEnabled) {
+                            Label(biometricName, systemImage: biometricIcon)
+                        }
+                    } else {
+                        Label("Biometrics not available", systemImage: "lock.slash")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
                 Section("Appearance") {
                     Picker("Theme", selection: $appTheme) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
@@ -100,6 +133,11 @@ struct ConfigView: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("Settings")
+            .task {
+                let context = LAContext()
+                canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+                biometricType = context.biometryType
+            }
         }
     }
 }

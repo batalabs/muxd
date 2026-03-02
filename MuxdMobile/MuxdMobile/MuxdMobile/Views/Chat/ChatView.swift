@@ -91,8 +91,9 @@ struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ChatViewModel
+    @StateObject private var speechRecognizer = SpeechRecognizer()
     @State private var inputText = ""
-        @State private var showRenameSheet = false
+    @State private var showRenameSheet = false
     @State private var showDeleteConfirmation = false
     @State private var isStarred = false
     @State private var sessionTitle: String
@@ -172,10 +173,25 @@ struct ChatView: View {
                             .padding(.vertical, 12)
                             .modifier(GlassInputModifier())
                             .focused($inputFocused)
-                            .disabled(viewModel.isStreaming)
+                            .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
                             .onSubmit {
                                 sendMessage()
                             }
+                            .onChange(of: speechRecognizer.transcript) { _, newValue in
+                                if !newValue.isEmpty {
+                                    inputText = newValue
+                                }
+                            }
+
+                        // Mic button
+                        if speechRecognizer.isAuthorized && !viewModel.isStreaming {
+                            Button {
+                                speechRecognizer.toggleRecording()
+                            } label: {
+                                Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
+                            }
+                            .buttonStyle(TintedGlassButtonStyle(tint: speechRecognizer.isRecording ? .red : .secondary))
+                        }
 
                         Button(action: viewModel.isStreaming ? cancelMessage : sendMessage) {
                             Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.right")
@@ -389,6 +405,15 @@ struct MessageBubbleView: View {
                             .background(isActualUserMessage ? Color.accentColor : Color(.systemGray5))
                             .foregroundColor(isActualUserMessage ? .white : .primary)
                             .cornerRadius(18)
+                            .contextMenu {
+                                Button {
+                                    UIPasteboard.general.string = message.textContent
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.success)
+                                } label: {
+                                    Label("Copy", systemImage: "doc.on.doc")
+                                }
+                            }
 
                         if !isActualUserMessage { Spacer(minLength: 20) }
                     }
@@ -478,6 +503,7 @@ func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
 struct ToolResultBlockView: View {
     let block: ContentBlock
     var count: Int = 1
+    @State private var copied = false
 
     private var hasContent: Bool {
         if block.isImageResult && block.imageData != nil {
@@ -522,6 +548,21 @@ struct ToolResultBlockView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = result
+                            copied = true
+                            let generator = UINotificationFeedbackGenerator()
+                            generator.notificationOccurred(.success)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                copied = false
+                            }
+                        } label: {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.caption2)
+                                .foregroundColor(copied ? .green : .secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Text(truncateToLines(result, maxLines: 5))
@@ -530,6 +571,7 @@ struct ToolResultBlockView: View {
                         .padding(8)
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
+                        .textSelection(.enabled)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -563,12 +605,159 @@ struct MarkdownText: View {
                 FontSize(codeSize)
             }
             .markdownBlockStyle(\.codeBlock) { configuration in
-                configuration.label
-                    .font(.system(size: codeSize, design: .monospaced))
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(6)
+                CodeBlockView(configuration: configuration, fontSize: codeSize)
             }
+    }
+}
+
+
+enum SyntaxHighlighter {
+    // Common keywords across languages
+    static let keywords = Set([
+        // Swift/Kotlin
+        "func", "let", "var", "if", "else", "for", "while", "return", "guard", "switch", "case", "default",
+        "struct", "class", "enum", "protocol", "extension", "import", "private", "public", "internal",
+        "static", "override", "final", "lazy", "weak", "unowned", "self", "super", "nil", "true", "false",
+        "try", "catch", "throw", "throws", "async", "await", "in", "where", "as", "is", "init", "deinit",
+        // JavaScript/TypeScript
+        "const", "function", "new", "this", "typeof", "instanceof", "delete", "void", "undefined",
+        "export", "from", "implements", "interface", "type", "declare", "module", "namespace",
+        // Python
+        "def", "elif", "except", "finally", "lambda", "pass", "raise", "with", "yield", "None", "True", "False",
+        "and", "or", "not", "global", "nonlocal", "assert",
+        // Go
+        "package", "go", "chan", "select", "defer", "fallthrough", "range", "map", "make",
+        // Rust
+        "fn", "impl", "trait", "pub", "mod", "use", "crate", "mut", "ref", "move", "match", "loop",
+        // General
+        "break", "continue", "do"
+    ])
+
+    static let typeKeywords = Set([
+        "String", "Int", "Bool", "Double", "Float", "Array", "Dictionary", "Set", "Optional",
+        "Any", "AnyObject", "Void", "Never", "some", "any",
+        "number", "string", "boolean", "object", "array", "null",
+        "int", "float", "bool", "str", "list", "dict", "tuple"
+    ])
+
+    static func highlight(_ code: String, language: String?, fontSize: CGFloat, isDark: Bool) -> AttributedString {
+        var result = AttributedString(code)
+        let baseFont = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+
+        // Set base attributes
+        result.font = baseFont
+        result.foregroundColor = isDark ? .white : .black
+
+        // Colors
+        let keywordColor = isDark ? UIColor.systemPink : UIColor.systemPurple
+        let stringColor = isDark ? UIColor.systemGreen : UIColor(red: 0.77, green: 0.1, blue: 0.08, alpha: 1)
+        let commentColor = UIColor.systemGray
+        let numberColor = isDark ? UIColor.systemYellow : UIColor.systemBlue
+        let typeColor = isDark ? UIColor.systemCyan : UIColor.systemTeal
+
+        // Highlight strings (double and single quoted)
+        let stringPatterns = [
+            "\"(?:[^\"\\\\]|\\\\.)*\"",  // Double quoted
+            "'(?:[^'\\\\]|\\\\.)*'",      // Single quoted
+            "`(?:[^`\\\\]|\\\\.)*`"       // Backtick (template literals)
+        ]
+        for pattern in stringPatterns {
+            highlightPattern(pattern, in: &result, code: code, color: stringColor)
+        }
+
+        // Highlight comments
+        highlightPattern("//[^\n]*", in: &result, code: code, color: commentColor)
+        highlightPattern("#[^\n]*", in: &result, code: code, color: commentColor) // Python/Shell comments
+        highlightPattern("/\\*[\\s\\S]*?\\*/", in: &result, code: code, color: commentColor) // Block comments
+
+        // Highlight numbers
+        highlightPattern("\\b\\d+\\.?\\d*\\b", in: &result, code: code, color: numberColor)
+
+        // Highlight keywords
+        for keyword in keywords {
+            highlightPattern("\\b\(keyword)\\b", in: &result, code: code, color: keywordColor)
+        }
+
+        // Highlight type keywords
+        for typeKw in typeKeywords {
+            highlightPattern("\\b\(typeKw)\\b", in: &result, code: code, color: typeColor)
+        }
+
+        return result
+    }
+
+    private static func highlightPattern(_ pattern: String, in attributedString: inout AttributedString, code: String, color: UIColor) {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return }
+        let nsRange = NSRange(code.startIndex..., in: code)
+        let matches = regex.matches(in: code, options: [], range: nsRange)
+
+        for match in matches {
+            if let swiftRange = Range(match.range, in: code) {
+                let start = AttributedString.Index(swiftRange.lowerBound, within: attributedString)
+                let end = AttributedString.Index(swiftRange.upperBound, within: attributedString)
+                if let start = start, let end = end {
+                    attributedString[start..<end].foregroundColor = Color(color)
+                }
+            }
+        }
+    }
+}
+
+struct CodeBlockView: View {
+    let configuration: CodeBlockConfiguration
+    let fontSize: CGFloat
+    @State private var copied = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var highlightedCode: AttributedString {
+        SyntaxHighlighter.highlight(
+            configuration.content,
+            language: configuration.language,
+            fontSize: fontSize,
+            isDark: colorScheme == .dark
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with language and copy button
+            HStack {
+                if let language = configuration.language {
+                    Text(language)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Button {
+                    UIPasteboard.general.string = configuration.content
+                    copied = true
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        copied = false
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            .font(.caption2)
+                        Text(copied ? "Copied" : "Copy")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(copied ? .green : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+
+            // Code content with syntax highlighting
+            Text(highlightedCode)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+        }
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
     }
 }
 
