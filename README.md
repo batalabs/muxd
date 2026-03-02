@@ -18,21 +18,21 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
 </p>
 
-> 📖 **Full documentation at [muxd.sh/docs](https://muxd.sh/docs)** — setup guides for [client](https://muxd.sh/docs/client) and [hub](https://muxd.sh/docs/hub) modes, [commands](https://muxd.sh/docs/commands), [tools](https://muxd.sh/docs/tools), and [configuration](https://muxd.sh/docs/configuration).
+> 📖 **Full documentation at [muxd.sh/docs](https://muxd.sh/docs)** -setup guides for [client](https://muxd.sh/docs/client) and [hub](https://muxd.sh/docs/hub) modes, [commands](https://muxd.sh/docs/commands), [tools](https://muxd.sh/docs/tools), and [configuration](https://muxd.sh/docs/configuration).
 
 ---
 
 ## Why muxd?
 
-Most AI coding tools treat each conversation as disposable — close the window and it's gone. muxd saves everything to a local SQLite database so you can close your terminal, reboot, come back next week, and pick up exactly where you left off.
+Most AI coding tools treat each conversation as disposable -close the window and it's gone. muxd saves everything to a local SQLite database so you can close your terminal, reboot, come back next week, and pick up exactly where you left off.
 
-- **Persistent sessions** — conversations survive restarts. Search, branch, and resume any session by project or ID.
-- **Branch and fork** — explore alternatives without losing your current thread, like git branches for conversations.
-- **Project memory** — the agent remembers your conventions, architecture decisions, and gotchas across sessions.
-- **Hub architecture** — run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
-- **Multi-channel** — same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
-- **27 built-in tools** — file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
-- **Any provider** — Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API. Switch models mid-session.
+- **Persistent sessions** -conversations survive restarts. Search, branch, and resume any session by project or ID.
+- **Branch and fork** -explore alternatives without losing your current thread, like git branches for conversations.
+- **Project memory** -the agent remembers your conventions, architecture decisions, and gotchas across sessions.
+- **Hub architecture** -run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
+- **Multi-channel** -same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
+- **27 built-in tools** -file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
+- **Any provider** -Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API. Switch models mid-session.
 
 ---
 
