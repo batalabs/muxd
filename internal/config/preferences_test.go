@@ -59,7 +59,7 @@ func TestDataDir(t *testing.T) {
 
 func TestConfigGroupNames(t *testing.T) {
 	names := ConfigGroupNames()
-	want := []string{"models", "tools", "messaging", "daemon", "theme"}
+	want := []string{"models", "tools", "daemon", "hub", "theme"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d group names, got %d", len(want), len(names))
 	}
@@ -136,8 +136,7 @@ func TestParseBoolish(t *testing.T) {
 func TestIsSensitiveKey(t *testing.T) {
 	sensitive := []string{
 		"anthropic.api_key",
-		"x.client_id", "x.client_secret", "x.access_token",
-		"x.refresh_token", "telegram.bot_token",
+		"textbelt.api_key",
 	}
 	for _, k := range sensitive {
 		if !isSensitiveKey(k) {
@@ -264,7 +263,7 @@ func TestScheduledAllowedToolsSet(t *testing.T) {
 	t.Run("empty uses defaults", func(t *testing.T) {
 		p := Preferences{}
 		got := p.ScheduledAllowedToolsSet()
-		defaults := []string{"file_read", "grep", "list_files", "git_status", "web_search", "web_fetch", "todo_read", "x_post"}
+		defaults := []string{"file_read", "grep", "list_files", "git_status", "web_search", "web_fetch", "todo_read"}
 		for _, name := range defaults {
 			if !got[name] {
 				t.Errorf("expected default tool %q to be allowed", name)
@@ -333,18 +332,6 @@ func TestMergePreferences(t *testing.T) {
 		}
 	})
 
-	t.Run("copies telegram allowed IDs", func(t *testing.T) {
-		dst := DefaultPreferences()
-		src := DefaultPreferences()
-		src.TelegramAllowedIDs = []int64{111, 222}
-
-		mergePreferences(&dst, &src)
-
-		if len(dst.TelegramAllowedIDs) != 2 {
-			t.Errorf("expected 2 telegram IDs, got %d", len(dst.TelegramAllowedIDs))
-		}
-	})
-
 	t.Run("all provider keys merge", func(t *testing.T) {
 		dst := DefaultPreferences()
 		src := DefaultPreferences()
@@ -354,16 +341,9 @@ func TestMergePreferences(t *testing.T) {
 		src.GoogleAPIKey = "google"
 		src.FireworksAPIKey = "fireworks"
 		src.BraveAPIKey = "brave"
-		src.XClientID = "xcid"
-		src.XClientSecret = "xcs"
-		src.XAccessToken = "xat"
-		src.XRefreshToken = "xrt"
-		src.XTokenExpiry = "xte"
-		src.XRedirectURL = "xru"
 		src.SchedulerAllowedTools = "bash"
-		src.ToolsDisabled = "x_post"
+		src.ToolsDisabled = "web_fetch"
 		src.OllamaURL = "http://localhost:11434"
-		src.TelegramBotToken = "tok"
 
 		mergePreferences(&dst, &src)
 
@@ -387,9 +367,6 @@ func TestMergePreferences(t *testing.T) {
 		}
 		if dst.OllamaURL != "http://localhost:11434" {
 			t.Errorf("OllamaURL = %q", dst.OllamaURL)
-		}
-		if dst.TelegramBotToken != "tok" {
-			t.Errorf("TelegramBotToken = %q", dst.TelegramBotToken)
 		}
 	})
 }
@@ -612,17 +589,6 @@ func TestExecuteConfigAction(t *testing.T) {
 		}
 	})
 
-	t.Run("messaging group", func(t *testing.T) {
-		p := DefaultPreferences()
-		result, err := ExecuteConfigAction(&p, []string{"messaging"})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !strings.Contains(result, "Messaging:") {
-			t.Error("expected 'Messaging:' in output")
-		}
-	})
-
 	t.Run("theme group", func(t *testing.T) {
 		p := DefaultPreferences()
 		result, err := ExecuteConfigAction(&p, []string{"theme"})
@@ -777,21 +743,13 @@ func TestLoadProviderAPIKey_fireworksFromPrefs(t *testing.T) {
 
 func TestGet_additionalKeys(t *testing.T) {
 	p := DefaultPreferences()
-	p.XAccessToken = "at-1234"
-	p.XRefreshToken = "rt-5678"
-	p.XTokenExpiry = "2025-12-31"
-	p.XRedirectURL = "http://localhost:8080"
-	p.ToolsDisabled = "x_post,bash"
+	p.ToolsDisabled = "web_fetch,bash"
 
 	tests := []struct {
 		key  string
 		want string
 	}{
-		{"x.access_token", "****1234"},
-		{"x.refresh_token", "****5678"},
-		{"x.token_expiry", "2025-12-31"},
-		{"x.redirect_url", "http://localhost:8080"},
-		{"tools.disabled", "x_post,bash"},
+		{"tools.disabled", "web_fetch,bash"},
 		{"nonexistent", ""},
 	}
 	for _, tt := range tests {
@@ -811,12 +769,7 @@ func TestSet_additionalKeys(t *testing.T) {
 		key   string
 		value string
 	}{
-		{"x.client_id", "cid-123"},
-		{"x.access_token", "at-val"},
-		{"x.refresh_token", "rt-val"},
-		{"x.token_expiry", "2025-12-31"},
-		{"x.redirect_url", "http://localhost:8080"},
-		{"tools.disabled", "x_post"},
+		{"tools.disabled", "web_fetch"},
 		{"scheduler.allowed_tools", "bash,file_read"},
 	}
 
@@ -826,13 +779,7 @@ func TestSet_additionalKeys(t *testing.T) {
 		}
 	}
 
-	if p.XClientID != "cid-123" {
-		t.Errorf("XClientID = %q", p.XClientID)
-	}
-	if p.XRedirectURL != "http://localhost:8080" {
-		t.Errorf("XRedirectURL = %q", p.XRedirectURL)
-	}
-	if p.ToolsDisabled != "x_post" {
+	if p.ToolsDisabled != "web_fetch" {
 		t.Errorf("ToolsDisabled = %q", p.ToolsDisabled)
 	}
 }

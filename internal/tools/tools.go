@@ -19,6 +19,9 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 )
 
+// nowFunc is overridable in tests.
+var nowFunc = time.Now
+
 // TodoList holds an in-memory per-session task list.
 type TodoList struct {
 	mu    sync.Mutex
@@ -60,19 +63,12 @@ type ToolContext struct {
 	Disabled           map[string]bool
 	ScheduledAllowed   map[string]bool
 	SpawnAgent         func(description, prompt string) (string, error)
-	ScheduleTweet      func(text string, scheduledFor time.Time, recurrence string) (string, error) // legacy
 	ScheduleTool       func(toolName string, input map[string]any, scheduledFor time.Time, recurrence string) (string, error)
 	ListScheduledJobs  func(toolName string, limit int) ([]ScheduledJobInfo, error)
 	CancelScheduledJob func(id string) error
 	UpdateScheduledJob func(id string, toolInput map[string]any, scheduledFor *time.Time, recurrence *string) error
 	BraveAPIKey        string
 	TextbeltAPIKey     string
-	XClientID          string
-	XClientSecret      string
-	XAccessToken       string
-	XRefreshToken      string
-	XTokenExpiry       string
-	SaveXOAuthTokens   func(accessToken, refreshToken, tokenExpiry string) error
 	MCP                MCPManager
 }
 
@@ -108,14 +104,6 @@ func AllTools() []ToolDef {
 		webSearchTool(),
 		webFetchTool(),
 		httpRequestTool(),
-		xPostTool(),
-		xSearchTool(),
-		xMentionsTool(),
-		xReplyTool(),
-		xScheduleTool(),
-		xScheduleListTool(),
-		xScheduleUpdateTool(),
-		xScheduleCancelTool(),
 		smsSendTool(),
 		smsStatusTool(),
 		smsScheduleTool(),
@@ -196,12 +184,6 @@ func ToolRiskTags(name string) []string {
 		return []string{"network", "write"}
 	case "web_fetch", "web_search":
 		return []string{"network"}
-	case "x_post", "x_schedule", "x_reply":
-		return []string{"network", "write"}
-	case "x_search", "x_mentions":
-		return []string{"network"}
-	case "x_schedule_update", "x_schedule_cancel":
-		return []string{"write"}
 	case "sms_send":
 		return []string{"network", "write"}
 	case "sms_schedule":
@@ -223,13 +205,6 @@ func ToolProfileDisabledSet(profile string) map[string]bool {
 		disabled["bash"] = true
 		disabled["web_fetch"] = true
 		disabled["web_search"] = true
-		disabled["x_post"] = true
-		disabled["x_search"] = true
-		disabled["x_mentions"] = true
-		disabled["x_reply"] = true
-		disabled["x_schedule"] = true
-		disabled["x_schedule_update"] = true
-		disabled["x_schedule_cancel"] = true
 		disabled["sms_send"] = true
 		disabled["sms_status"] = true
 		disabled["sms_schedule"] = true

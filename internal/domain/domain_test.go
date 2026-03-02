@@ -38,68 +38,19 @@ func TestNewUUID_unique(t *testing.T) {
 // commands.go
 // ---------------------------------------------------------------------------
 
-func TestCommandHelp_TUI(t *testing.T) {
-	cmds := CommandHelp(false)
+func TestCommandHelp(t *testing.T) {
+	cmds := CommandHelp()
+	if len(cmds) == 0 {
+		t.Fatal("expected non-empty command list")
+	}
+	// Verify known commands are present
+	names := make(map[string]bool, len(cmds))
 	for _, c := range cmds {
-		if c.TelegramOnly {
-			t.Errorf("TUI help should not include TelegramOnly command %s", c.Name)
-		}
+		names[c.Name] = true
 	}
-	// Verify TUI-only commands are present
-	found := false
-	for _, c := range cmds {
-		if c.Name == "/undo" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("TUI help should include /undo")
-	}
-}
-
-func TestCommandHelp_Telegram(t *testing.T) {
-	cmds := CommandHelp(true)
-	for _, c := range cmds {
-		if c.TUIOnly {
-			t.Errorf("Telegram help should not include TUIOnly command %s", c.Name)
-		}
-	}
-	// Verify Telegram-only commands are present
-	found := false
-	for _, c := range cmds {
-		if c.Name == "/start" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Telegram help should include /start")
-	}
-}
-
-func TestCommandHelp_commonCommandsInBoth(t *testing.T) {
-	tuiCmds := CommandHelp(false)
-	tgCmds := CommandHelp(true)
-
-	// /help should appear in both
-	for _, name := range []string{"/help", "/new", "/config"} {
-		tuiFound, tgFound := false, false
-		for _, c := range tuiCmds {
-			if c.Name == name {
-				tuiFound = true
-			}
-		}
-		for _, c := range tgCmds {
-			if c.Name == name {
-				tgFound = true
-			}
-		}
-		if !tuiFound {
-			t.Errorf("%s should be in TUI help", name)
-		}
-		if !tgFound {
-			t.Errorf("%s should be in Telegram help", name)
+	for _, want := range []string{"/help", "/new", "/config", "/undo"} {
+		if !names[want] {
+			t.Errorf("CommandHelp should include %s", want)
 		}
 	}
 }

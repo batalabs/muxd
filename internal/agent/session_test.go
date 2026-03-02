@@ -41,39 +41,6 @@ func TestService_SetBraveAPIKey(t *testing.T) {
 	}
 }
 
-func TestService_SetXOAuth(t *testing.T) {
-	var savedAccess, savedRefresh, savedExpiry string
-	saver := func(a, r, e string) error {
-		savedAccess, savedRefresh, savedExpiry = a, r, e
-		return nil
-	}
-	svc := &Service{}
-	svc.SetXOAuth("cid", "csec", "at", "rt", "exp", saver)
-
-	if svc.xClientID != "cid" {
-		t.Errorf("expected xClientID=cid, got %s", svc.xClientID)
-	}
-	if svc.xClientSecret != "csec" {
-		t.Errorf("expected xClientSecret=csec, got %s", svc.xClientSecret)
-	}
-	if svc.xAccessToken != "at" {
-		t.Errorf("expected xAccessToken=at, got %s", svc.xAccessToken)
-	}
-	if svc.xRefreshToken != "rt" {
-		t.Errorf("expected xRefreshToken=rt, got %s", svc.xRefreshToken)
-	}
-	if svc.xTokenExpiry != "exp" {
-		t.Errorf("expected xTokenExpiry=exp, got %s", svc.xTokenExpiry)
-	}
-	// Verify saver callback works
-	if err := svc.xTokenSaver("a2", "r2", "e2"); err != nil {
-		t.Fatalf("saver: %v", err)
-	}
-	if savedAccess != "a2" || savedRefresh != "r2" || savedExpiry != "e2" {
-		t.Error("saver was not called with expected values")
-	}
-}
-
 func TestService_SetDisabledTools(t *testing.T) {
 	svc := &Service{disabledTools: map[string]bool{}}
 

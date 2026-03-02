@@ -35,24 +35,22 @@ type Preferences struct {
 	GoogleAPIKey          string `json:"google_api_key,omitempty"`
 	FireworksAPIKey       string `json:"fireworks_api_key,omitempty"`
 	BraveAPIKey           string `json:"brave_api_key,omitempty"`
-	XClientID             string `json:"x_client_id,omitempty"`
-	XClientSecret         string `json:"x_client_secret,omitempty"`
-	XAccessToken          string `json:"x_access_token,omitempty"`
-	XRefreshToken         string `json:"x_refresh_token,omitempty"`
-	XTokenExpiry          string `json:"x_token_expiry,omitempty"`
-	XRedirectURL          string `json:"x_redirect_url,omitempty"`
 	TextbeltAPIKey        string `json:"textbelt_api_key,omitempty"`
 	SchedulerAllowedTools string `json:"scheduler_allowed_tools,omitempty"`
 	ToolsDisabled         string `json:"tools_disabled,omitempty"`
 	OllamaURL             string `json:"ollama_url,omitempty"`
 
-	// Telegram settings
-	TelegramBotToken   string  `json:"telegram_bot_token,omitempty"`
-	TelegramAllowedIDs []int64 `json:"telegram_allowed_ids,omitempty"`
-
 	// Daemon settings
 	DaemonBindAddress string `json:"daemon_bind_address,omitempty"`
 	DaemonAuthToken   string `json:"daemon_auth_token,omitempty"`
+
+	// Hub settings
+	HubBindAddress string `json:"hub_bind_address,omitempty"`
+	HubAuthToken   string `json:"hub_auth_token,omitempty"`
+	HubURL         string `json:"hub_url,omitempty"`
+	HubNodeToken   string `json:"hub_node_token,omitempty"`
+	HubNodeID      string `json:"hub_node_id,omitempty"`
+	HubNodeName    string `json:"hub_node_name,omitempty"`
 }
 
 // PrefEntry holds a single key-value preference entry for display.
@@ -81,15 +79,15 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "tools",
-		Keys: []string{"brave.api_key", "x.client_id", "x.client_secret", "x.redirect_url", "textbelt.api_key", "scheduler.allowed_tools"},
-	},
-	{
-		Name: "messaging",
-		Keys: []string{"telegram.bot_token", "telegram.allowed_ids"},
+		Keys: []string{"brave.api_key", "textbelt.api_key", "scheduler.allowed_tools"},
 	},
 	{
 		Name: "daemon",
 		Keys: []string{"daemon.bind_address", "daemon.auth_token"},
+	},
+	{
+		Name: "hub",
+		Keys: []string{"hub.bind_address", "hub.auth_token", "hub.url", "hub.node_token", "hub.node_id", "hub.node_name"},
 	},
 	{
 		Name: "theme",
@@ -225,24 +223,6 @@ func mergePreferences(dst, src *Preferences) {
 	if src.BraveAPIKey != "" {
 		dst.BraveAPIKey = src.BraveAPIKey
 	}
-	if src.XClientID != "" {
-		dst.XClientID = src.XClientID
-	}
-	if src.XClientSecret != "" {
-		dst.XClientSecret = src.XClientSecret
-	}
-	if src.XAccessToken != "" {
-		dst.XAccessToken = src.XAccessToken
-	}
-	if src.XRefreshToken != "" {
-		dst.XRefreshToken = src.XRefreshToken
-	}
-	if src.XTokenExpiry != "" {
-		dst.XTokenExpiry = src.XTokenExpiry
-	}
-	if src.XRedirectURL != "" {
-		dst.XRedirectURL = src.XRedirectURL
-	}
 	if src.TextbeltAPIKey != "" {
 		dst.TextbeltAPIKey = src.TextbeltAPIKey
 	}
@@ -255,17 +235,29 @@ func mergePreferences(dst, src *Preferences) {
 	if src.OllamaURL != "" {
 		dst.OllamaURL = src.OllamaURL
 	}
-	if src.TelegramBotToken != "" {
-		dst.TelegramBotToken = src.TelegramBotToken
-	}
-	if len(src.TelegramAllowedIDs) > 0 {
-		dst.TelegramAllowedIDs = src.TelegramAllowedIDs
-	}
 	if src.DaemonBindAddress != "" {
 		dst.DaemonBindAddress = src.DaemonBindAddress
 	}
 	if src.DaemonAuthToken != "" {
 		dst.DaemonAuthToken = src.DaemonAuthToken
+	}
+	if src.HubBindAddress != "" {
+		dst.HubBindAddress = src.HubBindAddress
+	}
+	if src.HubAuthToken != "" {
+		dst.HubAuthToken = src.HubAuthToken
+	}
+	if src.HubURL != "" {
+		dst.HubURL = src.HubURL
+	}
+	if src.HubNodeToken != "" {
+		dst.HubNodeToken = src.HubNodeToken
+	}
+	if src.HubNodeID != "" {
+		dst.HubNodeID = src.HubNodeID
+	}
+	if src.HubNodeName != "" {
+		dst.HubNodeName = src.HubNodeName
 	}
 	// Booleans: copy from src (they represent the user's last settings)
 	dst.FooterTokens = src.FooterTokens
@@ -363,15 +355,6 @@ func (p Preferences) entryMap() map[string]string {
 
 // All returns all preference entries as a flat list.
 func (p Preferences) All() []PrefEntry {
-	allowedStr := ""
-	if len(p.TelegramAllowedIDs) > 0 {
-		parts := make([]string, len(p.TelegramAllowedIDs))
-		for i, id := range p.TelegramAllowedIDs {
-			parts[i] = strconv.FormatInt(id, 10)
-		}
-		allowedStr = strings.Join(parts, ",")
-	}
-
 	return []PrefEntry{
 		{"footer.tokens", strconv.FormatBool(p.FooterTokens)},
 		{"footer.cost", strconv.FormatBool(p.FooterCost)},
@@ -391,17 +374,18 @@ func (p Preferences) All() []PrefEntry {
 		{"google.api_key", resolveKeyDisplay(p.GoogleAPIKey, "GOOGLE_API_KEY")},
 		{"fireworks.api_key", resolveKeyDisplay(p.FireworksAPIKey, "FIREWORKS_API_KEY")},
 		{"brave.api_key", resolveKeyDisplay(p.BraveAPIKey, "BRAVE_SEARCH_API_KEY")},
-		{"x.client_id", p.XClientID},
-		{"x.client_secret", MaskKey(p.XClientSecret)},
-		{"x.redirect_url", p.XRedirectURL},
 		{"textbelt.api_key", MaskKey(p.TextbeltAPIKey)},
 		{"scheduler.allowed_tools", p.SchedulerAllowedTools},
 		{"tools.disabled", p.ToolsDisabled},
 		{"ollama.url", p.OllamaURL},
-		{"telegram.bot_token", MaskKey(p.TelegramBotToken)},
-		{"telegram.allowed_ids", allowedStr},
 		{"daemon.bind_address", p.DaemonBindAddress},
 		{"daemon.auth_token", MaskKey(p.DaemonAuthToken)},
+		{"hub.bind_address", p.HubBindAddress},
+		{"hub.auth_token", MaskKey(p.HubAuthToken)},
+		{"hub.url", p.HubURL},
+		{"hub.node_token", MaskKey(p.HubNodeToken)},
+		{"hub.node_id", p.HubNodeID},
+		{"hub.node_name", p.HubNodeName},
 	}
 }
 
@@ -444,18 +428,6 @@ func (p Preferences) Get(key string) string {
 		return MaskKey(p.FireworksAPIKey)
 	case "brave.api_key":
 		return MaskKey(p.BraveAPIKey)
-	case "x.client_id":
-		return p.XClientID
-	case "x.client_secret":
-		return MaskKey(p.XClientSecret)
-	case "x.access_token":
-		return MaskKey(p.XAccessToken)
-	case "x.refresh_token":
-		return MaskKey(p.XRefreshToken)
-	case "x.token_expiry":
-		return p.XTokenExpiry
-	case "x.redirect_url":
-		return p.XRedirectURL
 	case "textbelt.api_key":
 		return MaskKey(p.TextbeltAPIKey)
 	case "scheduler.allowed_tools":
@@ -464,21 +436,22 @@ func (p Preferences) Get(key string) string {
 		return p.ToolsDisabled
 	case "ollama.url":
 		return p.OllamaURL
-	case "telegram.bot_token":
-		return MaskKey(p.TelegramBotToken)
-	case "telegram.allowed_ids":
-		if len(p.TelegramAllowedIDs) == 0 {
-			return ""
-		}
-		parts := make([]string, len(p.TelegramAllowedIDs))
-		for i, id := range p.TelegramAllowedIDs {
-			parts[i] = strconv.FormatInt(id, 10)
-		}
-		return strings.Join(parts, ",")
 	case "daemon.bind_address":
 		return p.DaemonBindAddress
 	case "daemon.auth_token":
 		return MaskKey(p.DaemonAuthToken)
+	case "hub.bind_address":
+		return p.HubBindAddress
+	case "hub.auth_token":
+		return MaskKey(p.HubAuthToken)
+	case "hub.url":
+		return p.HubURL
+	case "hub.node_token":
+		return MaskKey(p.HubNodeToken)
+	case "hub.node_id":
+		return p.HubNodeID
+	case "hub.node_name":
+		return p.HubNodeName
 	default:
 		return ""
 	}
@@ -544,18 +517,6 @@ func (p *Preferences) Set(key, value string) error {
 		p.FireworksAPIKey = value
 	case "brave.api_key":
 		p.BraveAPIKey = value
-	case "x.client_id":
-		p.XClientID = value
-	case "x.client_secret":
-		p.XClientSecret = value
-	case "x.access_token":
-		p.XAccessToken = value
-	case "x.refresh_token":
-		p.XRefreshToken = value
-	case "x.token_expiry":
-		p.XTokenExpiry = value
-	case "x.redirect_url":
-		p.XRedirectURL = value
 	case "textbelt.api_key":
 		p.TextbeltAPIKey = value
 	case "scheduler.allowed_tools":
@@ -564,18 +525,22 @@ func (p *Preferences) Set(key, value string) error {
 		p.ToolsDisabled = value
 	case "ollama.url":
 		p.OllamaURL = value
-	case "telegram.bot_token":
-		p.TelegramBotToken = value
-	case "telegram.allowed_ids":
-		ids, err := ParseAllowedIDs(value)
-		if err != nil {
-			return err
-		}
-		p.TelegramAllowedIDs = ids
 	case "daemon.bind_address":
 		p.DaemonBindAddress = value
 	case "daemon.auth_token":
 		p.DaemonAuthToken = value
+	case "hub.bind_address":
+		p.HubBindAddress = value
+	case "hub.auth_token":
+		p.HubAuthToken = value
+	case "hub.url":
+		p.HubURL = value
+	case "hub.node_token":
+		p.HubNodeToken = value
+	case "hub.node_id":
+		p.HubNodeID = value
+	case "hub.node_name":
+		p.HubNodeName = value
 	default:
 		return fmt.Errorf("unknown key: %s", key)
 	}
@@ -632,19 +597,18 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.GoogleAPIKey)
 	sanitize(&p.FireworksAPIKey)
 	sanitize(&p.BraveAPIKey)
-	sanitize(&p.XClientID)
-	sanitize(&p.XClientSecret)
-	sanitize(&p.XAccessToken)
-	sanitize(&p.XRefreshToken)
-	sanitize(&p.XRedirectURL)
-	sanitize(&p.XTokenExpiry)
 	sanitize(&p.TextbeltAPIKey)
 	sanitize(&p.SchedulerAllowedTools)
 	sanitize(&p.ToolsDisabled)
-	sanitize(&p.TelegramBotToken)
 	sanitize(&p.OllamaURL)
 	sanitize(&p.DaemonBindAddress)
 	sanitize(&p.DaemonAuthToken)
+	sanitize(&p.HubBindAddress)
+	sanitize(&p.HubAuthToken)
+	sanitize(&p.HubURL)
+	sanitize(&p.HubNodeToken)
+	sanitize(&p.HubNodeID)
+	sanitize(&p.HubNodeName)
 	sanitize(&p.FooterEmoji)
 	return changed
 }
@@ -778,7 +742,7 @@ func (p Preferences) ScheduledAllowedToolsSet() map[string]bool {
 	if raw == "" {
 		for _, name := range []string{
 			"file_read", "grep", "list_files", "git_status",
-			"web_search", "web_fetch", "todo_read", "x_post",
+			"web_search", "web_fetch", "todo_read",
 		} {
 			out[name] = true
 		}
@@ -834,7 +798,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	case "show":
 		return FormatConfigGroups(prefs.Grouped()), nil
 
-	case "models", "tools", "messaging", "daemon", "theme":
+	case "models", "tools", "daemon", "hub", "theme":
 		group := prefs.GroupByName(sub)
 		if group == nil {
 			return "", fmt.Errorf("unknown config group: %s", sub)
@@ -863,7 +827,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 		return "Preferences reset to defaults.", nil
 
 	default:
-		return "", fmt.Errorf("usage: /config [show|models|tools|messaging|theme|set <key> <value>|reset]")
+		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|theme|set <key> <value>|reset]")
 	}
 }
 

@@ -11,16 +11,15 @@ import (
 
 // SlashCommands lists the available slash commands.
 var SlashCommands = []string{
-	"/branch", "/clear", "/config", "/continue", "/exit", "/help",
-	"/new", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/sh", "/telegram", "/tools", "/tweet", "/undo", "/x",
+	"/branch", "/clear", "/config", "/continue", "/emoji", "/exit", "/help",
+	"/new", "/nodes", "/qr", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/sh", "/tools", "/undo",
 }
 
 // ConfigSubcommands lists the available /config subcommands.
-var ConfigSubcommands = []string{"messaging", "models", "reset", "set", "show", "theme", "tools"}
+var ConfigSubcommands = []string{"models", "reset", "set", "show", "theme", "tools"}
 var ToolSubcommands = []string{"list", "enable", "disable", "toggle", "profile"}
 var ToolProfiles = []string{"safe", "coder", "research"}
 var ScheduleSubcommands = []string{"add", "add-task", "list", "cancel"}
-var XSubcommands = []string{"auth", "status", "logout"}
 
 // ConfigKeys lists the available /config set keys.
 var ConfigKeys = []string{
@@ -28,10 +27,9 @@ var ConfigKeys = []string{
 	"footer.keybindings", "footer.session", "footer.tokens", "google.api_key",
 	"grok.api_key", "mistral.api_key", "model", "ollama.url", "openai.api_key",
 	"scheduler.allowed_tools",
-	"x.client_id", "x.client_secret", "x.access_token", "x.refresh_token", "x.token_expiry", "x.redirect_url",
-	"zai.api_key",
+	"textbelt.api_key",
 	"tools.disabled",
-	"telegram.allowed_ids", "telegram.bot_token",
+	"zai.api_key",
 }
 
 // ModelAliasNames returns the sorted list of model alias names.
@@ -163,12 +161,6 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 			}
 		}
 		return nil
-	case "/x":
-		partial := ""
-		if len(fields) >= 2 {
-			partial = strings.ToLower(fields[1])
-		}
-		return FilterByPrefix(XSubcommands, "/x ", partial)
 	}
 
 	return nil
@@ -201,16 +193,12 @@ func CommandExpectsArgs(completion string) bool {
 		return len(fields) == 1
 	case "/remember":
 		return len(fields) == 1
-	case "/tweet":
-		return len(fields) == 1
 	case "/schedule":
 		if len(fields) == 1 {
 			return true
 		}
 		sub := strings.ToLower(fields[1])
 		return (sub == "add" || sub == "add-task" || sub == "cancel") && len(fields) == 2
-	case "/x":
-		return len(fields) == 1
 	case "/tools":
 		if len(fields) == 1 {
 			return false

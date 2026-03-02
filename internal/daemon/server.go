@@ -226,21 +226,11 @@ func (s *Server) Start(port int) error {
 			allowed := map[string]bool{}
 			braveKey := ""
 			textbeltKey := ""
-			xClientID := ""
-			xClientSecret := ""
-			xAccessToken := ""
-			xRefreshToken := ""
-			xTokenExpiry := ""
 			if s.prefs != nil {
 				disabled = s.prefs.DisabledToolsSet()
 				allowed = s.prefs.ScheduledAllowedToolsSet()
 				braveKey = s.prefs.BraveAPIKey
 				textbeltKey = s.prefs.TextbeltAPIKey
-				xClientID = s.prefs.XClientID
-				xClientSecret = s.prefs.XClientSecret
-				xAccessToken = s.prefs.XAccessToken
-				xRefreshToken = s.prefs.XRefreshToken
-				xTokenExpiry = s.prefs.XTokenExpiry
 			}
 			planMode := false
 			ctx := &tools.ToolContext{
@@ -250,23 +240,7 @@ func (s *Server) Start(port int) error {
 				ScheduledAllowed: allowed,
 				BraveAPIKey:      braveKey,
 				TextbeltAPIKey:   textbeltKey,
-				XClientID:        xClientID,
-				XClientSecret:    xClientSecret,
-				XAccessToken:     xAccessToken,
-				XRefreshToken:    xRefreshToken,
-				XTokenExpiry:     xTokenExpiry,
-				SaveXOAuthTokens: func(accessToken, refreshToken, tokenExpiry string) error {
-					s.mu.Lock()
-					defer s.mu.Unlock()
-					if s.prefs == nil {
-						return fmt.Errorf("preferences not loaded")
-					}
-					s.prefs.XAccessToken = accessToken
-					s.prefs.XRefreshToken = refreshToken
-					s.prefs.XTokenExpiry = tokenExpiry
-					return config.SavePreferences(*s.prefs)
-				},
-				ScheduleTool: s.store.CreateScheduledToolJob,
+				ScheduleTool:     s.store.CreateScheduledToolJob,
 				ListScheduledJobs: func(toolName string, limit int) ([]tools.ScheduledJobInfo, error) {
 					jobs, err := s.store.ListScheduledToolJobs(limit)
 					if err != nil {
@@ -946,18 +920,6 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 			ag.SetTextbeltAPIKey(req.Value)
 		}
 	}
-	if strings.HasPrefix(req.Key, "x.") {
-		for _, ag := range s.agents {
-			ag.SetXOAuth(
-				s.prefs.XClientID,
-				s.prefs.XClientSecret,
-				s.prefs.XAccessToken,
-				s.prefs.XRefreshToken,
-				s.prefs.XTokenExpiry,
-				s.xTokenSaverFor(ag),
-			)
-		}
-	}
 	if req.Key == "tools.disabled" {
 		disabled := s.prefs.DisabledToolsSet()
 		for _, ag := range s.agents {
@@ -1049,21 +1011,6 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	return ag, nil
 }
 
-// xTokenSaverFor returns a token-save callback for the given agent.
-// On refresh, it persists to disk, updates s.prefs, and updates the
-// agent's cached tokens so subsequent loop iterations use the new values.
-func (s *Server) xTokenSaverFor(ag *agent.Service) func(string, string, string) error {
-	return func(accessToken, refreshToken, tokenExpiry string) error {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.prefs.XAccessToken = accessToken
-		s.prefs.XRefreshToken = refreshToken
-		s.prefs.XTokenExpiry = tokenExpiry
-		ag.UpdateXTokens(accessToken, refreshToken, tokenExpiry)
-		return config.SavePreferences(*s.prefs)
-	}
-}
-
 // configureAgent sets up credentials, disabled tools, MCP, git, and memory
 // on an agent. Must be called with s.mu held.
 func (s *Server) configureAgent(ag *agent.Service) {
@@ -1072,16 +1019,6 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	}
 	if s.prefs != nil && s.prefs.TextbeltAPIKey != "" {
 		ag.SetTextbeltAPIKey(s.prefs.TextbeltAPIKey)
-	}
-	if s.prefs != nil {
-		ag.SetXOAuth(
-			s.prefs.XClientID,
-			s.prefs.XClientSecret,
-			s.prefs.XAccessToken,
-			s.prefs.XRefreshToken,
-			s.prefs.XTokenExpiry,
-			s.xTokenSaverFor(ag),
-		)
 	}
 	if s.prefs != nil {
 		ag.SetDisabledTools(s.prefs.DisabledToolsSet())

@@ -91,6 +91,7 @@ type HealthInfo struct {
 	PID      int
 	Model    string
 	Provider string
+	Mode     string // "hub" when connected to a hub, empty for direct daemon
 }
 
 // Health checks if the daemon is responding.
@@ -102,7 +103,14 @@ func (c *DaemonClient) Health() error {
 // HealthCheck returns detailed health info from the daemon.
 func (c *DaemonClient) HealthCheck() (*HealthInfo, error) {
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(c.baseURL + "/api/health")
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/api/health", nil)
+	if err != nil {
+		return nil, fmt.Errorf("health check: %w", err)
+	}
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("health check: %w", err)
 	}
@@ -126,6 +134,9 @@ func (c *DaemonClient) HealthCheck() (*HealthInfo, error) {
 	}
 	if v, ok := raw["provider"].(string); ok {
 		info.Provider = v
+	}
+	if v, ok := raw["mode"].(string); ok {
+		info.Mode = v
 	}
 	return info, nil
 }
@@ -443,9 +454,14 @@ func (c *DaemonClient) BranchSession(sessionID string, atSequence int) (*domain.
 	return &sess, nil
 }
 
-// SetBaseURL overrides the base URL (useful for testing).
+// SetBaseURL overrides the base URL (useful for testing or remote connections).
 func (c *DaemonClient) SetBaseURL(url string) {
 	c.baseURL = url
+}
+
+// BaseURL returns the current base URL.
+func (c *DaemonClient) BaseURL() string {
+	return c.baseURL
 }
 
 // ---------------------------------------------------------------------------

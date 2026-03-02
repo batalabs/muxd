@@ -32,7 +32,7 @@ func TestComputeCompletions(t *testing.T) {
 		{
 			name:  "config subcommands",
 			input: "/config ",
-			want:  []string{"/config messaging", "/config models", "/config reset", "/config set", "/config show", "/config theme", "/config tools"},
+			want:  []string{"/config models", "/config reset", "/config set", "/config show", "/config theme", "/config tools"},
 		},
 		{
 			name:  "config partial subcommand",
@@ -42,7 +42,7 @@ func TestComputeCompletions(t *testing.T) {
 		{
 			name:  "config partial subcommand m",
 			input: "/config m",
-			want:  []string{"/config messaging", "/config models"},
+			want:  []string{"/config models"},
 		},
 		{
 			name:  "config set shows keys",
@@ -67,8 +67,8 @@ func TestComputeCompletions(t *testing.T) {
 		},
 		{
 			name:  "schedule add tool names",
-			input: "/schedule add x_",
-			want:  []string{"/schedule add x_mentions", "/schedule add x_post", "/schedule add x_reply", "/schedule add x_schedule", "/schedule add x_schedule_cancel", "/schedule add x_schedule_list", "/schedule add x_schedule_update", "/schedule add x_search"},
+			input: "/schedule add sms_",
+			want:  []string{"/schedule add sms_schedule", "/schedule add sms_send", "/schedule add sms_status"},
 		},
 		{
 			name:  "config set model shows model aliases",
