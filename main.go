@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -243,7 +245,8 @@ func main() {
 					hostname, _ := os.Hostname()
 					name = hostname
 				}
-				nodeID, err := hubClient.Register(name, bindAddr, port, version)
+				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
+				nodeID, err := hubClient.Register(name, regHost, port, version)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
 					return
@@ -336,7 +339,8 @@ func main() {
 					hostname, _ := os.Hostname()
 					name = hostname
 				}
-				nodeID, err := hubClient.Register(name, bindAddr, port, version)
+				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
+				nodeID, err := hubClient.Register(name, regHost, port, version)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
 					return
@@ -455,6 +459,44 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 	if err := config.SavePreferences(*prefs); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to save hub auth token: %v\n", err)
 	}
+}
+
+// resolveHubRegistrationHost determines the host address to register with the hub.
+// If bindAddr is "localhost" or "0.0.0.0" (i.e. not a specific IP), it discovers
+// the local IP that routes to the hub so the hub can proxy back to this node.
+func resolveHubRegistrationHost(bindAddr, hubURL string) string {
+	if bindAddr != "localhost" && bindAddr != "0.0.0.0" && bindAddr != "" {
+		// Already a specific IP — use it as-is.
+		return bindAddr
+	}
+
+	// Parse the hub URL to get its host.
+	parsed, err := url.Parse(hubURL)
+	if err != nil {
+		// Fall back to scanning local interfaces.
+		if ips := daemon.GetLocalIPs(); len(ips) > 0 {
+			return ips[0]
+		}
+		return bindAddr
+	}
+	hubHost := parsed.Hostname()
+	if hubHost == "" || hubHost == "localhost" || hubHost == "127.0.0.1" {
+		// Hub is on the same machine — localhost is correct.
+		return bindAddr
+	}
+
+	// UDP dial doesn't send traffic; it just lets the OS pick the source interface
+	// that routes to the hub host.
+	conn, err := net.Dial("udp4", hubHost+":4097")
+	if err != nil {
+		if ips := daemon.GetLocalIPs(); len(ips) > 0 {
+			return ips[0]
+		}
+		return bindAddr
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }
 
 // printHubInfo reads the hub lockfile and prints connection info + QR code.
