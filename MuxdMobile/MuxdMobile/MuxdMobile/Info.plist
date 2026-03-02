@@ -22,6 +22,12 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is needed to scan QR code for server connections.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to unlock and protect your sessions.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is needed for voice input.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition is used to convert your voice to text.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -45,13 +45,72 @@ struct AppGlassButtonStyle: ButtonStyle {
 @main
 struct MuxdMobileApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var biometricManager = BiometricManager()
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(biometricManager)
                 .preferredColorScheme(appTheme.colorScheme)
+                .overlay {
+                    if biometricManager.isLocked {
+                        LockScreenView()
+                            .environmentObject(biometricManager)
+                    }
+                }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                biometricManager.lockIfEnabled()
+            }
+        }
+    }
+}
+
+struct LockScreenView: View {
+    @EnvironmentObject var biometricManager: BiometricManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            (colorScheme == .dark ? Color.black : Color.white)
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Image("Logo")
+                    .resizable()
+                    .frame(width: 80, height: 80)
+                    .cornerRadius(16)
+
+                Text("muxd")
+                    .font(.system(size: 32, weight: .bold))
+
+                Text("Locked")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Button {
+                    Task {
+                        await biometricManager.authenticate()
+                    }
+                } label: {
+                    Label("Unlock with \(biometricManager.biometricTypeName)", systemImage: biometricManager.biometricIcon)
+                        .font(.headline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 20)
+            }
+        }
+        .task {
+            _ = await biometricManager.authenticate()
         }
     }
 }
