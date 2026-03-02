@@ -101,7 +101,7 @@ func (c *NodeClient) FetchMemory() (map[string]string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		// Hub doesn't support memory yet — not an error.
+		// Hub doesn't support memory yet -not an error.
 		return nil, nil
 	}
 	if resp.StatusCode != http.StatusOK {

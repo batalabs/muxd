@@ -48,8 +48,8 @@ type Preferences struct {
 	HubBindAddress string `json:"hub_bind_address,omitempty"`
 	HubAuthToken   string `json:"hub_auth_token,omitempty"`
 	HubURL         string `json:"hub_url,omitempty"`
-	HubClientToken string `json:"hub_client_token,omitempty"`
-	HubClientName  string `json:"hub_client_name,omitempty"`
+	HubNodeToken   string `json:"hub_node_token,omitempty"`
+	HubNodeName    string `json:"hub_node_name,omitempty"`
 }
 
 // PrefEntry holds a single key-value preference entry for display.
@@ -89,8 +89,8 @@ var ConfigGroupDefs = []ConfigGroupDef{
 		Keys: []string{"hub.bind_address", "hub.auth_token"},
 	},
 	{
-		Name: "client",
-		Keys: []string{"hub.url", "hub.client_token", "hub.client_name"},
+		Name: "node",
+		Keys: []string{"hub.url", "hub.node_token", "hub.node_name"},
 	},
 	{
 		Name: "theme",
@@ -131,8 +131,8 @@ func DefaultPreferences() Preferences {
 }
 
 // LoadPreferences reads preferences from ~/.config/muxd/config.json.
-// If preferences.json also exists (legacy), it merges both files — values
-// from preferences.json take priority — then saves the merged result to
+// If preferences.json also exists (legacy), it merges both files -values
+// from preferences.json take priority -then saves the merged result to
 // config.json and removes the old file.
 func LoadPreferences() Preferences {
 	dir := ConfigDir()
@@ -253,11 +253,11 @@ func mergePreferences(dst, src *Preferences) {
 	if src.HubURL != "" {
 		dst.HubURL = src.HubURL
 	}
-	if src.HubClientToken != "" {
-		dst.HubClientToken = src.HubClientToken
+	if src.HubNodeToken != "" {
+		dst.HubNodeToken = src.HubNodeToken
 	}
-	if src.HubClientName != "" {
-		dst.HubClientName = src.HubClientName
+	if src.HubNodeName != "" {
+		dst.HubNodeName = src.HubNodeName
 	}
 	// Booleans: copy from src (they represent the user's last settings)
 	dst.FooterTokens = src.FooterTokens
@@ -383,8 +383,8 @@ func (p Preferences) All() []PrefEntry {
 		{"hub.bind_address", p.HubBindAddress},
 		{"hub.auth_token", MaskKey(p.HubAuthToken)},
 		{"hub.url", p.HubURL},
-		{"hub.client_token", MaskKey(p.HubClientToken)},
-		{"hub.client_name", p.HubClientName},
+		{"hub.node_token", MaskKey(p.HubNodeToken)},
+		{"hub.node_name", p.HubNodeName},
 	}
 }
 
@@ -445,10 +445,10 @@ func (p Preferences) Get(key string) string {
 		return MaskKey(p.HubAuthToken)
 	case "hub.url":
 		return p.HubURL
-	case "hub.client_token":
-		return MaskKey(p.HubClientToken)
-	case "hub.client_name":
-		return p.HubClientName
+	case "hub.node_token":
+		return MaskKey(p.HubNodeToken)
+	case "hub.node_name":
+		return p.HubNodeName
 	default:
 		return ""
 	}
@@ -532,10 +532,10 @@ func (p *Preferences) Set(key, value string) error {
 		p.HubAuthToken = value
 	case "hub.url":
 		p.HubURL = value
-	case "hub.client_token":
-		p.HubClientToken = value
-	case "hub.client_name":
-		p.HubClientName = value
+	case "hub.node_token":
+		p.HubNodeToken = value
+	case "hub.node_name":
+		p.HubNodeName = value
 	default:
 		return fmt.Errorf("unknown key: %s", key)
 	}
@@ -544,7 +544,7 @@ func (p *Preferences) Set(key, value string) error {
 
 // SanitizeValue strips null bytes, ASCII control characters (< 32 except
 // \n and \t), and DEL (0x7F) from a string value and trims surrounding
-// whitespace. API keys and secrets should never contain control characters —
+// whitespace. API keys and secrets should never contain control characters;
 // these typically sneak in through clipboard paste artifacts.
 func SanitizeValue(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -556,7 +556,7 @@ func SanitizeValue(s string) string {
 }
 
 // isSensitiveKey returns true for config keys whose values should be sanitized
-// (API keys, secrets, tokens, client IDs — anything that may be pasted).
+// (API keys, secrets, tokens, client IDs -anything that may be pasted).
 func isSensitiveKey(key string) bool {
 	return strings.HasSuffix(key, ".api_key") ||
 		strings.HasSuffix(key, ".api_secret") ||
@@ -601,8 +601,8 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.HubBindAddress)
 	sanitize(&p.HubAuthToken)
 	sanitize(&p.HubURL)
-	sanitize(&p.HubClientToken)
-	sanitize(&p.HubClientName)
+	sanitize(&p.HubNodeToken)
+	sanitize(&p.HubNodeName)
 	sanitize(&p.FooterEmoji)
 	return changed
 }
@@ -777,7 +777,7 @@ func PreferencesFilePath() string {
 }
 
 // ---------------------------------------------------------------------------
-// Config actions — adapter-agnostic business logic
+// Config actions -adapter-agnostic business logic
 // ---------------------------------------------------------------------------
 
 // ExecuteConfigAction handles /config subcommands and returns a plain-text
@@ -792,7 +792,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	case "show":
 		return FormatConfigGroups(prefs.Grouped()), nil
 
-	case "models", "tools", "daemon", "hub", "client", "theme":
+	case "models", "tools", "daemon", "hub", "node", "theme":
 		group := prefs.GroupByName(sub)
 		if group == nil {
 			return "", fmt.Errorf("unknown config group: %s", sub)
@@ -821,7 +821,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 		return "Preferences reset to defaults.", nil
 
 	default:
-		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|client|theme|set <key> <value>|reset]")
+		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|node|theme|set <key> <value>|reset]")
 	}
 }
 

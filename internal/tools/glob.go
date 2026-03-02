@@ -13,7 +13,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// glob — recursive file pattern matching with ** support
+// glob -recursive file pattern matching with ** support
 // ---------------------------------------------------------------------------
 
 func globTool() ToolDef {
@@ -128,7 +128,7 @@ func globMatch(basePath, pattern string) ([]string, error) {
 
 		// Match the suffix pattern against the file name or relative path.
 		if suffix == "" {
-			// Pattern was just "**" — match everything.
+			// Pattern was just "**" -match everything.
 			matches = append(matches, filepath.ToSlash(path))
 			return nil
 		}

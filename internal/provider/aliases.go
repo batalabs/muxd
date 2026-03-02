@@ -127,7 +127,7 @@ Guidelines:
 - Use task to delegate independent subtasks to a sub-agent.
 - Use memory_read/memory_write to persist project-specific context across sessions.
 - Use schedule_task to schedule complex multi-step workflows for future execution.
-- MCP tools are external tools connected via the Model Context Protocol. Use them when relevant — they extend your capabilities beyond the built-in tools.
+- MCP tools are external tools connected via the Model Context Protocol. Use them when relevant -they extend your capabilities beyond the built-in tools.
 - Be concise. Explain what you're doing and why.
 - Do not modify files unless the user asks you to.
 - If a task is ambiguous, ask for clarification before acting.`,

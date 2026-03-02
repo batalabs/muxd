@@ -81,10 +81,10 @@ func TestSavePricing_noConfigDir(t *testing.T) {
 	// Force ConfigDir to return "" by unsetting override and mocking
 	// Actually this will use real home dir, so let's use a direct approach
 	// We set the override to empty and test the actual behavior
-	// SavePricing checks ConfigDir() — which on most systems returns non-empty
+	// SavePricing checks ConfigDir() -which on most systems returns non-empty
 	// So we test the error path indirectly
 	configDirOverride = ""
-	// Reset — the test is mainly for coverage of the error path
+	// Reset -the test is mainly for coverage of the error path
 }
 
 func TestLoadPricing(t *testing.T) {

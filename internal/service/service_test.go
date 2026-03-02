@@ -21,7 +21,7 @@ func TestHandleCommand_invalid(t *testing.T) {
 }
 
 func TestHandleCommand_caseInsensitive(t *testing.T) {
-	// Only test with "status" — it's read-only on all platforms.
+	// Only test with "status" -it's read-only on all platforms.
 	// Other actions (install, uninstall, start, stop) have real side effects.
 	for _, action := range []string{"STATUS", "Status", "status"} {
 		t.Run(action, func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestHandleCommand_stop_noLockfile(t *testing.T) {
 }
 
 func TestHandleCommand_status(t *testing.T) {
-	// Status is read-only on all platforms — should not error.
+	// Status is read-only on all platforms -should not error.
 	err := HandleCommand("status")
 	if err != nil {
 		t.Errorf("HandleCommand(status) = %v, want nil", err)
@@ -70,7 +70,7 @@ func TestHandleCommand_status(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Platform paths — these work on any OS (just path construction)
+// Platform paths -these work on any OS (just path construction)
 // ---------------------------------------------------------------------------
 
 func TestServiceExePath(t *testing.T) {
@@ -174,7 +174,7 @@ func TestHubLogPath(t *testing.T) {
 }
 
 func TestHandleCommand_hubActionsRecognized(t *testing.T) {
-	// status-hub and stop-hub are safe to call — they just read state / fail fast.
+	// status-hub and stop-hub are safe to call -they just read state / fail fast.
 	for _, action := range []string{"status-hub", "stop-hub"} {
 		t.Run(action, func(t *testing.T) {
 			err := HandleCommand(action)

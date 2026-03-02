@@ -14,7 +14,7 @@ Store API keys in environment variables instead of config files:
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
 export BRAVE_SEARCH_API_KEY="..."
-export TELEGRAM_BOT_TOKEN="123456:ABC-..."
+export MUXD_HUB_TOKEN="your-hub-token"
 
 muxd
 ```
@@ -24,7 +24,7 @@ muxd
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
 $env:OPENAI_API_KEY = "sk-..."
 $env:BRAVE_SEARCH_API_KEY = "..."
-$env:TELEGRAM_BOT_TOKEN = "123456:ABC-..."
+$env:MUXD_HUB_TOKEN = "your-hub-token"
 
 muxd
 ```
@@ -80,7 +80,6 @@ If you suspect a key was leaked:
 1. **Revoke immediately:**
    - Anthropic: console.anthropic.com → API keys
    - OpenAI: platform.openai.com → API keys
-   - Telegram: @BotFather → disable bot
    - Brave: asearch.brave.com → Manage API keys
 
 2. **Generate new key:**
@@ -176,38 +175,38 @@ chmod 700 ~/.local/share/muxd/
 
 ---
 
-## Telegram Bot Security
+## Hub Security
 
-### Best Practice #1: Restrict Users
-Only allow trusted users to control your bot:
+### Best Practice #1: Use a Stable Token
+The hub auth token controls access to all connected nodes. Set it explicitly to avoid accidental rotation:
 
+```bash
+# Via environment variable (recommended for services)
+MUXD_HUB_TOKEN="your-token" muxd --hub
+
+# Via CLI flag
+muxd --hub --hub-token "your-token"
+
+# Via config
+/config set hub.auth_token your-token
 ```
-/config show
-# Look for: telegram.allowed_ids
 
-/config set telegram.allowed_ids 123456789,987654321
+The token is also persisted in the hub database (`hub.db`) as a backup.
+
+### Best Practice #2: Bind Address
+By default the hub binds to `localhost`. To accept connections from other machines:
+
+```bash
+muxd --hub --hub-bind 0.0.0.0
 ```
 
-Get your Telegram user ID:
-- Send any message to @IDBot
-- It replies with your ID
+Only do this on trusted networks. The hub has no TLS - use a reverse proxy (nginx, caddy) for public exposure.
 
-### Best Practice #2: Use API Keys Wisely
-Your Telegram bot token is like an API key:
-- ❌ Don't share it
-- ❌ Don't commit it to git
-- ❌ Don't paste it in Discord/Slack
-
-If leaked:
-1. Message @BotFather
-2. Select your bot → Edit → Revoke Token
-3. Update muxd: `/config set telegram.bot_token <new-token>`
-
-### Best Practice #3: Monitor Commands
-If you enable Telegram, be aware:
-- Bot can run any shell command
-- Rate limiting prevents DOS but not abuse
-- Don't add untrusted people to allowed_ids
+### Best Practice #3: Protect the Hub Token
+The hub token grants full access to all connected nodes (sessions, files, commands):
+- Treat it like an API key
+- Don't share it in public channels
+- Rotate it if compromised: set a new token and restart all nodes
 
 ---
 
@@ -297,7 +296,7 @@ When muxd creates/edits files, it stores undo/redo checkpoints:
 ### "I Committed My Config to GitHub"
 
 **Immediate (1 hour):**
-1. Revoke all keys (API providers, Telegram)
+1. Revoke all keys (API providers, hub token)
 2. Delete the commit from git history:
    ```bash
    git filter-branch --force --index-filter \
@@ -329,7 +328,6 @@ grep -l "ANTHROPIC_API_KEY\|OPENAI_API_KEY" ~/.bash_history ~/.zsh_history
 **Recent API usage (at provider):**
 - Anthropic: console.anthropic.com → Dashboard
 - OpenAI: platform.openai.com → Usage
-- Telegram: @BotFather → Check bot stats
 
 **Session logs (muxd):**
 ```bash
@@ -341,16 +339,13 @@ ls -la ~/.local/share/muxd/
 
 ## FAQ
 
-**Q: Can muxd see my API keys if I use env vars?**  
+**Q: Can muxd see my API keys if I use env vars?**
 A: muxd can read them at startup (standard practice), but they're not stored to disk.
 
-**Q: Is my Telegram bot data encrypted?**  
-A: Telegram messages are encrypted in transit. muxd stores responses locally in plaintext.
+**Q: Can someone on the internet access my muxd daemon?**
+A: By default no - it only listens on `localhost`. If you use `--bind 0.0.0.0` or run a hub with `--hub-bind 0.0.0.0`, it's accessible on your network. Use token auth and trusted networks.
 
-**Q: Can someone on the internet access my muxd daemon?**  
-A: No. It only listens on `localhost` (127.0.0.1). Not accessible remotely.
-
-**Q: What if my computer is stolen?**  
+**Q: What if my computer is stolen?**
 A: With full disk encryption enabled: keys are safe. Without it: they can be read.
 
 **Q: Can I use muxd in a Docker container?**  
@@ -374,4 +369,4 @@ A: At minimum quarterly. More often if:
 - **OWASP Top 10:** https://owasp.org/www-project-top-ten/
 ---
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-03-02

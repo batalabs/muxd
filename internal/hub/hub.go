@@ -163,7 +163,7 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 func (h *Hub) registerNode(name, host string, port int, token, version string) (*Node, error) {
 	now := time.Now().UTC()
 
-	// Check for an existing node with the same name — replace it instead of
+	// Check for an existing node with the same name -replace it instead of
 	// creating a duplicate. This handles daemon restarts cleanly.
 	if existingID := h.findNodeByName(name); existingID != "" {
 		h.mu.Lock()
@@ -319,12 +319,12 @@ func (h *Hub) sweepOfflineNodes() {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) loadNodes() {
-	// Purge stale nodes on startup — nodes offline for over 1 hour.
+	// Purge stale nodes on startup -nodes offline for over 1 hour.
 	purgeCutoff := time.Now().UTC().Add(-1 * time.Hour)
 	h.db.Exec(`DELETE FROM nodes WHERE status = ? AND last_seen_at < ?`,
 		string(StatusOffline), purgeCutoff.Format(time.RFC3339))
 
-	// Mark all remaining nodes as offline on startup — they must re-register
+	// Mark all remaining nodes as offline on startup -they must re-register
 	// or heartbeat to prove they're alive.
 	h.db.Exec(`UPDATE nodes SET status = ?`, string(StatusOffline))
 
@@ -373,7 +373,7 @@ func (h *Hub) withAuth(next http.HandlerFunc) http.HandlerFunc {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) printConnectionQR(bindAddr string) {
-	// Determine which host to encode — use LAN IP when bound to all interfaces.
+	// Determine which host to encode -use LAN IP when bound to all interfaces.
 	host := bindAddr
 	if host == "0.0.0.0" || host == "" {
 		if ips := daemon.GetLocalIPs(); len(ips) > 0 {
@@ -433,7 +433,7 @@ func writeHubJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // ---------------------------------------------------------------------------
-// Hub lockfile — separate from daemon lockfile
+// Hub lockfile -separate from daemon lockfile
 // ---------------------------------------------------------------------------
 
 const hubLockfileName = "hub.lock"

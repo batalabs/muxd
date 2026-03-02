@@ -23,7 +23,7 @@ func (h *Hub) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hub/logs/stream", h.withAuth(h.handleLogStream))
 	mux.HandleFunc("GET /api/hub/memory", h.withAuth(h.handleGetMemory))
 	mux.HandleFunc("PUT /api/hub/memory", h.withAuth(h.handlePutMemory))
-	// Proxy routes — match any method via wildcard
+	// Proxy routes -match any method via wildcard
 	mux.HandleFunc("/api/hub/proxy/{nodeID}/{path...}", h.withAuth(h.handleProxy))
 }
 

@@ -113,7 +113,7 @@ func TestLoadMCPConfig_EnvExpansion(t *testing.T) {
 	origEnv := lookupEnvFunc
 	defer func() { lookupEnvFunc = origEnv }()
 
-	// Test with env var not set — should use default
+	// Test with env var not set -should use default
 	lookupEnvFunc = func(key string) (string, bool) { return "", false }
 	cfg, err := LoadMCPConfig(dir)
 	if err != nil {
@@ -199,7 +199,7 @@ func TestLoadMCPConfig_NoConfigFiles(t *testing.T) {
 
 func TestLoadMCPConfig_DefaultTypeIsStdio(t *testing.T) {
 	dir := t.TempDir()
-	// type omitted — should default to stdio and validate command
+	// type omitted -should default to stdio and validate command
 	data := `{"mcpServers":{"svc":{"command":"my-server"}}}`
 	if err := os.WriteFile(filepath.Join(dir, ".mcp.json"), []byte(data), 0o644); err != nil {
 		t.Fatal(err)
@@ -217,4 +217,3 @@ func TestLoadMCPConfig_DefaultTypeIsStdio(t *testing.T) {
 		t.Errorf("command = %q, want %q", cfg.MCPServers["svc"].Command, "my-server")
 	}
 }
-

@@ -151,7 +151,7 @@ func (a *Service) Resume() error {
 		return nil
 	}
 
-	// No compaction — load all messages.
+	// No compaction -load all messages.
 	msgs, err := a.store.GetMessages(a.session.ID)
 	if err != nil {
 		return fmt.Errorf("loading messages: %w", err)

@@ -15,7 +15,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// OpenAIProvider — implements Provider for the OpenAI API
+// OpenAIProvider -implements Provider for the OpenAI API
 // ---------------------------------------------------------------------------
 
 // OpenAIProvider implements Provider for the OpenAI API.

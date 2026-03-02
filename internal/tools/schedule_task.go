@@ -29,7 +29,7 @@ func ParseScheduleTime(raw string, now time.Time) (time.Time, error) {
 }
 
 // ---------------------------------------------------------------------------
-// schedule_task — schedule a full agent loop for future execution
+// schedule_task -schedule a full agent loop for future execution
 // ---------------------------------------------------------------------------
 
 func scheduleTaskTool() ToolDef {
@@ -88,7 +88,7 @@ func scheduleTaskTool() ToolDef {
 }
 
 // ---------------------------------------------------------------------------
-// schedule_list — list scheduled jobs
+// schedule_list -list scheduled jobs
 // ---------------------------------------------------------------------------
 
 func scheduleListTool() ToolDef {
@@ -146,7 +146,7 @@ func scheduleListTool() ToolDef {
 }
 
 // ---------------------------------------------------------------------------
-// schedule_cancel — cancel a scheduled job
+// schedule_cancel -cancel a scheduled job
 // ---------------------------------------------------------------------------
 
 func scheduleCancelTool() ToolDef {

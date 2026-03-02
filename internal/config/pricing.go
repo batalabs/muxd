@@ -46,7 +46,7 @@ func LoadPricing() map[string]domain.ModelPricing {
 
 	data, err := os.ReadFile(filepath.Join(dir, "pricing.json"))
 	if err != nil {
-		// First run or missing file — write defaults.
+		// First run or missing file -write defaults.
 		if err := SavePricing(defaults); err != nil {
 			fmt.Fprintf(os.Stderr, "config: save default pricing: %v\n", err)
 		}

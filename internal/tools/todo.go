@@ -46,7 +46,7 @@ func todoReadTool() ToolDef {
 
 			var b strings.Builder
 			for _, item := range items {
-				fmt.Fprintf(&b, "[%s] %s — %s", item.ID, item.Status, item.Title)
+				fmt.Fprintf(&b, "[%s] %s -%s", item.ID, item.Status, item.Title)
 				if item.Description != "" {
 					fmt.Fprintf(&b, " (%s)", item.Description)
 				}

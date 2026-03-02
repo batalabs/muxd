@@ -59,7 +59,7 @@ func TestDataDir(t *testing.T) {
 
 func TestConfigGroupNames(t *testing.T) {
 	names := ConfigGroupNames()
-	want := []string{"models", "tools", "daemon", "hub", "client", "theme"}
+	want := []string{"models", "tools", "daemon", "hub", "node", "theme"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d group names, got %d", len(want), len(names))
 	}
@@ -378,7 +378,7 @@ func TestLoadPreferences(t *testing.T) {
 		t.Cleanup(func() { configDirOverride = orig })
 
 		// Temporarily clear HOME to make ConfigDir return ""
-		// This is tricky — instead just test with a nonexistent dir
+		// This is tricky -instead just test with a nonexistent dir
 		// so ReadFile fails gracefully
 		configDirOverride = filepath.Join(t.TempDir(), "nonexistent")
 		p := LoadPreferences()
@@ -509,7 +509,7 @@ func TestSavePreferences(t *testing.T) {
 		configDirOverride = ""
 		t.Cleanup(func() { configDirOverride = orig })
 
-		// Force ConfigDir to return "" — we need HOME unset
+		// Force ConfigDir to return "" -we need HOME unset
 		// Use a simpler approach: set to empty and verify
 		err := SavePreferences(DefaultPreferences())
 		if err != nil {
@@ -528,7 +528,7 @@ func TestWarnInsecurePermissions(t *testing.T) {
 		f := filepath.Join(t.TempDir(), "secure.json")
 		os.WriteFile(f, []byte("{}"), 0o600)
 
-		// Capture stderr — just verify no panic
+		// Capture stderr -just verify no panic
 		warnInsecurePermissions(f)
 	})
 

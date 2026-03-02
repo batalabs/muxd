@@ -167,7 +167,7 @@ func isSchedulerAllowed(toolName string, ctx *ToolContext) bool {
 	if name == "" {
 		return false
 	}
-	// Agent tasks bypass the per-tool allowlist — the spawned agent
+	// Agent tasks bypass the per-tool allowlist -the spawned agent
 	// enforces its own tool policy.
 	if name == AgentTaskToolName {
 		return true

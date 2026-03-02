@@ -18,7 +18,7 @@ muxd/
 │   │   ├── config.go               # ConfigDir, DataDir, LoadAPIKey
 │   │   ├── preferences.go          # Preferences, ExecuteConfigAction
 │   │   ├── pricing.go              # LoadPricing, SavePricing
-│   │   └── telegram.go             # TelegramConfig
+│   │   └── logger.go               # Logger (file + stderr)
 │   ├── store/                      # SQLite persistence
 │   │   └── store.go                # Store, OpenStore, all CRUD methods
 │   ├── provider/                   # LLM provider abstraction
@@ -26,16 +26,28 @@ muxd/
 │   │   ├── anthropic.go            # AnthropicProvider, SSE parsing
 │   │   ├── openai.go               # OpenAIProvider
 │   │   ├── ollama.go               # OllamaProvider
+│   │   ├── fireworks.go            # FireworksProvider (OpenAI-compatible)
+│   │   ├── grok.go                 # GrokProvider (OpenAI-compatible)
+│   │   ├── mistral.go              # MistralProvider (OpenAI-compatible)
+│   │   ├── zai.go                  # ZAIProvider (OpenAI-compatible)
+│   │   ├── errors.go               # Shared error types and retry logic
 │   │   └── aliases.go              # ModelAliases, ResolveModel, ModelCost, BuildSystemPrompt
-│   ├── tools/                      # tool definitions + execution (24 tools)
-│   │   ├── tools.go                # ToolDef, ToolContext, AllTools, file/bash/grep/list_files/ask_user
+│   ├── tools/                      # tool definitions + execution (27 tools)
+│   │   ├── tools.go                # ToolDef, ToolContext, AllTools, file_read/file_write/file_edit/bash/grep/list_files/ask_user
+│   │   ├── glob.go                 # glob (file pattern matching)
+│   │   ├── git.go                  # git_status
+│   │   ├── http.go                 # http_request
+│   │   ├── log.go                  # log_read
+│   │   ├── memory.go               # memory_read, memory_write (per-project + hub shared)
+│   │   ├── image.go                # image path detection and base64 encoding
 │   │   ├── todo.go                 # todo_read, todo_write (in-memory per-session)
 │   │   ├── web.go                  # web_search (Brave API), web_fetch (HTML-to-text)
+│   │   ├── sms.go                  # sms_send, sms_status, sms_schedule (Textbelt)
 │   │   ├── patch.go                # patch_apply (unified diff parser + applier)
 │   │   ├── plan.go                 # plan_enter, plan_exit, mode-aware tool filtering
 │   │   ├── task.go                 # task (sub-agent spawner)
-│   │   ├── x.go                    # X/Twitter tools (post, search, mentions, reply, schedule)
-│   │   └── x_auth.go              # X OAuth 2.0 PKCE flow
+│   │   ├── schedule_task.go        # schedule_task, schedule_list, schedule_cancel
+│   │   └── scheduler.go            # task scheduler engine
 │   ├── agent/                      # agent loop (adapter-independent)
 │   │   ├── agent.go                # Service struct, Event types, NewService
 │   │   ├── submit.go               # Submit method (multi-turn agent loop)
@@ -46,6 +58,14 @@ muxd/
 │   │   └── repair.go               # repairDanglingToolUseMessages
 │   ├── checkpoint/                 # git undo/redo
 │   │   └── checkpoint.go           # git helpers (DetectGitRepo, StashCreate, etc.)
+│   ├── hub/                        # hub coordinator (multi-node management)
+│   │   ├── hub.go                  # Hub struct, node registry, health checker, auth
+│   │   ├── hub_client.go           # HubClient for TUI node picker
+│   │   ├── node_client.go          # NodeClient for daemon-to-hub communication
+│   │   ├── routes.go               # HTTP API routes (register, heartbeat, sessions, memory, proxy)
+│   │   ├── proxy.go                # reverse proxy to node daemons
+│   │   ├── logs.go                 # log broker (ingest + SSE streaming)
+│   │   └── store.go                # hub SQLite database (nodes, logs, memory, settings)
 │   ├── daemon/                     # HTTP server + client + lockfile
 │   │   ├── server.go               # Server, routes, handlers
 │   │   ├── client.go               # DaemonClient, SSEEvent
@@ -56,17 +76,14 @@ muxd/
 │   │   └── manager.go              # MCPManager, tool discovery, stdio transport
 │   ├── service/                    # OS service management
 │   │   └── service.go              # HandleCommand, install/uninstall/start/stop
-│   ├── tui/                        # Bubble Tea TUI
-│   │   ├── model.go                # Model, InitialModel, Update, View
-│   │   ├── program.go              # var Prog, SetProgram()
-│   │   ├── render.go               # RenderAssistantLines, markdown
-│   │   ├── styles.go               # lipgloss styles
-│   │   ├── complete.go             # autocomplete
-│   │   ├── clipboard.go            # clipboard read/write
-│   │   └── tool_picker.go          # interactive tool picker UI
-│   └── telegram/                   # Telegram bot adapter
-│       ├── adapter.go              # NewAdapter, Run, handleMessage
-│       └── format.go               # MarkdownToTelegramHTML
+│   └── tui/                        # Bubble Tea TUI
+│       ├── model.go                # Model, InitialModel, Update, View
+│       ├── program.go              # var Prog, SetProgram()
+│       ├── render.go               # RenderAssistantLines, markdown
+│       ├── styles.go               # lipgloss styles
+│       ├── complete.go             # autocomplete
+│       ├── clipboard.go            # clipboard read/write
+│       └── tool_picker.go          # interactive tool picker UI
 ├── assets/                         # images and diagrams
 ├── docs/
 ├── go.mod, go.sum, .gitignore
@@ -96,13 +113,13 @@ agent           <- imports domain, provider, tools, checkpoint
   ^
 mcp             <- imports domain, provider
   ^
+hub             <- imports config, daemon
+  ^
 daemon          <- imports domain, store, agent, config, provider
   ^
 service         <- imports config, daemon
   ^
 tui             <- imports domain, store, config, provider, daemon, checkpoint
-  ^
-telegram        <- imports domain, store, config, provider, agent, checkpoint
   ^
 main            <- imports all
 ```
@@ -129,11 +146,27 @@ Custom message types are defined at the top of `tui/model.go`:
 
 ## Client/Server Architecture
 
-muxd runs in two modes:
+muxd runs in three modes:
 
 1. **TUI mode** (default): Starts an embedded HTTP server, creates a `DaemonClient` to talk to it, and runs the Bubble Tea TUI. The TUI communicates with the agent loop exclusively through HTTP/SSE.
 
 2. **Daemon mode** (`--daemon`): Starts the HTTP server headlessly on port 4096. Multiple TUI clients can connect to the same daemon via lockfile discovery.
+
+3. **Hub mode** (`--hub`): Runs a central coordinator that tracks multiple muxd daemons (nodes) across machines. Nodes register with the hub, send heartbeats, and the hub proxies requests and aggregates sessions. The hub has its own SQLite database for nodes, logs, shared memory, and settings.
+
+### Hub Architecture
+
+```
+Mobile App / TUI (--remote) ──> Hub (:4097) ──> Node A (:4096)
+                                            ──> Node B (:4096)
+                                            ──> Node C (:4096)
+```
+
+- Nodes register via `POST /api/hub/nodes/register` with name, host, port, and auth token
+- Heartbeats every 30 seconds keep nodes online; 90s timeout marks offline, 1hr purge
+- Hub proxies API requests to nodes via `/api/hub/proxy/{nodeID}/{path}`
+- Shared memory allows nodes to sync project facts through the hub
+- Hub auth token is persisted in the hub database (survives config.json loss)
 
 ### Lockfile Discovery
 
@@ -167,7 +200,7 @@ Key details:
 
 ## Streaming
 
-muxd supports Anthropic, OpenAI, and Ollama streaming:
+muxd supports streaming from all providers (Anthropic, OpenAI, Ollama, and OpenAI-compatible providers like Fireworks, Grok, Mistral, ZAI):
 
 ### Anthropic SSE Streaming
 
@@ -241,3 +274,5 @@ The `internal/service/` package supports installing muxd as a system service:
 | Windows | Registry run key in `HKCU\...\Run` |
 
 Commands: `muxd -service install|uninstall|status|start|stop`
+
+Hub service variants: `muxd -service install-hub|uninstall-hub|status-hub|start-hub|stop-hub`

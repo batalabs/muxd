@@ -16,7 +16,7 @@ func gitStatusTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "git_status",
-			Description: "Show modified, staged, and untracked files in the git repo. Returns short-format status. Only call once per turn — do not repeat if you already have the result.",
+			Description: "Show modified, staged, and untracked files in the git repo. Returns short-format status. Only call once per turn -do not repeat if you already have the result.",
 			Properties: map[string]provider.ToolProp{
 				"path": {Type: "string", Description: "Directory path (default: cwd)"},
 			},

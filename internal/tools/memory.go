@@ -207,7 +207,7 @@ func memoryReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "memory_read",
-			Description: "Read all project memory facts that persist across sessions. Returns key-value pairs. Only call once per turn — do not repeat if you already have the result.",
+			Description: "Read all project memory facts that persist across sessions. Returns key-value pairs. Only call once per turn -do not repeat if you already have the result.",
 			Properties:  map[string]provider.ToolProp{},
 			Required:    []string{},
 		},

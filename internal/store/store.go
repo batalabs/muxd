@@ -102,7 +102,7 @@ func (s *Store) migrate() error {
 		`ALTER TABLE sessions ADD COLUMN branch_point INTEGER DEFAULT 0`,
 		`ALTER TABLE sessions ADD COLUMN tags TEXT NOT NULL DEFAULT ''`,
 	} {
-		// ALTER TABLE errors expected — column may already exist.
+		// ALTER TABLE errors expected -column may already exist.
 		if _, err := s.db.Exec(q); err != nil {
 			// expected: column already exists
 		}

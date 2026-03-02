@@ -55,7 +55,7 @@ func (a *Service) callProviderWithRetry(
 		msg := ""
 		var apiErr *provider.APIError
 		if errors.As(err, &apiErr) && apiErr.IsRetryable() {
-			// API error (429, 503, 529) — prefer server's Retry-After.
+			// API error (429, 503, 529) -prefer server's Retry-After.
 			// Don't cap the server's Retry-After; it knows when we can retry.
 			if apiErr.RetryAfterMs > 0 {
 				retryWait = time.Duration(apiErr.RetryAfterMs) * time.Millisecond
@@ -68,9 +68,9 @@ func (a *Service) callProviderWithRetry(
 			} else if apiErr.StatusCode == 503 {
 				label = "Service unavailable"
 			}
-			msg = fmt.Sprintf("%s — retrying in %s (attempt %d/%d)", label, retryWait.Round(time.Millisecond), attempt+1, maxRetries)
+			msg = fmt.Sprintf("%s -retrying in %s (attempt %d/%d)", label, retryWait.Round(time.Millisecond), attempt+1, maxRetries)
 		} else if isStreamError(err) {
-			// Stream dropped mid-response (EOF, connection reset) — retry with backoff.
+			// Stream dropped mid-response (EOF, connection reset) -retry with backoff.
 			// Flush stale pooled connections so the next attempt gets a fresh TCP/TLS
 			// connection. Go's Transport only auto-retries stale connections for
 			// idempotent methods (GET), not POST.
@@ -78,7 +78,7 @@ func (a *Service) callProviderWithRetry(
 			if retryWait > retryMaxWait {
 				retryWait = retryMaxWait
 			}
-			msg = fmt.Sprintf("Connection lost — retrying in %s (attempt %d/%d)", retryWait.Round(time.Millisecond), attempt+1, maxRetries)
+			msg = fmt.Sprintf("Connection lost -retrying in %s (attempt %d/%d)", retryWait.Round(time.Millisecond), attempt+1, maxRetries)
 		} else {
 			// Non-retryable error (auth, invalid request, etc.)
 			return nil, "", provider.Usage{}, err

@@ -119,7 +119,7 @@ func TestPersistCompaction(t *testing.T) {
 		}
 		sess := &domain.Session{ID: "sess-empty"}
 		st.addSession(sess)
-		// No messages — maxSeq will be 0
+		// No messages -maxSeq will be 0
 
 		svc := NewService("key", "model", "label", st, sess, &fakeProvider{name: "test"})
 		svc.persistCompaction("summary")
@@ -166,7 +166,7 @@ func TestCompactMessages_edgeCases(t *testing.T) {
 	})
 
 	t.Run("no assistant in head", func(t *testing.T) {
-		// All user messages — headEnd should be 1
+		// All user messages -headEnd should be 1
 		var msgs []domain.TranscriptMessage
 		for i := 0; i < CompactKeepTail+5; i++ {
 			if i%2 == 0 {
@@ -210,6 +210,6 @@ func (s *persistCompactionMock) MessageMaxSequence(sessionID string) (int, error
 	return len(s.messages[sessionID]), nil
 }
 
-// fakeProvider is defined in session_test.go — the compiler sees it package-wide.
+// fakeProvider is defined in session_test.go -the compiler sees it package-wide.
 // We need a provider for summarizationModel tests.
 var _ provider.Provider = (*fakeProvider)(nil)

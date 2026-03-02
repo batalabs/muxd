@@ -19,7 +19,7 @@ import (
 // A single shared Transport reuses connections and avoids ephemeral port
 // exhaustion on Windows. DisableCompression prevents gzip-over-chunked
 // encoding failures. TLSNextProto is left nil so Go auto-negotiates HTTP/2,
-// which uses its own binary framing instead of chunked transfer encoding —
+// which uses its own binary framing instead of chunked transfer encoding,
 // avoiding Go 1.25+'s strict bare-LF rejection (CVE-2025-22871).
 var streamHTTPClient = &http.Client{
 	Transport: &http.Transport{
@@ -52,7 +52,7 @@ var TestAPIURL string
 const AnthropicMessagesURL = "https://api.anthropic.com/v1/messages"
 
 // ---------------------------------------------------------------------------
-// StreamMessagePure — delegates to AnthropicProvider for SSE streaming
+// StreamMessagePure -delegates to AnthropicProvider for SSE streaming
 // ---------------------------------------------------------------------------
 
 // StreamMessagePure calls the Anthropic API using the default URL or
@@ -88,7 +88,7 @@ func StreamMessagePureWithURL(
 }
 
 // ---------------------------------------------------------------------------
-// AnthropicProvider — implements Provider for the Anthropic API
+// AnthropicProvider -implements Provider for the Anthropic API
 // ---------------------------------------------------------------------------
 
 // AnthropicProvider implements Provider for the Anthropic API.
@@ -589,7 +589,7 @@ type lenientReader struct {
 func (lr *lenientReader) Read(p []byte) (int, error) {
 	n, err := lr.r.Read(p)
 	if err != nil && err != io.EOF {
-		// Transport error — save it and return what we got.
+		// Transport error -save it and return what we got.
 		lr.err = err
 		if n > 0 {
 			return n, nil // deliver buffered data, suppress error for now
@@ -769,7 +769,7 @@ func parseAnthropicSSE(body io.Reader, onDelta func(string)) ([]domain.ContentBl
 	}
 
 	// Check for transport errors saved by lenientReader. If the API already
-	// sent a stop_reason, the response is complete — ignore the error.
+	// sent a stop_reason, the response is complete -ignore the error.
 	// Also ignore if we got content blocks (partial response is better than
 	// no response for the retry logic to handle).
 	var transportErr error
@@ -791,7 +791,7 @@ func parseAnthropicSSE(body io.Reader, onDelta func(string)) ([]domain.ContentBl
 
 		// Stream died before completion (no stop_reason received).
 		// Propagate error so the retry logic gets a chance, even if we
-		// received partial blocks — partial tool_use with incomplete JSON
+		// received partial blocks -partial tool_use with incomplete JSON
 		// is worse than a clean retry.
 		return nil, "", usage, containerID, fmt.Errorf("reading stream: %w", transportErr)
 	}

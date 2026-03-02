@@ -156,7 +156,7 @@ func (s *mockStore) addSession(sess *domain.Session) {
 }
 
 // ---------------------------------------------------------------------------
-// testAnthropicProvider — routes through StreamMessagePure (respects TestAPIURL)
+// testAnthropicProvider -routes through StreamMessagePure (respects TestAPIURL)
 // ---------------------------------------------------------------------------
 
 // testAnthropicProvider implements provider.Provider and delegates to

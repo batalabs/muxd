@@ -11,7 +11,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// patch_apply — unified diff parser + applier
+// patch_apply -unified diff parser + applier
 // ---------------------------------------------------------------------------
 
 func patchApplyTool() ToolDef {
@@ -127,11 +127,11 @@ func parsePatch(patch string) ([]fileDiff, error) {
 				}
 				op := l[0]
 				if op != '+' && op != '-' && op != ' ' && op != '\\' {
-					// Not a valid diff line — treat as end of hunk.
+					// Not a valid diff line -treat as end of hunk.
 					break
 				}
 				if op == '\\' {
-					// "\ No newline at end of file" — skip.
+					// "\ No newline at end of file" -skip.
 					i++
 					continue
 				}

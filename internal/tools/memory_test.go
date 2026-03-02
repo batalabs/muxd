@@ -10,7 +10,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// ProjectMemory — Load / Save
+// ProjectMemory -Load / Save
 // ---------------------------------------------------------------------------
 
 func TestProjectMemory_LoadSave(t *testing.T) {
@@ -107,7 +107,7 @@ func TestProjectMemory_LoadSave(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ProjectMemory — FormatForPrompt
+// ProjectMemory -FormatForPrompt
 // ---------------------------------------------------------------------------
 
 func TestProjectMemory_FormatForPrompt(t *testing.T) {
@@ -329,7 +329,7 @@ func TestMemoryWriteTool(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ProjectMemory — LocalKeys
+// ProjectMemory -LocalKeys
 // ---------------------------------------------------------------------------
 
 func TestProjectMemory_LocalKeys(t *testing.T) {
@@ -368,7 +368,7 @@ func TestProjectMemory_LocalKeys(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ProjectMemory — MergeHub
+// ProjectMemory -MergeHub
 // ---------------------------------------------------------------------------
 
 func TestProjectMemory_MergeHub(t *testing.T) {
@@ -380,7 +380,7 @@ func TestProjectMemory_MergeHub(t *testing.T) {
 	pm.Save(local)
 	pm.MarkLocal("local_secret")
 
-	// Merge hub facts — hub wins on shared keys, local_keys preserved
+	// Merge hub facts -hub wins on shared keys, local_keys preserved
 	hubFacts := map[string]string{"stack": "Go+SQLite", "hub_only": "yes"}
 	if err := pm.MergeHub(hubFacts); err != nil {
 		t.Fatal(err)
@@ -429,7 +429,7 @@ func TestProjectMemory_SavePreservesLocalKeys(t *testing.T) {
 	pm.Save(map[string]string{"a": "1"})
 	pm.MarkLocal("a")
 
-	// Save again with different facts — local_keys should be preserved
+	// Save again with different facts -local_keys should be preserved
 	pm.Save(map[string]string{"b": "2"})
 
 	if !pm.IsLocal("a") {
@@ -438,7 +438,7 @@ func TestProjectMemory_SavePreservesLocalKeys(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// memory_write — scope parameter
+// memory_write -scope parameter
 // ---------------------------------------------------------------------------
 
 func TestMemoryWriteTool_scope(t *testing.T) {

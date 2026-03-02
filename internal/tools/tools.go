@@ -476,7 +476,7 @@ func grepTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "grep",
-			Description: "Search file contents for a regex pattern. Returns matching lines as file:line:content. Use include to filter by extension (e.g. '*.go'). Use context_lines for surrounding context. Only call once per query — do not repeat with the same pattern.",
+			Description: "Search file contents for a regex pattern. Returns matching lines as file:line:content. Use include to filter by extension (e.g. '*.go'). Use context_lines for surrounding context. Only call once per query -do not repeat with the same pattern.",
 			Properties: map[string]provider.ToolProp{
 				"pattern":       {Type: "string", Description: "Regular expression pattern to search for"},
 				"path":          {Type: "string", Description: "Directory or file to search (default: current directory)"},

@@ -951,7 +951,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Paste detection: bracketed paste flag OR rapid keystrokes (< 5ms)
-		// indicate pasted text — treat Enter as a literal newline, not submit.
+		// indicate pasted text -treat Enter as a literal newline, not submit.
 		now := time.Now()
 		isPaste := msg.Paste || (!m.lastKeypressTime.IsZero() && now.Sub(m.lastKeypressTime) < 5*time.Millisecond)
 		m.lastKeypressTime = now
@@ -2113,7 +2113,7 @@ func disabledToolsCSV(disabled map[string]bool) string {
 }
 
 func (m *Model) applyConfigSetting(key, value string) {
-	// API key changed — update daemon and local state
+	// API key changed -update daemon and local state
 	if strings.HasSuffix(key, ".api_key") {
 		if m.Daemon != nil {
 			if _, err := m.Daemon.SetConfig(key, value); err != nil {
@@ -2125,7 +2125,7 @@ func (m *Model) applyConfigSetting(key, value string) {
 			m.APIKey = resolved
 		}
 	}
-	// Model changed — resolve provider, update runtime
+	// Model changed -resolve provider, update runtime
 	if key == "model" {
 		name := value
 		currentProvName := ""
@@ -2186,7 +2186,7 @@ func (m Model) validateConfigInput(key, value string) error {
 		if strings.TrimSpace(modelID) == "" {
 			return fmt.Errorf("model cannot be empty")
 		}
-		// Warn if the resolved provider has no API key — the user likely
+		// Warn if the resolved provider has no API key -the user likely
 		// intended a different provider but typed a bare model name.
 		if resolvedProv != "ollama" && !strings.Contains(value, "/") {
 			if _, keyErr := config.LoadProviderAPIKey(m.Prefs, resolvedProv); keyErr != nil {
@@ -2552,7 +2552,7 @@ func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
 		return m, PrintToScrollback(m.renderError("No daemon connection available."))
 	}
 
-	// /qr new — regenerate token before showing QR code
+	// /qr new -regenerate token before showing QR code
 	if len(args) > 0 && args[0] == "new" {
 		regenURL := fmt.Sprintf("http://localhost:%d/api/qrcode/regenerate", m.Daemon.Port())
 		req, err := http.NewRequest("POST", regenURL, nil)

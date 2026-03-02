@@ -13,7 +13,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// http_request — generic REST API caller
+// http_request -generic REST API caller
 // ---------------------------------------------------------------------------
 
 func httpRequestTool() ToolDef {

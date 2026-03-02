@@ -1076,7 +1076,7 @@ func (s *Server) executeScheduledAgentTask(call tools.ScheduledToolCall) (string
 	s.configureAgent(ag)
 	s.mu.Unlock()
 
-	// Disable ask_user in headless mode — no one to answer.
+	// Disable ask_user in headless mode -no one to answer.
 	ag.SetDisabledTools(map[string]bool{"ask_user": true})
 
 	var result strings.Builder

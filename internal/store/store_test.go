@@ -1164,7 +1164,7 @@ func TestStore_MarkScheduledToolJobFailed_truncatesError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Scheduled tool jobs — optional time fields populated
+// Scheduled tool jobs -optional time fields populated
 // ---------------------------------------------------------------------------
 
 func TestStore_ScheduledToolJob_optionalTimesParsed(t *testing.T) {

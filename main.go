@@ -55,7 +55,7 @@ func main() {
 	serviceCmd := flag.String("service", "", "Service management: install|uninstall|status|start|stop")
 	flag.Parse()
 
-	// Set up log file — all stderr output is also written to ~/.local/share/muxd/muxd.log.
+	// Set up log file -all stderr output is also written to ~/.local/share/muxd/muxd.log.
 	logger := config.NewLogger()
 	defer logger.Close()
 
@@ -186,7 +186,7 @@ func main() {
 
 	provider.SetOllamaBaseURL(prefs.OllamaURL)
 
-	// Resolve provider and model (no hardcoded default — user must configure)
+	// Resolve provider and model (no hardcoded default -user must configure)
 	modelLabel := *modelFlag
 	if modelLabel == "" {
 		modelLabel = prefs.Model
@@ -244,12 +244,12 @@ func main() {
 		// Node auto-registration with hub (if configured)
 		var hubClient *hub.NodeClient
 		var hubNodeID string
-		if prefs.HubURL != "" && prefs.HubClientToken != "" {
-			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, srv.AuthToken())
+		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
+			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, srv.AuthToken())
 			srv.SetPushHubMemory(hubClient.PushMemory)
 			go func() {
 				port := srv.Port() // blocks until listener is bound
-				name := prefs.HubClientName
+				name := prefs.HubNodeName
 				if name == "" {
 					hostname, _ := os.Hostname()
 					name = hostname
@@ -261,7 +261,7 @@ func main() {
 					return
 				}
 				hubNodeID = nodeID
-				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
+				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
 
 				// Fetch and merge hub memory
 				mergeHubMemory(hubClient)
@@ -320,7 +320,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "warning: daemon on port %d not responding: %v\n", lf.Port, err)
 			fmt.Fprintf(os.Stderr, "hint: kill the old process and restart muxd\n")
 		} else if info.Provider == "" || info.Model == "" {
-			fmt.Fprintf(os.Stderr, "Connected to daemon on port %d (pid %d) — no model configured\n", lf.Port, info.PID)
+			fmt.Fprintf(os.Stderr, "Connected to daemon on port %d (pid %d) -no model configured\n", lf.Port, info.PID)
 			fmt.Fprintf(os.Stderr, "hint: the daemon was started without a provider/model.\n")
 			fmt.Fprintf(os.Stderr, "      kill the process (pid %d) and restart: muxd --daemon\n", info.PID)
 		} else {
@@ -345,13 +345,13 @@ func main() {
 		dc.SetAuthToken(embeddedServer.AuthToken())
 
 		// Hub registration for embedded server (same as daemon mode)
-		if prefs.HubURL != "" && prefs.HubClientToken != "" {
-			embeddedHubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, embeddedServer.AuthToken())
+		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
+			embeddedHubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, embeddedServer.AuthToken())
 			embeddedServer.SetPushHubMemory(embeddedHubClient.PushMemory)
 			embeddedHubDone = make(chan struct{})
 			go func() {
 				port := embeddedServer.Port()
-				name := prefs.HubClientName
+				name := prefs.HubNodeName
 				if name == "" {
 					hostname, _ := os.Hostname()
 					name = hostname
@@ -363,7 +363,7 @@ func main() {
 					return
 				}
 				embeddedHubNodeID = nodeID
-				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
+				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
 
 				// Fetch and merge hub memory
 				mergeHubMemory(embeddedHubClient)
@@ -524,7 +524,7 @@ func mergeHubMemory(hubClient *hub.NodeClient) {
 // the local IP that routes to the hub so the hub can proxy back to this node.
 func resolveHubRegistrationHost(bindAddr, hubURL string) string {
 	if bindAddr != "localhost" && bindAddr != "0.0.0.0" && bindAddr != "" {
-		// Already a specific IP — use it as-is.
+		// Already a specific IP -use it as-is.
 		return bindAddr
 	}
 
@@ -539,7 +539,7 @@ func resolveHubRegistrationHost(bindAddr, hubURL string) string {
 	}
 	hubHost := parsed.Hostname()
 	if hubHost == "" || hubHost == "localhost" || hubHost == "127.0.0.1" {
-		// Hub is on the same machine — localhost is correct.
+		// Hub is on the same machine -localhost is correct.
 		return bindAddr
 	}
 
@@ -565,7 +565,7 @@ func printHubInfo() {
 		os.Exit(1)
 	}
 
-	// Determine display host — use LAN IP when bound to all interfaces
+	// Determine display host -use LAN IP when bound to all interfaces
 	host := lf.BindAddr
 	if host == "0.0.0.0" || host == "" || host == "localhost" {
 		if ips := daemon.GetLocalIPs(); len(ips) > 0 {

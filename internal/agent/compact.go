@@ -81,7 +81,7 @@ func CompactMessages(msgs []domain.TranscriptMessage) CompactResult {
 
 // compactIfNeeded checks if context exceeds the threshold and performs
 // compaction with LLM-generated summary if needed.
-// Acts as a safety net — if server-side compaction (Anthropic) triggers first,
+// Acts as a safety net -if server-side compaction (Anthropic) triggers first,
 // input tokens stay below threshold and this never activates.
 func (a *Service) compactIfNeeded(onEvent EventFunc) {
 	a.mu.Lock()
@@ -104,7 +104,7 @@ func (a *Service) compactIfNeeded(onEvent EventFunc) {
 
 	onEvent(Event{Kind: EventToolStart, ToolUseID: "internal_compact", ToolName: "compact_context"})
 
-	// Generate LLM summary of dropped messages (unlocked — makes API call).
+	// Generate LLM summary of dropped messages (unlocked -makes API call).
 	summary := a.generateCompactionSummary(result.Dropped)
 
 	// Replace the placeholder user message with the real summary.

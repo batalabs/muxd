@@ -62,7 +62,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 	a.compactIfNeeded(onEvent)
 
 	// Resolve CWD for system prompt.
-	// Getwd error is intentionally ignored — empty string is a valid fallback.
+	// Getwd error is intentionally ignored -empty string is a valid fallback.
 	cwd := a.Cwd
 	if cwd == "" {
 		cwd, _ = tools.Getwd() //nolint:errcheck // fallback to empty string

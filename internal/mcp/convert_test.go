@@ -155,7 +155,7 @@ func TestToToolSpec_NoTypeFieldFallsBackToObject(t *testing.T) {
 			"type": "object",
 			"properties": map[string]any{
 				"data": map[string]any{
-					// No "type" key — should fallback to "object"
+					// No "type" key -should fallback to "object"
 					"description": "Complex data",
 				},
 			},

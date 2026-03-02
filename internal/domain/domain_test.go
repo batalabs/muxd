@@ -78,7 +78,7 @@ func TestCommandDefs_allHaveGroup(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// types.go — TranscriptMessage
+// types.go -TranscriptMessage
 // ---------------------------------------------------------------------------
 
 func TestTranscriptMessage_HasBlocks(t *testing.T) {
@@ -154,7 +154,7 @@ func TestTranscriptMessage_TextContent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// types.go — Session
+// types.go -Session
 // ---------------------------------------------------------------------------
 
 func TestSession_TagList(t *testing.T) {
@@ -224,7 +224,7 @@ func TestSession_HasTag_emptyTags(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// types.go — ContentBlock JSON
+// types.go -ContentBlock JSON
 // ---------------------------------------------------------------------------
 
 func TestContentBlock_fields(t *testing.T) {
@@ -269,7 +269,7 @@ func TestContentBlock_imageFields(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// types.go — ModelPricing / APIModelInfo
+// types.go -ModelPricing / APIModelInfo
 // ---------------------------------------------------------------------------
 
 func TestModelPricing_fields(t *testing.T) {
@@ -290,7 +290,7 @@ func TestAPIModelInfo_fields(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// types.go — JSON round-trip
+// types.go -JSON round-trip
 // ---------------------------------------------------------------------------
 
 func TestContentBlock_jsonTags(t *testing.T) {
@@ -318,7 +318,7 @@ func TestSession_zeroValue(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// uuid.go — format details
+// uuid.go -format details
 // ---------------------------------------------------------------------------
 
 func TestNewUUID_version4Bits(t *testing.T) {

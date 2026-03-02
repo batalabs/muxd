@@ -216,7 +216,7 @@ func TestGrokProvider_FetchModels(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// Grok uses a const for base URL — we test via the common httptest pattern
+	// Grok uses a const for base URL -we test via the common httptest pattern
 	// by testing FetchModels error path instead
 	p := &GrokProvider{}
 	_, err := p.FetchModels("")

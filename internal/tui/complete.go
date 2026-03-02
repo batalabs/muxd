@@ -74,7 +74,7 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 		}
 		sub := strings.ToLower(fields[1])
 		if sub == "set" {
-			// /config set <key> — complete key names
+			// /config set <key> -complete key names
 			if len(fields) <= 3 && !(len(fields) == 3 && strings.HasSuffix(input, " ")) {
 				partial := ""
 				if len(fields) >= 3 {
@@ -82,7 +82,7 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 				}
 				return FilterByPrefix(ConfigKeys, "/config set ", partial)
 			}
-			// /config set model <value> — complete model names
+			// /config set model <value> -complete model names
 			if len(fields) >= 3 && strings.ToLower(fields[2]) == "model" {
 				partial := ""
 				if len(fields) >= 4 {

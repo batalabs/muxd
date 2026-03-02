@@ -18,7 +18,7 @@ var ollamaBaseURL = "http://localhost:11434"
 // SetOllamaBaseURL configures the Ollama endpoint.
 func SetOllamaBaseURL(raw string) {
 	// Strip control characters (null bytes, etc.) that may be pasted or
-	// read from a corrupted config file — these cause net/url parse failures.
+	// read from a corrupted config file -these cause net/url parse failures.
 	raw = strings.Map(func(r rune) rune {
 		if r < 32 && r != '\n' && r != '\t' {
 			return -1

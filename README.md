@@ -50,6 +50,62 @@ Most AI coding tools treat each conversation as disposable -close the window and
 
 ---
 
+## How it works
+
+muxd has three modes depending on how you want to use it.
+
+### Client (default)
+
+Run `muxd` and you get a terminal TUI with a built-in agent server. Everything runs locally on one machine. Sessions are stored in a local SQLite database and persist across restarts.
+
+```bash
+muxd                              # new session
+muxd -c                           # resume latest session
+muxd --model openai/gpt-4o        # use a different model
+```
+
+### Daemon
+
+Run `muxd --daemon` to start a headless agent server. This is useful for always-on machines where you want to connect from other clients (TUI, mobile app) without keeping a terminal open. Install it as a system service so it starts on boot.
+
+```bash
+muxd --daemon                     # start headless server
+muxd --daemon --bind 0.0.0.0      # accept connections from other machines
+muxd -service install             # install as system service
+```
+
+### Hub
+
+The hub is a central coordinator that manages multiple muxd daemons (called nodes) across different machines. You run one hub and point your daemons at it. The [mobile app](https://github.com/batalabs/muxd-mobile) connects to the hub and lets you pick which node to talk to.
+
+```
+Mobile App / TUI ──> Hub (:4097) ──> Node A (desktop)
+                                 ──> Node B (laptop)
+                                 ──> Node C (server)
+```
+
+**Start a hub:**
+```bash
+muxd --hub --hub-bind 0.0.0.0     # hub on all interfaces
+```
+
+**Connect a daemon to the hub:**
+```bash
+muxd --daemon --bind 0.0.0.0      # start daemon
+# then set the hub connection in config:
+# /config set hub.url http://hub-ip:4097
+# /config set hub.node_token <hub-token>
+```
+
+**Connect from a remote TUI:**
+```bash
+muxd --remote hub-ip:4097 --token <hub-token>
+```
+
+The hub tracks node health with heartbeats, proxies requests to the right node, aggregates sessions across all nodes, and shares project memory between them.
+
+---
+
 ## Install
 
 **Windows (PowerShell)**
@@ -86,8 +142,6 @@ Resume a session:
 ```bash
 muxd -c                           # resume latest session
 ```
-
-See [muxd.sh/docs](https://muxd.sh/docs) for daemon mode, hub setup, slash commands, keybindings, and CLI flags.
 
 ---
 

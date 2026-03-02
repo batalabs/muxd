@@ -13,14 +13,14 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// web_search — Brave Search API
+// web_search -Brave Search API
 // ---------------------------------------------------------------------------
 
 func webSearchTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "web_search",
-			Description: "Search the web and return results with title, URL, and snippet. Use to find current information, documentation, or answers. Only call once per query — review results before searching again with a different query.",
+			Description: "Search the web and return results with title, URL, and snippet. Use to find current information, documentation, or answers. Only call once per query -review results before searching again with a different query.",
 			Properties: map[string]provider.ToolProp{
 				"query": {Type: "string", Description: "Search query"},
 				"count": {Type: "integer", Description: "Number of results to return (default: 5, max: 20)"},
@@ -128,7 +128,7 @@ type braveSearchResponse struct {
 }
 
 // ---------------------------------------------------------------------------
-// web_fetch — HTTP GET with HTML-to-text extraction
+// web_fetch -HTTP GET with HTML-to-text extraction
 // ---------------------------------------------------------------------------
 
 func webFetchTool() ToolDef {

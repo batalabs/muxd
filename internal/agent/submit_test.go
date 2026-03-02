@@ -345,7 +345,7 @@ func TestService_Submit_autoTitle(t *testing.T) {
 		var gotTitled bool
 		var mu sync.Mutex
 
-		// Only 1 user message — should NOT trigger title
+		// Only 1 user message -should NOT trigger title
 		svc.Submit("First question", func(evt Event) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -360,7 +360,7 @@ func TestService_Submit_autoTitle(t *testing.T) {
 		}
 		mu.Unlock()
 
-		// 2nd user message — still no title
+		// 2nd user message -still no title
 		svc.Submit("Second question", func(evt Event) {
 			mu.Lock()
 			defer mu.Unlock()
