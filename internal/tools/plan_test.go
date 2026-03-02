@@ -116,10 +116,10 @@ func TestAllToolsForMode(t *testing.T) {
 
 func TestAllToolSpecsForModeWithDisabled(t *testing.T) {
 	t.Run("normal mode with disabled set", func(t *testing.T) {
-		disabled := map[string]bool{"bash": true, "x_post": true}
+		disabled := map[string]bool{"bash": true, "sms_send": true}
 		specs := AllToolSpecsForModeWithDisabled(false, disabled)
 		for _, s := range specs {
-			if s.Name == "bash" || s.Name == "x_post" {
+			if s.Name == "bash" || s.Name == "sms_send" {
 				t.Errorf("disabled tool %q should be excluded", s.Name)
 			}
 		}

@@ -721,7 +721,7 @@ func ParseBoolish(s string) (bool, error) {
 }
 
 // DisabledToolsSet parses tools.disabled into a normalized set.
-// Format: comma-separated tool names (e.g. "x_post,web_fetch").
+// Format: comma-separated tool names (e.g. "sms_send,web_fetch").
 func (p Preferences) DisabledToolsSet() map[string]bool {
 	out := map[string]bool{}
 	raw := strings.TrimSpace(p.ToolsDisabled)
@@ -791,7 +791,7 @@ func PreferencesFilePath() string {
 // ---------------------------------------------------------------------------
 
 // ExecuteConfigAction handles /config subcommands and returns a plain-text
-// response. The caller (TUI or Telegram) applies its own formatting.
+// response. The caller (TUI or hub) applies its own formatting.
 func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	sub := "show"
 	if len(args) > 0 {

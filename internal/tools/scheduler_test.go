@@ -18,15 +18,15 @@ func TestIsSchedulerAllowed(t *testing.T) {
 		want     bool
 	}{
 		{"empty tool name", "", nil, false},
-		{"nil context", "x_post", nil, false},
-		{"empty allowed set", "x_post", &ToolContext{ScheduledAllowed: map[string]bool{}}, false},
-		{"tool allowed", "x_post", &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}, true},
-		{"tool not in allowed set", "bash", &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}, false},
-		{"tool disabled", "x_post", &ToolContext{
-			ScheduledAllowed: map[string]bool{"x_post": true},
-			Disabled:         map[string]bool{"x_post": true},
+		{"nil context", "sms_send", nil, false},
+		{"empty allowed set", "sms_send", &ToolContext{ScheduledAllowed: map[string]bool{}}, false},
+		{"tool allowed", "sms_send", &ToolContext{ScheduledAllowed: map[string]bool{"sms_send": true}}, true},
+		{"tool not in allowed set", "bash", &ToolContext{ScheduledAllowed: map[string]bool{"sms_send": true}}, false},
+		{"tool disabled", "sms_send", &ToolContext{
+			ScheduledAllowed: map[string]bool{"sms_send": true},
+			Disabled:         map[string]bool{"sms_send": true},
 		}, false},
-		{"case insensitive", "X_POST", &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}, true},
+		{"case insensitive", "SMS_SEND", &ToolContext{ScheduledAllowed: map[string]bool{"sms_send": true}}, true},
 		{"agent task bypasses allowlist", AgentTaskToolName, nil, true},
 		{"agent task bypasses allowlist with empty context", AgentTaskToolName, &ToolContext{}, true},
 		{"agent task bypasses even with empty allowed set", AgentTaskToolName, &ToolContext{ScheduledAllowed: map[string]bool{}}, true},
@@ -151,12 +151,12 @@ func TestToolCallScheduler_RunOnce(t *testing.T) {
 	t.Run("runs allowed job successfully", func(t *testing.T) {
 		st := &fakeSchedulerStore{
 			dueJobs: []ScheduledToolCall{
-				{ID: "a", ToolName: "x_post", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "once"},
+				{ID: "a", ToolName: "sms_send", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "once"},
 			},
 		}
 		s := NewToolCallScheduler(st, time.Minute, func() *ToolContext {
 			return &ToolContext{
-				ScheduledAllowed: map[string]bool{"x_post": true},
+				ScheduledAllowed: map[string]bool{"sms_send": true},
 				Disabled:         map[string]bool{},
 			}
 		}, func(call ScheduledToolCall, ctx *ToolContext) (string, bool, error) {
@@ -178,7 +178,7 @@ func TestToolCallScheduler_RunOnce(t *testing.T) {
 		}
 		s := NewToolCallScheduler(st, time.Minute, func() *ToolContext {
 			return &ToolContext{
-				ScheduledAllowed: map[string]bool{"x_post": true},
+				ScheduledAllowed: map[string]bool{"sms_send": true},
 			}
 		}, func(call ScheduledToolCall, ctx *ToolContext) (string, bool, error) {
 			return "should-not-run", false, nil
@@ -194,11 +194,11 @@ func TestToolCallScheduler_RunOnce(t *testing.T) {
 	t.Run("marks failure on executor error", func(t *testing.T) {
 		st := &fakeSchedulerStore{
 			dueJobs: []ScheduledToolCall{
-				{ID: "c", ToolName: "x_post", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "once"},
+				{ID: "c", ToolName: "sms_send", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "once"},
 			},
 		}
 		s := NewToolCallScheduler(st, time.Minute, func() *ToolContext {
-			return &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}
+			return &ToolContext{ScheduledAllowed: map[string]bool{"sms_send": true}}
 		}, func(call ScheduledToolCall, ctx *ToolContext) (string, bool, error) {
 			return "", false, errors.New("boom")
 		})
@@ -213,11 +213,11 @@ func TestToolCallScheduler_RunOnce(t *testing.T) {
 	t.Run("reschedules recurring on success", func(t *testing.T) {
 		st := &fakeSchedulerStore{
 			dueJobs: []ScheduledToolCall{
-				{ID: "d", ToolName: "x_post", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "daily"},
+				{ID: "d", ToolName: "sms_send", ToolInput: map[string]any{"text": "hello"}, ScheduledFor: time.Now().Add(-time.Minute), Recurrence: "daily"},
 			},
 		}
 		s := NewToolCallScheduler(st, time.Minute, func() *ToolContext {
-			return &ToolContext{ScheduledAllowed: map[string]bool{"x_post": true}}
+			return &ToolContext{ScheduledAllowed: map[string]bool{"sms_send": true}}
 		}, func(call ScheduledToolCall, ctx *ToolContext) (string, bool, error) {
 			return "ok", false, nil
 		})

@@ -102,7 +102,7 @@ type ScheduledToolJobStore interface {
 // ---------------------------------------------------------------------------
 
 // Service encapsulates the agent conversation loop independent of any
-// UI framework. Adapters (TUI, Telegram, future HTTP) call Submit() to drive
+// UI framework. Adapters (TUI, hub, future HTTP) call Submit() to drive
 // the loop and receive progress via the callback.
 type Service struct {
 	mu sync.Mutex

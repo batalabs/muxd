@@ -109,7 +109,6 @@ Tools available (%d):
   Interaction: ask_user
   Task Mgmt:   todo_read, todo_write
   Web:         web_search (Brave), web_fetch
-  X/Twitter:   x_post, x_search, x_mentions, x_reply, x_schedule, x_schedule_list, x_schedule_update, x_schedule_cancel
   Multi-Edit:  patch_apply
   Plan Mode:   plan_enter, plan_exit
   Sub-Agent:   task
