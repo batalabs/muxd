@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>An open-source AI coding agent that lives in your terminal.</b><br>
-  <sub>Multiplex conversations across terminal, Telegram, and web. Branch, resume, and search your AI history like git.</sub>
+  <sub>Multiplex conversations across terminal, hub, and web. Branch, resume, and search your AI history like git.</sub>
 </p>
 
 <p align="center">
@@ -18,6 +18,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
 </p>
 
+> 📖 **New to muxd?** Read the full documentation at **[muxd.sh/docs](https://muxd.sh/docs)** — includes setup guides for [client](https://muxd.sh/docs/client) and [hub](https://muxd.sh/docs/hub) modes, command reference, and configuration.
+
 ---
 
 ## Why muxd?
@@ -27,7 +29,7 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 - **Persistent sessions**: every conversation is saved to a local SQLite database. Close your terminal, reboot, come back next week, your context is still there.
 - **Project memory**: persist project-specific facts across sessions. The agent remembers your conventions, architecture decisions, and gotchas.
 - **Branch and fork**: explore alternative approaches without losing your current thread, just like git branches.
-- **Multi-channel**: talk to the same agent from your terminal, Telegram, mobile app, or a headless daemon. Conversations sync across all of them.
+- **Multi-channel**: talk to the same agent from your terminal, hub, mobile app, or a headless daemon. Conversations sync across all of them.
 - **Provider-agnostic**: switch between 9 providers with a single command.
 
 ---
@@ -42,14 +44,13 @@ Most AI coding tools lock you into one conversation at a time and forget everyth
 
 ## Features
 
-### 33 Built-in Tools
+### 25 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
 | **File ops** | `file_read`, `file_write`, `file_edit`, `list_files`, `patch_apply` |
 | **Code search** | `grep`, `glob`, `bash`, `git_status` |
 | **Web & HTTP** | `web_search`, `web_fetch`, `http_request` |
-| **X / Twitter** | `x_post`, `x_search`, `x_mentions`, `x_reply`, `x_schedule` + management |
 | **SMS** | `sms_send`, `sms_status`, `sms_schedule` |
 | **Workflow** | `todo_read`, `todo_write`, `ask_user`, `plan_enter`, `plan_exit`, `task` |
 | **Memory** | `memory_read`, `memory_write` |
@@ -136,6 +137,10 @@ muxd -c <session-id>              # resume specific session
 muxd -model claude-opus           # use a different model
 muxd --daemon                     # headless daemon mode
 muxd --daemon -bind 0.0.0.0       # daemon accessible from LAN / mobile
+muxd --hub                        # start hub coordinator
+muxd --hub --hub-bind 0.0.0.0     # hub on all interfaces
+muxd --remote host:4097 --token x # connect to hub
+muxd --hub-info                   # show hub connection details
 ```
 
 ---
@@ -159,7 +164,6 @@ muxd --daemon -bind 0.0.0.0       # daemon accessible from LAN / mobile
 | `/tools enable/disable <tool>` | Toggle individual tools |
 | `/schedule add <tool>` | Schedule a tool to run later |
 | `/schedule add-task <time> <prompt>` | Schedule a multi-step agent task |
-| `/tweet <text>` | Post to X/Twitter |
 | `/emoji` | Pick a footer emoji |
 | `/qr` | Show QR code for mobile app connection |
 | `/sh` | Drop into the muxd interactive shell |
@@ -198,7 +202,12 @@ muxd --daemon -bind 0.0.0.0       # daemon accessible from LAN / mobile
 | `-daemon` | `false` | Run in daemon mode (no TUI) |
 | `-bind` | `localhost` | Network interface to bind (`localhost`, `0.0.0.0`, or specific IP) |
 | `-version` | | Print version and exit |
-| `-service` | | Service management: `install` \| `uninstall` \| `status` \| `start` \| `stop` |
+| `-service` | | Service management: `install` \| `uninstall` \| `status` \| `start` \| `stop` \| `install-hub` \| `uninstall-hub` \| `start-hub` \| `stop-hub` \| `status-hub` |
+| `--hub` | `false` | Run as hub coordinator |
+| `--hub-bind` | `localhost` | Hub bind address |
+| `--hub-info` | | Print hub connection info and exit |
+| `--remote` | | Connect to remote hub (`host:port`) |
+| `--token` | | Auth token for remote connection |
 
 </details>
 
@@ -206,7 +215,7 @@ muxd --daemon -bind 0.0.0.0       # daemon accessible from LAN / mobile
 
 ## Architecture
 
-muxd uses a client/server architecture. The TUI connects to an agent loop via HTTP/SSE, so the same agent can serve terminal, Telegram, and web clients simultaneously.
+muxd uses a client/server architecture. The TUI connects to an agent loop via HTTP/SSE, so the same agent can serve terminal, hub, and web clients simultaneously.
 
 <p align="center">
   <img src="assets/architecture.png" alt="Architecture" width="600">
