@@ -384,29 +384,6 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 }
 
-func TestExtractTweetID(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		wantID string
-	}{
-		{"valid format", "Posted tweet 12345\nMore info", "12345"},
-		{"case insensitive", "posted Tweet 67890", "67890"},
-		{"empty input", "", ""},
-		{"no match", "Something else entirely", ""},
-		{"only one word", "hello", ""},
-		{"two words no match", "hello world", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractTweetID(tt.input)
-			if got != tt.wantID {
-				t.Errorf("extractTweetID(%q) = %q, want %q", tt.input, got, tt.wantID)
-			}
-		})
-	}
-}
-
 func TestGenerateAuthToken(t *testing.T) {
 	token := generateAuthToken()
 	if len(token) != 64 { // 32 bytes * 2 hex chars

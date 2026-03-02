@@ -289,6 +289,13 @@ func (a *Service) SetMemory(m *tools.ProjectMemory) {
 	a.memory = m
 }
 
+// SetPushHubMemory sets the callback for pushing shared facts to the hub.
+func (a *Service) SetPushHubMemory(fn func(facts map[string]string) error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.pushHubMemory = fn
+}
+
 // SetDisabledTools replaces the user-disabled tools set.
 func (a *Service) SetDisabledTools(disabled map[string]bool) {
 	a.mu.Lock()

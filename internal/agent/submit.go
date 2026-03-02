@@ -17,6 +17,19 @@ import (
 // The caller should wrap this in a goroutine. Events are delivered via onEvent.
 // Submit blocks until the turn is complete or cancelled.
 func (a *Service) Submit(userText string, onEvent EventFunc) {
+	userMsg := domain.TranscriptMessage{Role: "user", Content: userText}
+	a.submitMessage(userMsg, onEvent)
+}
+
+// SubmitBlocks sends a user message with structured content blocks (e.g. images + text).
+func (a *Service) SubmitBlocks(blocks []domain.ContentBlock, onEvent EventFunc) {
+	userMsg := domain.TranscriptMessage{Role: "user", Blocks: blocks}
+	userMsg.Content = userMsg.TextContent()
+	a.submitMessage(userMsg, onEvent)
+}
+
+// submitMessage is the shared implementation for Submit and SubmitBlocks.
+func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventFunc) {
 	a.mu.Lock()
 	if a.running {
 		a.mu.Unlock()
@@ -35,13 +48,12 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 	}()
 
 	// 1. Append user message and persist
-	userMsg := domain.TranscriptMessage{Role: "user", Content: userText}
 	a.mu.Lock()
 	a.messages = append(a.messages, userMsg)
 	a.mu.Unlock()
 
 	if a.store != nil && a.session != nil {
-		if err := a.store.AppendMessage(a.session.ID, "user", userText, 0); err != nil {
+		if err := a.store.AppendMessage(a.session.ID, "user", userMsg.Content, 0); err != nil {
 			fmt.Fprintf(os.Stderr, "agent: persist user message: %v\n", err)
 		}
 	}
@@ -59,7 +71,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 	// 3. Agent loop
 	for {
 		// Build ToolContext each iteration so hot-reloaded config
-		// (e.g. /x auth completing mid-loop) is picked up.
+		// (e.g. config changes mid-loop) is picked up.
 		a.mu.Lock()
 		if a.cancelled {
 			a.mu.Unlock()
@@ -84,6 +96,7 @@ func (a *Service) Submit(userText string, onEvent EventFunc) {
 			Memory:         a.memory,
 			PlanMode:       &a.planMode,
 			Disabled:       disabled,
+			PushHubMemory:  a.pushHubMemory,
 			BraveAPIKey:    a.braveAPIKey,
 			TextbeltAPIKey: a.textbeltAPIKey,
 			MCP:            mcpMgr,

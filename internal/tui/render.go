@@ -843,7 +843,22 @@ func FormatMessageForScrollback(msg domain.TranscriptMessage, width int) string 
 
 	switch msg.Role {
 	case "user":
-		wrapped := WrapWords(msg.Content, contentWidth-2)
+		// Build display text, inserting image placeholders for image blocks.
+		displayText := msg.Content
+		if msg.HasBlocks() {
+			var parts []string
+			for _, blk := range msg.Blocks {
+				switch blk.Type {
+				case "image":
+					size := len(blk.Base64Data) * 3 / 4
+					parts = append(parts, fmt.Sprintf("[image: %s (%s)]", blk.ImagePath, formatBytes(size)))
+				case "text":
+					parts = append(parts, blk.Text)
+				}
+			}
+			displayText = strings.Join(parts, "\n")
+		}
+		wrapped := WrapWords(displayText, contentWidth-2)
 		if len(wrapped) == 0 {
 			return UserIconStyle.Render("\u25cf ")
 		}
@@ -884,5 +899,17 @@ func FormatMessageForScrollback(msg domain.TranscriptMessage, width int) string 
 			b.WriteString(WelcomeStyle.Render(line))
 		}
 		return b.String()
+	}
+}
+
+// formatBytes formats a byte count into a human-readable string.
+func formatBytes(b int) string {
+	switch {
+	case b >= 1024*1024:
+		return fmt.Sprintf("%.1f MB", float64(b)/(1024*1024))
+	case b >= 1024:
+		return fmt.Sprintf("%.0f KB", float64(b)/1024)
+	default:
+		return fmt.Sprintf("%d B", b)
 	}
 }

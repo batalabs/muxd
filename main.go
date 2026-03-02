@@ -25,6 +25,7 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 	"github.com/batalabs/muxd/internal/service"
 	"github.com/batalabs/muxd/internal/store"
+	"github.com/batalabs/muxd/internal/tools"
 	"github.com/batalabs/muxd/internal/tui"
 )
 
@@ -238,6 +239,7 @@ func main() {
 		var hubNodeID string
 		if prefs.HubURL != "" && prefs.HubClientToken != "" {
 			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, srv.AuthToken())
+			srv.SetPushHubMemory(hubClient.PushMemory)
 			go func() {
 				port := srv.Port() // blocks until listener is bound
 				name := prefs.HubClientName
@@ -253,6 +255,9 @@ func main() {
 				}
 				hubNodeID = nodeID
 				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
+
+				// Fetch and merge hub memory
+				mergeHubMemory(hubClient)
 
 				// Start heartbeat loop
 				ticker := time.NewTicker(30 * time.Second)
@@ -295,6 +300,9 @@ func main() {
 	// TUI mode: check for existing daemon
 	var dc *daemon.DaemonClient
 	var embeddedServer *daemon.Server
+	var embeddedHubClient *hub.NodeClient
+	var embeddedHubNodeID string
+	var embeddedHubDone chan struct{}
 
 	lf, lfErr := daemon.ReadLockfile()
 	if lfErr == nil && !daemon.IsLockfileStale(lf) {
@@ -331,7 +339,9 @@ func main() {
 
 		// Hub registration for embedded server (same as daemon mode)
 		if prefs.HubURL != "" && prefs.HubClientToken != "" {
-			hubClient := hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, embeddedServer.AuthToken())
+			embeddedHubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, embeddedServer.AuthToken())
+			embeddedServer.SetPushHubMemory(embeddedHubClient.PushMemory)
+			embeddedHubDone = make(chan struct{})
 			go func() {
 				port := embeddedServer.Port()
 				name := prefs.HubClientName
@@ -340,18 +350,27 @@ func main() {
 					name = hostname
 				}
 				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
-				nodeID, err := hubClient.Register(name, regHost, port, version)
+				nodeID, err := embeddedHubClient.Register(name, regHost, port, version)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
 					return
 				}
+				embeddedHubNodeID = nodeID
 				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
+
+				// Fetch and merge hub memory
+				mergeHubMemory(embeddedHubClient)
 
 				ticker := time.NewTicker(30 * time.Second)
 				defer ticker.Stop()
-				for range ticker.C {
-					if err := hubClient.Heartbeat(nodeID); err != nil {
-						fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+				for {
+					select {
+					case <-ticker.C:
+						if err := embeddedHubClient.Heartbeat(nodeID); err != nil {
+							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+						}
+					case <-embeddedHubDone:
+						return
 					}
 				}
 			}()
@@ -415,6 +434,15 @@ func main() {
 
 	// Cleanup embedded server
 	if embeddedServer != nil {
+		// Deregister from hub before shutting down
+		if embeddedHubClient != nil && embeddedHubNodeID != "" {
+			if err := embeddedHubClient.Deregister(embeddedHubNodeID); err != nil {
+				fmt.Fprintf(os.Stderr, "hub: deregister failed: %v\n", err)
+			}
+		}
+		if embeddedHubDone != nil {
+			close(embeddedHubDone)
+		}
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer shutdownCancel()
 		if err := embeddedServer.Shutdown(shutdownCtx); err != nil {
@@ -459,6 +487,29 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 	if err := config.SavePreferences(*prefs); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to save hub auth token: %v\n", err)
 	}
+}
+
+// mergeHubMemory fetches shared memory facts from the hub and merges them into
+// the local project memory. Called once after successful hub registration.
+func mergeHubMemory(hubClient *hub.NodeClient) {
+	hubFacts, err := hubClient.FetchMemory()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "hub: fetch memory failed: %v\n", err)
+		return
+	}
+	if len(hubFacts) == 0 {
+		return
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	mem := tools.NewProjectMemory(cwd)
+	if err := mem.MergeHub(hubFacts); err != nil {
+		fmt.Fprintf(os.Stderr, "hub: merge memory failed: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "hub: merged %d memory facts\n", len(hubFacts))
 }
 
 // resolveHubRegistrationHost determines the host address to register with the hub.

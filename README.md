@@ -31,7 +31,7 @@ Most AI coding tools treat each conversation as disposable — close the window 
 - **Project memory** — the agent remembers your conventions, architecture decisions, and gotchas across sessions.
 - **Hub architecture** — run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
 - **Multi-channel** — same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
-- **25 built-in tools** — file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
+- **27 built-in tools** — file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
 - **Any provider** — Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API. Switch models mid-session.
 
 ---
@@ -43,9 +43,9 @@ Most AI coding tools treat each conversation as disposable — close the window 
 </p>
 
 <p align="center">
-  <img src="assets/mobile-clients.png" alt="muxd mobile - node picker" height="400">
+  <img src="assets/mobile-clients.png" alt="muxd mobile - node picker" height="550">
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/mobile-chat.png" alt="muxd mobile - chat" height="400">
+  <img src="assets/mobile-chat.png" alt="muxd mobile - chat" height="550">
 </p>
 
 ---

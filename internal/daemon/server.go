@@ -55,6 +55,7 @@ type Server struct {
 	detectGitRepo DetectGitRepoFunc
 	mcpManager    *mcp.Manager
 	logger        *config.Logger
+	pushHubMemory func(facts map[string]string) error
 }
 
 // NewServer creates a new daemon server.
@@ -130,6 +131,11 @@ func (s *Server) SetQuiet(quiet bool) {
 // SetLogger sets the logger for the daemon server.
 func (s *Server) SetLogger(l *config.Logger) {
 	s.logger = l
+}
+
+// SetPushHubMemory sets the callback for pushing shared memory facts to the hub.
+func (s *Server) SetPushHubMemory(fn func(facts map[string]string) error) {
+	s.pushHubMemory = fn
 }
 
 // logf writes a timestamped log line if a logger is configured.
@@ -341,60 +347,19 @@ func (d daemonScheduledToolStore) DueScheduledToolCalls(now time.Time, limit int
 			Recurrence:   it.Recurrence,
 		})
 	}
-
-	// Compatibility path: also execute legacy scheduled tweets.
-	tweets, err := d.st.DueScheduledTweets(now, limit)
-	if err == nil {
-		for _, tw := range tweets {
-			out = append(out, tools.ScheduledToolCall{
-				ID:       tw.ID,
-				Source:   "legacy_tweet",
-				ToolName: "x_post",
-				ToolInput: map[string]any{
-					"text": tw.Text,
-				},
-				ScheduledFor: tw.ScheduledFor,
-				Recurrence:   tw.Recurrence,
-			})
-		}
-	}
 	return out, nil
 }
 
 func (d daemonScheduledToolStore) MarkScheduledToolCallSucceeded(call tools.ScheduledToolCall, result string, completedAt time.Time) error {
-	if call.Source == "legacy_tweet" {
-		tweetID := extractTweetID(result)
-		// legacy schema stores tweet_id; parse when available from tool output.
-		return d.st.MarkScheduledTweetPosted(call.ID, tweetID, completedAt)
-	}
 	return d.st.MarkScheduledToolJobSucceeded(call.ID, result, completedAt)
 }
 
 func (d daemonScheduledToolStore) MarkScheduledToolCallFailed(call tools.ScheduledToolCall, errText, result string, attemptedAt time.Time) error {
-	if call.Source == "legacy_tweet" {
-		return d.st.MarkScheduledTweetFailed(call.ID, errText, attemptedAt)
-	}
 	return d.st.MarkScheduledToolJobFailed(call.ID, errText, result, attemptedAt)
 }
 
 func (d daemonScheduledToolStore) RescheduleScheduledToolCall(call tools.ScheduledToolCall, next time.Time) error {
-	if call.Source == "legacy_tweet" {
-		return d.st.RescheduleRecurringTweet(call.ID, next)
-	}
 	return d.st.RescheduleScheduledToolJob(call.ID, next)
-}
-
-func extractTweetID(result string) string {
-	lines := strings.Split(strings.TrimSpace(result), "\n")
-	if len(lines) == 0 {
-		return ""
-	}
-	parts := strings.Fields(lines[0])
-	// Expected: "Posted tweet <id>"
-	if len(parts) >= 3 && strings.EqualFold(parts[0], "posted") && strings.EqualFold(parts[1], "tweet") {
-		return parts[2]
-	}
-	return ""
 }
 
 // Port returns the actual listening port. Blocks until Start() has bound the
@@ -617,13 +582,18 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("id")
 
 	var req struct {
-		Text string `json:"text"`
+		Text   string `json:"text"`
+		Images []struct {
+			Path      string `json:"path"`
+			MediaType string `json:"media_type"`
+			Data      string `json:"data"`
+		} `json:"images,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
-	if strings.TrimSpace(req.Text) == "" {
+	if strings.TrimSpace(req.Text) == "" && len(req.Images) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty text"})
 		return
 	}
@@ -653,8 +623,8 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, flusher, event, data)
 	}
 
-	s.logf("submit session=%s len=%d", sessionID, len(req.Text))
-	ag.Submit(req.Text, func(evt agent.Event) {
+	s.logf("submit session=%s len=%d images=%d", sessionID, len(req.Text), len(req.Images))
+	onEvent := func(evt agent.Event) {
 		switch evt.Kind {
 		case agent.EventDelta:
 			sendSSE("delta", map[string]string{"text": evt.DeltaText})
@@ -724,7 +694,25 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 				"model": evt.ModelUsed,
 			})
 		}
-	})
+	}
+
+	if len(req.Images) > 0 {
+		var blocks []domain.ContentBlock
+		for _, img := range req.Images {
+			blocks = append(blocks, domain.ContentBlock{
+				Type:       "image",
+				MediaType:  img.MediaType,
+				Base64Data: img.Data,
+				ImagePath:  img.Path,
+			})
+		}
+		if strings.TrimSpace(req.Text) != "" {
+			blocks = append(blocks, domain.ContentBlock{Type: "text", Text: strings.TrimSpace(req.Text)})
+		}
+		ag.SubmitBlocks(blocks, onEvent)
+	} else {
+		ag.Submit(req.Text, onEvent)
+	}
 }
 
 func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
@@ -1050,6 +1038,11 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	cwd, _ := tools.Getwd()
 	if cwd != "" {
 		ag.SetMemory(tools.NewProjectMemory(cwd))
+	}
+
+	// Wire hub memory push if configured
+	if s.pushHubMemory != nil {
+		ag.SetPushHubMemory(s.pushHubMemory)
 	}
 }
 

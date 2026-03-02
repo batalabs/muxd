@@ -192,14 +192,22 @@ func newBlockMessage(role string, blocks []anthropicContentBlock) anthropicMessa
 }
 
 type anthropicContentBlock struct {
-	Type      string          `json:"type"`
-	Text      string          `json:"text,omitempty"`
-	ID        string          `json:"id,omitempty"`
-	Name      string          `json:"name,omitempty"`
-	Input     *map[string]any `json:"input,omitempty"`
-	ToolUseID string          `json:"tool_use_id,omitempty"`
-	Content   *string         `json:"content,omitempty"`
-	IsError   *bool           `json:"is_error,omitempty"`
+	Type      string                `json:"type"`
+	Text      string                `json:"text,omitempty"`
+	ID        string                `json:"id,omitempty"`
+	Name      string                `json:"name,omitempty"`
+	Input     *map[string]any       `json:"input,omitempty"`
+	ToolUseID string                `json:"tool_use_id,omitempty"`
+	Content   *string               `json:"content,omitempty"`
+	IsError   *bool                 `json:"is_error,omitempty"`
+	Source    *anthropicImageSource `json:"source,omitempty"`
+}
+
+// anthropicImageSource is the source object for image content blocks.
+type anthropicImageSource struct {
+	Type      string `json:"type"`       // "base64"
+	MediaType string `json:"media_type"` // "image/png", "image/jpeg", etc.
+	Data      string `json:"data"`       // base64-encoded bytes
 }
 
 // anthropicCacheControl marks a block for ephemeral prompt caching.
@@ -608,6 +616,15 @@ func buildAnthropicMessages(history []domain.TranscriptMessage) []anthropicMessa
 				switch b.Type {
 				case "text":
 					apiBlocks = append(apiBlocks, anthropicContentBlock{Type: "text", Text: b.Text})
+				case "image":
+					apiBlocks = append(apiBlocks, anthropicContentBlock{
+						Type: "image",
+						Source: &anthropicImageSource{
+							Type:      "base64",
+							MediaType: b.MediaType,
+							Data:      b.Base64Data,
+						},
+					})
 				case "compaction":
 					content := b.Text
 					apiBlocks = append(apiBlocks, anthropicContentBlock{Type: "compaction", Content: &content})

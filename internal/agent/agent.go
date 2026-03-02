@@ -161,6 +161,9 @@ type Service struct {
 
 	// memory is the per-project persistent fact store.
 	memory *tools.ProjectMemory
+
+	// pushHubMemory is called to push shared facts to the hub.
+	pushHubMemory func(facts map[string]string) error
 }
 
 // NewService creates a new Service for the given session.

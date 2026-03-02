@@ -233,10 +233,21 @@ func (c *DaemonClient) GetMessages(sessionID string) ([]domain.TranscriptMessage
 	return msgs, nil
 }
 
+// SubmitImage is an image attachment for the submit API.
+type SubmitImage struct {
+	Path      string `json:"path"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"` // base64
+}
+
 // Submit sends a user message and streams SSE events back via the callback.
 // This call blocks until the turn is complete.
-func (c *DaemonClient) Submit(sessionID, text string, onEvent func(SSEEvent)) error {
-	body, _ := json.Marshal(map[string]string{"text": text})
+func (c *DaemonClient) Submit(sessionID, text string, images []SubmitImage, onEvent func(SSEEvent)) error {
+	payload := map[string]any{"text": text}
+	if len(images) > 0 {
+		payload["images"] = images
+	}
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest("POST", c.baseURL+"/api/sessions/"+sessionID+"/submit", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)

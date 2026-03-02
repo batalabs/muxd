@@ -139,7 +139,6 @@ func TestParseOpenAISSE_emptyStream(t *testing.T) {
 	}
 }
 
-
 func TestBuildOpenAIMessages(t *testing.T) {
 	t.Run("system message", func(t *testing.T) {
 		msgs := buildOpenAIMessages(nil, "You are helpful.")
@@ -353,7 +352,6 @@ func TestZAIProvider_StreamMessage_success(t *testing.T) {
 	}
 }
 
-
 func TestConvertOpenAIProp(t *testing.T) {
 	prop := ToolProp{
 		Type:        "array",
@@ -369,3 +367,43 @@ func TestConvertOpenAIProp(t *testing.T) {
 	}
 }
 
+func TestBuildOpenAIMessages_ImageBlock(t *testing.T) {
+	msgs := []domain.TranscriptMessage{
+		{
+			Role: "user",
+			Blocks: []domain.ContentBlock{
+				{Type: "image", MediaType: "image/png", Base64Data: "aWNvbg==", ImagePath: "test.png"},
+				{Type: "text", Text: "describe this"},
+			},
+		},
+	}
+	result := buildOpenAIMessages(msgs, "")
+	if len(result) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(result))
+	}
+	if result[0].Role != "user" {
+		t.Fatalf("expected user role, got %s", result[0].Role)
+	}
+
+	var parts []map[string]any
+	if err := json.Unmarshal(result[0].Content, &parts); err != nil {
+		t.Fatalf("unmarshal content: %v", err)
+	}
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 parts, got %d", len(parts))
+	}
+	if parts[0]["type"] != "image_url" {
+		t.Errorf("expected image_url part, got %v", parts[0]["type"])
+	}
+	imgURL := parts[0]["image_url"].(map[string]any)
+	url := imgURL["url"].(string)
+	if !strings.HasPrefix(url, "data:image/png;base64,") {
+		t.Errorf("expected data URI prefix, got %s", url[:40])
+	}
+	if parts[1]["type"] != "text" {
+		t.Errorf("expected text part, got %v", parts[1]["type"])
+	}
+	if parts[1]["text"] != "describe this" {
+		t.Errorf("expected 'describe this', got %v", parts[1]["text"])
+	}
+}

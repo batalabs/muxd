@@ -130,25 +130,7 @@ func (s *Store) migrate() error {
 		return err
 	}
 
-	// Scheduled tweets queue.
-	if _, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS scheduled_tweets (
-			id TEXT PRIMARY KEY,
-			text TEXT NOT NULL,
-			scheduled_for TEXT NOT NULL,
-			recurrence TEXT NOT NULL DEFAULT 'once',
-			status TEXT NOT NULL DEFAULT 'pending',
-			tweet_id TEXT NOT NULL DEFAULT '',
-			error_text TEXT NOT NULL DEFAULT '',
-			last_attempt_at TEXT,
-			posted_at TEXT,
-			created_at TEXT NOT NULL DEFAULT (datetime('now'))
-		);
-	`); err != nil {
-		return err
-	}
-
-	// Generic scheduled tool-call jobs.
+	// Scheduled tool-call jobs.
 	if _, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS scheduled_tool_jobs (
 			id TEXT PRIMARY KEY,
@@ -174,7 +156,6 @@ func (s *Store) migrate() error {
 		CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, sequence);
 		CREATE INDEX IF NOT EXISTS idx_compactions_session ON compactions(session_id);
-		CREATE INDEX IF NOT EXISTS idx_scheduled_tweets_due ON scheduled_tweets(status, scheduled_for);
 		CREATE INDEX IF NOT EXISTS idx_scheduled_tool_jobs_due ON scheduled_tool_jobs(status, scheduled_for);
 	`)
 	return err
@@ -474,7 +455,7 @@ func (s *Store) MessageMaxSequence(sessionID string) (int, error) {
 }
 
 // ---------------------------------------------------------------------------
-// Scheduled tweets
+// Scheduled tool jobs
 // ---------------------------------------------------------------------------
 
 // ScheduledToolJob is a queued tool call for deferred execution.
@@ -646,153 +627,6 @@ func (s *Store) RescheduleScheduledToolJob(id string, next time.Time) error {
 		next.UTC().Format(time.RFC3339), id,
 	)
 	return err
-}
-
-// ScheduledTweet is a queued tweet for deferred posting.
-type ScheduledTweet struct {
-	ID            string
-	Text          string
-	ScheduledFor  time.Time
-	Recurrence    string
-	Status        string
-	TweetID       string
-	ErrorText     string
-	LastAttemptAt *time.Time
-	PostedAt      *time.Time
-	CreatedAt     time.Time
-}
-
-// CreateScheduledTweet enqueues a tweet for future posting.
-func (s *Store) CreateScheduledTweet(text string, scheduledFor time.Time, recurrence string) (string, error) {
-	if recurrence == "" {
-		recurrence = "once"
-	}
-	id := domain.NewUUID()
-	_, err := s.db.Exec(
-		`INSERT INTO scheduled_tweets (id, text, scheduled_for, recurrence, status)
-		 VALUES (?, ?, ?, ?, 'pending')`,
-		id, text, scheduledFor.UTC().Format(time.RFC3339), recurrence,
-	)
-	if err != nil {
-		return "", err
-	}
-	return id, nil
-}
-
-// ListScheduledTweets returns scheduled tweets ordered by schedule time.
-func (s *Store) ListScheduledTweets(limit int) ([]ScheduledTweet, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	rows, err := s.db.Query(
-		`SELECT id, text, scheduled_for, recurrence, status, tweet_id, error_text, COALESCE(last_attempt_at, ''), COALESCE(posted_at, ''), created_at
-		 FROM scheduled_tweets
-		 ORDER BY scheduled_for ASC
-		 LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanScheduledTweets(rows)
-}
-
-// DueScheduledTweets returns pending jobs whose schedule is due.
-func (s *Store) DueScheduledTweets(now time.Time, limit int) ([]ScheduledTweet, error) {
-	if limit <= 0 {
-		limit = 20
-	}
-	rows, err := s.db.Query(
-		`SELECT id, text, scheduled_for, recurrence, status, tweet_id, error_text, COALESCE(last_attempt_at, ''), COALESCE(posted_at, ''), created_at
-		 FROM scheduled_tweets
-		 WHERE status = 'pending' AND scheduled_for <= ?
-		 ORDER BY scheduled_for ASC
-		 LIMIT ?`,
-		now.UTC().Format(time.RFC3339), limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanScheduledTweets(rows)
-}
-
-// CancelScheduledTweet marks a scheduled tweet as cancelled.
-func (s *Store) CancelScheduledTweet(id string) error {
-	_, err := s.db.Exec(
-		`UPDATE scheduled_tweets
-		 SET status = 'cancelled'
-		 WHERE id = ? AND status IN ('pending', 'failed')`,
-		id,
-	)
-	return err
-}
-
-// MarkScheduledTweetPosted marks a queue entry as posted.
-func (s *Store) MarkScheduledTweetPosted(id, tweetID string, postedAt time.Time) error {
-	_, err := s.db.Exec(
-		`UPDATE scheduled_tweets
-		 SET status = 'posted', tweet_id = ?, error_text = '', last_attempt_at = ?, posted_at = ?
-		 WHERE id = ?`,
-		tweetID, postedAt.UTC().Format(time.RFC3339), postedAt.UTC().Format(time.RFC3339), id,
-	)
-	return err
-}
-
-// MarkScheduledTweetFailed records a failed post attempt.
-func (s *Store) MarkScheduledTweetFailed(id, errorText string, attemptedAt time.Time) error {
-	_, err := s.db.Exec(
-		`UPDATE scheduled_tweets
-		 SET status = 'failed', error_text = ?, last_attempt_at = ?
-		 WHERE id = ?`,
-		errorText, attemptedAt.UTC().Format(time.RFC3339), id,
-	)
-	return err
-}
-
-// RescheduleRecurringTweet updates a recurring entry for the next run.
-func (s *Store) RescheduleRecurringTweet(id string, next time.Time) error {
-	_, err := s.db.Exec(
-		`UPDATE scheduled_tweets
-		 SET status = 'pending', scheduled_for = ?, tweet_id = '', error_text = '', posted_at = NULL
-		 WHERE id = ?`,
-		next.UTC().Format(time.RFC3339), id,
-	)
-	return err
-}
-
-func scanScheduledTweets(rows *sql.Rows) ([]ScheduledTweet, error) {
-	var out []ScheduledTweet
-	for rows.Next() {
-		var item ScheduledTweet
-		var scheduledForStr, lastAttemptStr, postedAtStr, createdAtStr string
-		if err := rows.Scan(
-			&item.ID,
-			&item.Text,
-			&scheduledForStr,
-			&item.Recurrence,
-			&item.Status,
-			&item.TweetID,
-			&item.ErrorText,
-			&lastAttemptStr,
-			&postedAtStr,
-			&createdAtStr,
-		); err != nil {
-			return nil, err
-		}
-		if t, err := parseAnyTime(scheduledForStr); err == nil {
-			item.ScheduledFor = t
-		}
-		if t, err := parseAnyTime(createdAtStr); err == nil {
-			item.CreatedAt = t
-		}
-		if t, ok := parseOptionalTime(lastAttemptStr); ok {
-			item.LastAttemptAt = &t
-		}
-		if t, ok := parseOptionalTime(postedAtStr); ok {
-			item.PostedAt = &t
-		}
-		out = append(out, item)
-	}
-	return out, rows.Err()
 }
 
 func scanScheduledToolJobs(rows *sql.Rows) ([]ScheduledToolJob, error) {

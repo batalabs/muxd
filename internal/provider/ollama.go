@@ -298,21 +298,28 @@ func buildOllamaMessages(history []domain.TranscriptMessage, system string) []ma
 				msgs = append(msgs, msg)
 			}
 
-			// Preserve any regular user text in block-form messages.
+			// Preserve any regular user text and images in block-form messages.
 			var userTextParts []string
+			var images []string
 			for _, blk := range m.Blocks {
 				switch blk.Type {
 				case "text":
 					if strings.TrimSpace(blk.Text) != "" {
 						userTextParts = append(userTextParts, blk.Text)
 					}
+				case "image":
+					images = append(images, blk.Base64Data)
 				}
 			}
-			if len(userTextParts) > 0 {
-				msgs = append(msgs, map[string]any{
+			if len(userTextParts) > 0 || len(images) > 0 {
+				msg := map[string]any{
 					"role":    "user",
 					"content": strings.Join(userTextParts, "\n"),
-				})
+				}
+				if len(images) > 0 {
+					msg["images"] = images
+				}
+				msgs = append(msgs, msg)
 			}
 			continue
 		}

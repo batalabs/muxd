@@ -21,6 +21,8 @@ func (h *Hub) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hub/sessions", h.withAuth(h.handleAggregatedSessions))
 	mux.HandleFunc("POST /api/hub/logs", h.withAuth(h.handleIngestLog))
 	mux.HandleFunc("GET /api/hub/logs/stream", h.withAuth(h.handleLogStream))
+	mux.HandleFunc("GET /api/hub/memory", h.withAuth(h.handleGetMemory))
+	mux.HandleFunc("PUT /api/hub/memory", h.withAuth(h.handlePutMemory))
 	// Proxy routes — match any method via wildcard
 	mux.HandleFunc("/api/hub/proxy/{nodeID}/{path...}", h.withAuth(h.handleProxy))
 }
@@ -258,4 +260,51 @@ func generateLogID() string {
 		return ""
 	}
 	return hex.EncodeToString(b[:])
+}
+
+// ---------------------------------------------------------------------------
+// Shared memory
+// ---------------------------------------------------------------------------
+
+func (h *Hub) handleGetMemory(w http.ResponseWriter, _ *http.Request) {
+	rows, err := h.db.Query(`SELECT key, value FROM memory ORDER BY key`)
+	if err != nil {
+		writeHubJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	facts := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			continue
+		}
+		facts[k] = v
+	}
+	writeHubJSON(w, http.StatusOK, facts)
+}
+
+func (h *Hub) handlePutMemory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Facts map[string]string `json:"facts"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeHubJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	if len(req.Facts) == 0 {
+		writeHubJSON(w, http.StatusBadRequest, map[string]string{"error": "facts is required"})
+		return
+	}
+
+	for k, v := range req.Facts {
+		if v == "" {
+			h.db.Exec(`DELETE FROM memory WHERE key = ?`, k)
+		} else {
+			h.db.Exec(`INSERT INTO memory (key, value, updated_at) VALUES (?, ?, datetime('now'))
+				ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, k, v)
+		}
+	}
+	writeHubJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

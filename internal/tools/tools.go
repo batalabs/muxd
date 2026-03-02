@@ -67,6 +67,7 @@ type ToolContext struct {
 	ListScheduledJobs  func(toolName string, limit int) ([]ScheduledJobInfo, error)
 	CancelScheduledJob func(id string) error
 	UpdateScheduledJob func(id string, toolInput map[string]any, scheduledFor *time.Time, recurrence *string) error
+	PushHubMemory      func(facts map[string]string) error
 	BraveAPIKey        string
 	TextbeltAPIKey     string
 	MCP                MCPManager
@@ -116,6 +117,8 @@ func AllTools() []ToolDef {
 		memoryReadTool(),
 		memoryWriteTool(),
 		scheduleTaskTool(),
+		scheduleListTool(),
+		scheduleCancelTool(),
 	}
 }
 

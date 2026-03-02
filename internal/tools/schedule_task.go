@@ -45,6 +45,10 @@ func scheduleTaskTool() ToolDef {
 			Required: []string{"prompt", "time"},
 		},
 		Execute: func(input map[string]any, ctx *ToolContext) (string, error) {
+			if ctx == nil || ctx.ScheduleTool == nil {
+				return "", fmt.Errorf("scheduler not available")
+			}
+
 			prompt, _ := input["prompt"].(string)
 			if strings.TrimSpace(prompt) == "" {
 				return "", fmt.Errorf("prompt is required")
@@ -71,10 +75,6 @@ func scheduleTaskTool() ToolDef {
 				}
 			}
 
-			if ctx == nil || ctx.ScheduleTool == nil {
-				return "", fmt.Errorf("scheduler not available")
-			}
-
 			toolInput := map[string]any{"prompt": prompt}
 			id, err := ctx.ScheduleTool(AgentTaskToolName, toolInput, scheduledFor, recurrence)
 			if err != nil {
@@ -83,6 +83,97 @@ func scheduleTaskTool() ToolDef {
 
 			return fmt.Sprintf("Scheduled agent task %s for %s (%s):\n%s",
 				id, scheduledFor.Local().Format("2006-01-02 15:04"), recurrence, prompt), nil
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// schedule_list — list scheduled jobs
+// ---------------------------------------------------------------------------
+
+func scheduleListTool() ToolDef {
+	return ToolDef{
+		Spec: provider.ToolSpec{
+			Name:        "schedule_list",
+			Description: "List scheduled jobs. Returns pending, completed, and failed jobs with their IDs, tool names, scheduled times, and recurrence. Use to check what is scheduled before creating new tasks.",
+			Properties: map[string]provider.ToolProp{
+				"limit": {Type: "integer", Description: "Maximum number of jobs to return (default: 50)"},
+			},
+			Required: []string{},
+		},
+		Execute: func(input map[string]any, ctx *ToolContext) (string, error) {
+			if ctx == nil || ctx.ListScheduledJobs == nil {
+				return "", fmt.Errorf("scheduler not available")
+			}
+
+			limit := 50
+			if v, ok := input["limit"].(float64); ok && v > 0 {
+				limit = int(v)
+			}
+
+			jobs, err := ctx.ListScheduledJobs("", limit)
+			if err != nil {
+				return "", fmt.Errorf("listing scheduled jobs: %w", err)
+			}
+
+			if len(jobs) == 0 {
+				return "No scheduled jobs.", nil
+			}
+
+			var b strings.Builder
+			fmt.Fprintf(&b, "%d scheduled job(s):\n\n", len(jobs))
+			for _, j := range jobs {
+				toolName := j.ToolName
+				if toolName == AgentTaskToolName {
+					toolName = "agent_task"
+				}
+				fmt.Fprintf(&b, "ID:         %s\n", j.ID)
+				fmt.Fprintf(&b, "Tool:       %s\n", toolName)
+				fmt.Fprintf(&b, "Scheduled:  %s\n", j.ScheduledFor.Local().Format("2006-01-02 15:04"))
+				fmt.Fprintf(&b, "Recurrence: %s\n", j.Recurrence)
+				fmt.Fprintf(&b, "Status:     %s\n", j.Status)
+				if prompt, ok := j.ToolInput["prompt"].(string); ok && prompt != "" {
+					if len(prompt) > 100 {
+						prompt = prompt[:100] + "..."
+					}
+					fmt.Fprintf(&b, "Prompt:     %s\n", prompt)
+				}
+				b.WriteString("\n")
+			}
+			return strings.TrimRight(b.String(), "\n"), nil
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// schedule_cancel — cancel a scheduled job
+// ---------------------------------------------------------------------------
+
+func scheduleCancelTool() ToolDef {
+	return ToolDef{
+		Spec: provider.ToolSpec{
+			Name:        "schedule_cancel",
+			Description: "Cancel a scheduled job by ID. Use schedule_list to find job IDs. Only pending or failed jobs can be cancelled.",
+			Properties: map[string]provider.ToolProp{
+				"id": {Type: "string", Description: "The job ID to cancel"},
+			},
+			Required: []string{"id"},
+		},
+		Execute: func(input map[string]any, ctx *ToolContext) (string, error) {
+			if ctx == nil || ctx.CancelScheduledJob == nil {
+				return "", fmt.Errorf("scheduler not available")
+			}
+
+			id, _ := input["id"].(string)
+			if strings.TrimSpace(id) == "" {
+				return "", fmt.Errorf("id is required")
+			}
+
+			if err := ctx.CancelScheduledJob(id); err != nil {
+				return "", fmt.Errorf("cancelling job: %w", err)
+			}
+
+			return fmt.Sprintf("Cancelled scheduled job %s", id), nil
 		},
 	}
 }

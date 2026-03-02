@@ -149,8 +149,30 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) registerNode(name, host string, port int, token, version string) (*Node, error) {
-	id := generateNodeID()
 	now := time.Now().UTC()
+
+	// Check for an existing node with the same name — replace it instead of
+	// creating a duplicate. This handles daemon restarts cleanly.
+	if existingID := h.findNodeByName(name); existingID != "" {
+		h.mu.Lock()
+		if n, ok := h.nodes[existingID]; ok {
+			n.Host = host
+			n.Port = port
+			n.Token = token
+			n.Version = version
+			n.Status = StatusOnline
+			n.LastSeenAt = now
+		}
+		h.mu.Unlock()
+		h.db.Exec(
+			`UPDATE nodes SET host = ?, port = ?, token = ?, version = ?, status = ?, last_seen_at = ? WHERE id = ?`,
+			host, port, token, version, string(StatusOnline), now.Format(time.RFC3339), existingID,
+		)
+		h.logf("node re-registered: %s (%s:%d)", existingID, host, port)
+		return h.getNode(existingID), nil
+	}
+
+	id := generateNodeID()
 	node := &Node{
 		ID:           id,
 		Name:         name,
@@ -181,6 +203,17 @@ func (h *Hub) registerNode(name, host string, port int, token, version string) (
 
 	h.logf("node registered: %s (%s:%d)", id, host, port)
 	return node, nil
+}
+
+func (h *Hub) findNodeByName(name string) string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, n := range h.nodes {
+		if n.Name == name {
+			return n.ID
+		}
+	}
+	return ""
 }
 
 func (h *Hub) deregisterNode(id string) error {
@@ -247,17 +280,24 @@ func (h *Hub) startHealthChecker() {
 }
 
 func (h *Hub) sweepOfflineNodes() {
-	cutoff := time.Now().UTC().Add(-90 * time.Second)
+	now := time.Now().UTC()
+	offlineCutoff := now.Add(-90 * time.Second)
+	purgeCutoff := now.Add(-1 * time.Hour)
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for _, n := range h.nodes {
-		if n.Status == StatusOnline && n.LastSeenAt.Before(cutoff) {
+	for id, n := range h.nodes {
+		if n.Status == StatusOnline && n.LastSeenAt.Before(offlineCutoff) {
 			n.Status = StatusOffline
 			h.db.Exec(
 				`UPDATE nodes SET status = ? WHERE id = ?`,
 				string(StatusOffline), n.ID,
 			)
 			h.logf("node %s marked offline (last seen %s)", n.ID, n.LastSeenAt.Format(time.RFC3339))
+		} else if n.Status == StatusOffline && n.LastSeenAt.Before(purgeCutoff) {
+			// Purge nodes that have been offline for over 1 hour.
+			h.db.Exec(`DELETE FROM nodes WHERE id = ?`, id)
+			delete(h.nodes, id)
+			h.logf("node %s purged (offline since %s)", id, n.LastSeenAt.Format(time.RFC3339))
 		}
 	}
 }

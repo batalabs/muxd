@@ -247,6 +247,27 @@ func TestContentBlock_fields(t *testing.T) {
 	}
 }
 
+func TestContentBlock_imageFields(t *testing.T) {
+	b := ContentBlock{
+		Type:       "image",
+		MediaType:  "image/png",
+		Base64Data: "iVBOR...",
+		ImagePath:  "screenshot.png",
+	}
+	if b.Type != "image" {
+		t.Errorf("Type = %q, want image", b.Type)
+	}
+	if b.MediaType != "image/png" {
+		t.Errorf("MediaType = %q, want image/png", b.MediaType)
+	}
+	if b.Base64Data != "iVBOR..." {
+		t.Errorf("Base64Data = %q", b.Base64Data)
+	}
+	if b.ImagePath != "screenshot.png" {
+		t.Errorf("ImagePath = %q, want screenshot.png", b.ImagePath)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // types.go — ModelPricing / APIModelInfo
 // ---------------------------------------------------------------------------

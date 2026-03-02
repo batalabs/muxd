@@ -837,48 +837,6 @@ func TestStore_BranchSession(t *testing.T) {
 	})
 }
 
-func TestStore_ScheduledTweets(t *testing.T) {
-	s := testStore(t)
-
-	now := time.Now().UTC()
-	id, err := s.CreateScheduledTweet("hello world", now.Add(2*time.Minute), "once")
-	if err != nil {
-		t.Fatalf("CreateScheduledTweet: %v", err)
-	}
-	if id == "" {
-		t.Fatal("expected non-empty id")
-	}
-
-	items, err := s.ListScheduledTweets(10)
-	if err != nil {
-		t.Fatalf("ListScheduledTweets: %v", err)
-	}
-	if len(items) == 0 {
-		t.Fatal("expected scheduled tweets in list")
-	}
-
-	due, err := s.DueScheduledTweets(now.Add(5*time.Minute), 10)
-	if err != nil {
-		t.Fatalf("DueScheduledTweets: %v", err)
-	}
-	if len(due) == 0 {
-		t.Fatal("expected due scheduled tweets")
-	}
-
-	if err := s.MarkScheduledTweetPosted(id, "tweet123", now); err != nil {
-		t.Fatalf("MarkScheduledTweetPosted: %v", err)
-	}
-	if err := s.RescheduleRecurringTweet(id, now.Add(24*time.Hour)); err != nil {
-		t.Fatalf("RescheduleRecurringTweet: %v", err)
-	}
-	if err := s.MarkScheduledTweetFailed(id, "test failure", now); err != nil {
-		t.Fatalf("MarkScheduledTweetFailed: %v", err)
-	}
-	if err := s.CancelScheduledTweet(id); err != nil {
-		t.Fatalf("CancelScheduledTweet: %v", err)
-	}
-}
-
 func TestStore_ScheduledToolJobs(t *testing.T) {
 	s := testStore(t)
 
@@ -1112,28 +1070,6 @@ func TestStore_DueScheduledToolJobs_defaultLimit(t *testing.T) {
 	}
 }
 
-func TestStore_ListScheduledTweets_defaultLimit(t *testing.T) {
-	s := testStore(t)
-	items, err := s.ListScheduledTweets(0)
-	if err != nil {
-		t.Fatalf("ListScheduledTweets(0): %v", err)
-	}
-	if len(items) != 0 {
-		t.Errorf("expected 0 items, got %d", len(items))
-	}
-}
-
-func TestStore_DueScheduledTweets_defaultLimit(t *testing.T) {
-	s := testStore(t)
-	items, err := s.DueScheduledTweets(time.Now(), 0)
-	if err != nil {
-		t.Fatalf("DueScheduledTweets(0): %v", err)
-	}
-	if len(items) != 0 {
-		t.Errorf("expected 0 items, got %d", len(items))
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Default recurrence
 // ---------------------------------------------------------------------------
@@ -1157,31 +1093,6 @@ func TestStore_CreateScheduledToolJob_emptyRecurrence(t *testing.T) {
 	}
 	if found == nil {
 		t.Fatal("job not found")
-	}
-	if found.Recurrence != "once" {
-		t.Errorf("Recurrence = %q, want %q", found.Recurrence, "once")
-	}
-}
-
-func TestStore_CreateScheduledTweet_emptyRecurrence(t *testing.T) {
-	s := testStore(t)
-	id, err := s.CreateScheduledTweet("tweet text", time.Now().Add(time.Hour), "")
-	if err != nil {
-		t.Fatalf("CreateScheduledTweet: %v", err)
-	}
-	items, err := s.ListScheduledTweets(10)
-	if err != nil {
-		t.Fatalf("ListScheduledTweets: %v", err)
-	}
-	var found *ScheduledTweet
-	for i := range items {
-		if items[i].ID == id {
-			found = &items[i]
-			break
-		}
-	}
-	if found == nil {
-		t.Fatal("tweet not found")
 	}
 	if found.Recurrence != "once" {
 		t.Errorf("Recurrence = %q, want %q", found.Recurrence, "once")
@@ -1292,48 +1203,6 @@ func TestStore_ScheduledToolJob_optionalTimesParsed(t *testing.T) {
 		}
 	}
 	t.Fatal("job not found")
-}
-
-// ---------------------------------------------------------------------------
-// Scheduled tweets — optional time fields populated
-// ---------------------------------------------------------------------------
-
-func TestStore_ScheduledTweet_optionalTimesParsed(t *testing.T) {
-	s := testStore(t)
-	now := time.Now().UTC()
-
-	id, err := s.CreateScheduledTweet("hello", now.Add(-time.Minute), "once")
-	if err != nil {
-		t.Fatalf("CreateScheduledTweet: %v", err)
-	}
-
-	// Mark posted to populate last_attempt_at and posted_at.
-	if err := s.MarkScheduledTweetPosted(id, "tweet_123", now); err != nil {
-		t.Fatalf("MarkScheduledTweetPosted: %v", err)
-	}
-
-	items, err := s.ListScheduledTweets(10)
-	if err != nil {
-		t.Fatalf("ListScheduledTweets: %v", err)
-	}
-	for _, item := range items {
-		if item.ID == id {
-			if item.LastAttemptAt == nil {
-				t.Error("expected LastAttemptAt to be populated")
-			}
-			if item.PostedAt == nil {
-				t.Error("expected PostedAt to be populated")
-			}
-			if item.TweetID != "tweet_123" {
-				t.Errorf("TweetID = %q, want tweet_123", item.TweetID)
-			}
-			if item.Status != "posted" {
-				t.Errorf("Status = %q, want posted", item.Status)
-			}
-			return
-		}
-	}
-	t.Fatal("tweet not found")
 }
 
 // ---------------------------------------------------------------------------

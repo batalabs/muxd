@@ -16,7 +16,7 @@ const AgentTaskToolName = "__agent_task__"
 // ScheduledToolCall represents one scheduled tool execution request.
 type ScheduledToolCall struct {
 	ID           string
-	Source       string // e.g. "tool_job", "legacy_tweet"
+	Source       string // e.g. "tool_job"
 	ToolName     string
 	ToolInput    map[string]any
 	ScheduledFor time.Time

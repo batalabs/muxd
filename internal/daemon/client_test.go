@@ -80,7 +80,7 @@ func TestDaemonClientSubmitSSE(t *testing.T) {
 	client.SetBaseURL(ts.URL)
 
 	var events []SSEEvent
-	err := client.Submit("test-session", "hello", func(evt SSEEvent) {
+	err := client.Submit("test-session", "hello", nil, func(evt SSEEvent) {
 		events = append(events, evt)
 	})
 	if err != nil {
@@ -118,7 +118,7 @@ func TestDaemonClientSubmitSSEToolEvents(t *testing.T) {
 	client.SetBaseURL(ts.URL)
 
 	var events []SSEEvent
-	err := client.Submit("test-session", "hello", func(evt SSEEvent) {
+	err := client.Submit("test-session", "hello", nil, func(evt SSEEvent) {
 		events = append(events, evt)
 	})
 	if err != nil {
@@ -491,7 +491,7 @@ func TestDaemonClientSubmit_httpError(t *testing.T) {
 	client := NewDaemonClient(0)
 	client.SetBaseURL(ts.URL)
 
-	err := client.Submit("sess-1", "hello", func(SSEEvent) {})
+	err := client.Submit("sess-1", "hello", nil, func(SSEEvent) {})
 	if err == nil {
 		t.Fatal("expected error for HTTP 400")
 	}

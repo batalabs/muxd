@@ -211,12 +211,42 @@ func buildOpenAIMessages(history []domain.TranscriptMessage, system string) []op
 		}
 
 		if m.HasBlocks() {
-			// Check if this is a tool results message (user role with tool_result blocks)
+			// User messages with image blocks → multi-part content array
 			if m.Role == "user" {
+				hasImages := false
+				for _, b := range m.Blocks {
+					if b.Type == "image" {
+						hasImages = true
+						break
+					}
+				}
+				if hasImages {
+					var parts []map[string]any
+					for _, b := range m.Blocks {
+						switch b.Type {
+						case "image":
+							parts = append(parts, map[string]any{
+								"type": "image_url",
+								"image_url": map[string]string{
+									"url": "data:" + b.MediaType + ";base64," + b.Base64Data,
+								},
+							})
+						case "text":
+							parts = append(parts, map[string]any{
+								"type": "text",
+								"text": b.Text,
+							})
+						}
+					}
+					raw, _ := json.Marshal(parts)
+					msgs = append(msgs, openaiMessage{Role: "user", Content: raw})
+					continue
+				}
+
+				// Tool results message (user role with tool_result blocks)
 				for _, b := range m.Blocks {
 					if b.Type == "tool_result" {
 						result := b.ToolResult
-						// Truncate old tool results to reduce context size.
 						const maxToolResult = 10000
 						if len(result) > maxToolResult {
 							result = result[:maxToolResult] + "\n... (truncated for context)"

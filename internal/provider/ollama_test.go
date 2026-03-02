@@ -187,3 +187,32 @@ func TestOllamaProvider_StreamMessage_FallsBackWhenModelLacksToolSupport(t *test
 		t.Fatalf("text = %q", blocks[0].Text)
 	}
 }
+
+func TestBuildOllamaMessages_ImageBlock(t *testing.T) {
+	msgs := []domain.TranscriptMessage{
+		{
+			Role: "user",
+			Blocks: []domain.ContentBlock{
+				{Type: "image", MediaType: "image/png", Base64Data: "aWNvbg=="},
+				{Type: "text", Text: "describe this"},
+			},
+		},
+	}
+	result := buildOllamaMessages(msgs, "")
+	if len(result) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(result))
+	}
+	if result[0]["role"] != "user" {
+		t.Errorf("expected user role, got %v", result[0]["role"])
+	}
+	images, ok := result[0]["images"].([]string)
+	if !ok {
+		t.Fatal("expected images array")
+	}
+	if len(images) != 1 || images[0] != "aWNvbg==" {
+		t.Errorf("unexpected images: %v", images)
+	}
+	if result[0]["content"] != "describe this" {
+		t.Errorf("expected 'describe this', got %v", result[0]["content"])
+	}
+}

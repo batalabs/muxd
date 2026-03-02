@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1392,7 +1393,49 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	userMsg := domain.TranscriptMessage{Role: "user", Content: trimmed}
+	// Detect image paths in the input and build multi-block message if found.
+	imgPaths, remainingText := tools.ExtractImagePaths(trimmed)
+	var userMsg domain.TranscriptMessage
+	var images []daemon.SubmitImage
+
+	if len(imgPaths) > 0 {
+		var blocks []domain.ContentBlock
+		for _, imgPath := range imgPaths {
+			data, err := os.ReadFile(imgPath)
+			if err != nil {
+				return m, PrintToScrollback(m.renderError(fmt.Sprintf("Failed to read image: %v", err)))
+			}
+			if len(data) > 20*1024*1024 {
+				return m, PrintToScrollback(m.renderError(fmt.Sprintf("Image too large (max 20MB): %s", filepath.Base(imgPath))))
+			}
+			mediaType := tools.MediaTypeFromExt(imgPath)
+			if mediaType == "" {
+				continue
+			}
+			b64 := base64.StdEncoding.EncodeToString(data)
+			blocks = append(blocks, domain.ContentBlock{
+				Type:       "image",
+				MediaType:  mediaType,
+				Base64Data: b64,
+				ImagePath:  filepath.Base(imgPath),
+			})
+			images = append(images, daemon.SubmitImage{
+				Path:      filepath.Base(imgPath),
+				MediaType: mediaType,
+				Data:      b64,
+			})
+		}
+		if remainingText != "" {
+			blocks = append(blocks, domain.ContentBlock{Type: "text", Text: remainingText})
+		}
+		userMsg = domain.TranscriptMessage{Role: "user", Blocks: blocks}
+		if remainingText != "" {
+			userMsg.Content = remainingText
+		}
+	} else {
+		userMsg = domain.TranscriptMessage{Role: "user", Content: trimmed}
+	}
+
 	m.messages = append(m.messages, userMsg)
 	m.history = append(m.history, trimmed)
 	m.historyIdx = -1
@@ -1404,10 +1447,15 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 	m.streamFlushedLen = 0
 	m.appendRuntimeLog("submit: " + summarizeForLog(trimmed))
 
+	submitText := trimmed
+	if len(images) > 0 {
+		submitText = remainingText
+	}
+
 	formatted := FormatMessageForScrollback(userMsg, m.width)
 	cmds := []tea.Cmd{
 		PrintToScrollback(formatted),
-		StreamViaDaemon(m.Daemon, m.Session.ID, trimmed),
+		StreamViaDaemon(m.Daemon, m.Session.ID, submitText, images),
 		m.spinner.Tick,
 	}
 	return m, tea.Batch(cmds...)
@@ -2845,12 +2893,12 @@ func (m Model) handleStreamDone(msg StreamDoneMsg) (tea.Model, tea.Cmd) {
 
 // StreamViaDaemon sends a message to the daemon via HTTP SSE and dispatches
 // events to the TUI via Prog.Send().
-func StreamViaDaemon(d *daemon.DaemonClient, sessionID, text string) tea.Cmd {
+func StreamViaDaemon(d *daemon.DaemonClient, sessionID, text string, images []daemon.SubmitImage) tea.Cmd {
 	return func() tea.Msg {
 		if d == nil {
 			return StreamDoneMsg{Err: fmt.Errorf("no daemon connection")}
 		}
-		err := d.Submit(sessionID, text, func(evt daemon.SSEEvent) {
+		err := d.Submit(sessionID, text, images, func(evt daemon.SSEEvent) {
 			if Prog == nil {
 				return
 			}

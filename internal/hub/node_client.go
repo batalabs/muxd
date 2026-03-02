@@ -86,6 +86,61 @@ func (c *NodeClient) Deregister(nodeID string) error {
 	return nil
 }
 
+// FetchMemory retrieves shared memory facts from the hub.
+func (c *NodeClient) FetchMemory() (map[string]string, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/hub/memory", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating fetch memory request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.hubToken)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching hub memory: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		// Hub doesn't support memory yet — not an error.
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("hub memory fetch failed: %d", resp.StatusCode)
+	}
+
+	var facts map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&facts); err != nil {
+		return nil, fmt.Errorf("decoding hub memory: %w", err)
+	}
+	return facts, nil
+}
+
+// PushMemory sends memory facts to the hub for shared storage.
+func (c *NodeClient) PushMemory(facts map[string]string) error {
+	body, err := json.Marshal(map[string]any{"facts": facts})
+	if err != nil {
+		return fmt.Errorf("marshaling memory: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", c.baseURL+"/api/hub/memory", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("creating push memory request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.hubToken)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("pushing hub memory: %w", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("hub memory push failed: %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // Heartbeat sends a liveness signal to the hub.
 func (c *NodeClient) Heartbeat(nodeID string) error {
 	req, err := http.NewRequest("POST", c.baseURL+"/api/hub/nodes/"+nodeID+"/heartbeat", nil)

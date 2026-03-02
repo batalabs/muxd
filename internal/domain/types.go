@@ -20,6 +20,11 @@ type ContentBlock struct {
 	CallerType string `json:"caller_type,omitempty"`
 	// CallerToolID is the server_tool_use ID that spawned a PTC tool call.
 	CallerToolID string `json:"caller_tool_id,omitempty"`
+
+	// Image support
+	MediaType  string `json:"media_type,omitempty"`  // e.g. "image/png", "image/jpeg"
+	Base64Data string `json:"base64_data,omitempty"` // base64-encoded image bytes
+	ImagePath  string `json:"image_path,omitempty"`  // original file path (for display)
 }
 
 // TranscriptMessage is a message with a role and content blocks.
