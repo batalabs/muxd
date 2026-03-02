@@ -59,7 +59,7 @@ func TestDataDir(t *testing.T) {
 
 func TestConfigGroupNames(t *testing.T) {
 	names := ConfigGroupNames()
-	want := []string{"models", "tools", "daemon", "hub", "node", "theme"}
+	want := []string{"models", "tools", "daemon", "hub", "client", "theme"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d group names, got %d", len(want), len(names))
 	}

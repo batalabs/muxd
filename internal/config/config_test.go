@@ -131,7 +131,7 @@ func TestPreferences_Grouped(t *testing.T) {
 	}
 
 	// Verify group names
-	wantNames := []string{"models", "tools", "daemon", "hub", "node", "theme"}
+	wantNames := []string{"models", "tools", "daemon", "hub", "client", "theme"}
 	for i, g := range groups {
 		if g.Name != wantNames[i] {
 			t.Errorf("group %d name = %q, want %q", i, g.Name, wantNames[i])

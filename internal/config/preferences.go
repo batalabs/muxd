@@ -48,9 +48,8 @@ type Preferences struct {
 	HubBindAddress string `json:"hub_bind_address,omitempty"`
 	HubAuthToken   string `json:"hub_auth_token,omitempty"`
 	HubURL         string `json:"hub_url,omitempty"`
-	HubNodeToken   string `json:"hub_node_token,omitempty"`
-	HubNodeID      string `json:"hub_node_id,omitempty"`
-	HubNodeName    string `json:"hub_node_name,omitempty"`
+	HubClientToken string `json:"hub_client_token,omitempty"`
+	HubClientName  string `json:"hub_client_name,omitempty"`
 }
 
 // PrefEntry holds a single key-value preference entry for display.
@@ -90,8 +89,8 @@ var ConfigGroupDefs = []ConfigGroupDef{
 		Keys: []string{"hub.bind_address", "hub.auth_token"},
 	},
 	{
-		Name: "node",
-		Keys: []string{"hub.url", "hub.node_token", "hub.node_id", "hub.node_name"},
+		Name: "client",
+		Keys: []string{"hub.url", "hub.client_token", "hub.client_name"},
 	},
 	{
 		Name: "theme",
@@ -254,14 +253,11 @@ func mergePreferences(dst, src *Preferences) {
 	if src.HubURL != "" {
 		dst.HubURL = src.HubURL
 	}
-	if src.HubNodeToken != "" {
-		dst.HubNodeToken = src.HubNodeToken
+	if src.HubClientToken != "" {
+		dst.HubClientToken = src.HubClientToken
 	}
-	if src.HubNodeID != "" {
-		dst.HubNodeID = src.HubNodeID
-	}
-	if src.HubNodeName != "" {
-		dst.HubNodeName = src.HubNodeName
+	if src.HubClientName != "" {
+		dst.HubClientName = src.HubClientName
 	}
 	// Booleans: copy from src (they represent the user's last settings)
 	dst.FooterTokens = src.FooterTokens
@@ -387,9 +383,8 @@ func (p Preferences) All() []PrefEntry {
 		{"hub.bind_address", p.HubBindAddress},
 		{"hub.auth_token", MaskKey(p.HubAuthToken)},
 		{"hub.url", p.HubURL},
-		{"hub.node_token", MaskKey(p.HubNodeToken)},
-		{"hub.node_id", p.HubNodeID},
-		{"hub.node_name", p.HubNodeName},
+		{"hub.client_token", MaskKey(p.HubClientToken)},
+		{"hub.client_name", p.HubClientName},
 	}
 }
 
@@ -450,12 +445,10 @@ func (p Preferences) Get(key string) string {
 		return MaskKey(p.HubAuthToken)
 	case "hub.url":
 		return p.HubURL
-	case "hub.node_token":
-		return MaskKey(p.HubNodeToken)
-	case "hub.node_id":
-		return p.HubNodeID
-	case "hub.node_name":
-		return p.HubNodeName
+	case "hub.client_token":
+		return MaskKey(p.HubClientToken)
+	case "hub.client_name":
+		return p.HubClientName
 	default:
 		return ""
 	}
@@ -539,12 +532,10 @@ func (p *Preferences) Set(key, value string) error {
 		p.HubAuthToken = value
 	case "hub.url":
 		p.HubURL = value
-	case "hub.node_token":
-		p.HubNodeToken = value
-	case "hub.node_id":
-		p.HubNodeID = value
-	case "hub.node_name":
-		p.HubNodeName = value
+	case "hub.client_token":
+		p.HubClientToken = value
+	case "hub.client_name":
+		p.HubClientName = value
 	default:
 		return fmt.Errorf("unknown key: %s", key)
 	}
@@ -610,9 +601,8 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.HubBindAddress)
 	sanitize(&p.HubAuthToken)
 	sanitize(&p.HubURL)
-	sanitize(&p.HubNodeToken)
-	sanitize(&p.HubNodeID)
-	sanitize(&p.HubNodeName)
+	sanitize(&p.HubClientToken)
+	sanitize(&p.HubClientName)
 	sanitize(&p.FooterEmoji)
 	return changed
 }
@@ -802,7 +792,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 	case "show":
 		return FormatConfigGroups(prefs.Grouped()), nil
 
-	case "models", "tools", "daemon", "hub", "node", "theme":
+	case "models", "tools", "daemon", "hub", "client", "theme":
 		group := prefs.GroupByName(sub)
 		if group == nil {
 			return "", fmt.Errorf("unknown config group: %s", sub)
@@ -831,7 +821,7 @@ func ExecuteConfigAction(prefs *Preferences, args []string) (string, error) {
 		return "Preferences reset to defaults.", nil
 
 	default:
-		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|node|theme|set <key> <value>|reset]")
+		return "", fmt.Errorf("usage: /config [show|models|tools|daemon|hub|client|theme|set <key> <value>|reset]")
 	}
 }
 

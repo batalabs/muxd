@@ -234,11 +234,11 @@ func main() {
 		// Node auto-registration with hub (if configured)
 		var hubClient *hub.NodeClient
 		var hubNodeID string
-		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
-			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, srv.AuthToken())
+		if prefs.HubURL != "" && prefs.HubClientToken != "" {
+			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, srv.AuthToken())
 			go func() {
 				port := srv.Port() // blocks until listener is bound
-				name := prefs.HubNodeName
+				name := prefs.HubClientName
 				if name == "" {
 					hostname, _ := os.Hostname()
 					name = hostname
@@ -249,8 +249,7 @@ func main() {
 					return
 				}
 				hubNodeID = nodeID
-				saveHubNodeIDIfNew(&prefs, nodeID)
-				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
+				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
 
 				// Start heartbeat loop
 				ticker := time.NewTicker(30 * time.Second)
@@ -326,6 +325,33 @@ func main() {
 		// Port() blocks until Start() has bound the listener, so no race.
 		dc = daemon.NewDaemonClient(embeddedServer.Port())
 		dc.SetAuthToken(embeddedServer.AuthToken())
+
+		// Hub registration for embedded server (same as daemon mode)
+		if prefs.HubURL != "" && prefs.HubClientToken != "" {
+			hubClient := hub.NewNodeClient(prefs.HubURL, prefs.HubClientToken, embeddedServer.AuthToken())
+			go func() {
+				port := embeddedServer.Port()
+				name := prefs.HubClientName
+				if name == "" {
+					hostname, _ := os.Hostname()
+					name = hostname
+				}
+				nodeID, err := hubClient.Register(name, bindAddr, port, version)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
+					return
+				}
+				fmt.Fprintf(os.Stderr, "hub: registered as client %s\n", nodeID)
+
+				ticker := time.NewTicker(30 * time.Second)
+				defer ticker.Stop()
+				for range ticker.C {
+					if err := hubClient.Heartbeat(nodeID); err != nil {
+						fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+					}
+				}
+			}()
+		}
 	}
 
 	// Create or resume session
@@ -428,17 +454,6 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 	prefs.HubAuthToken = token
 	if err := config.SavePreferences(*prefs); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to save hub auth token: %v\n", err)
-	}
-}
-
-// saveHubNodeIDIfNew persists the hub-assigned node ID to preferences.
-func saveHubNodeIDIfNew(prefs *config.Preferences, nodeID string) {
-	if prefs.HubNodeID == nodeID {
-		return
-	}
-	prefs.HubNodeID = nodeID
-	if err := config.SavePreferences(*prefs); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to save hub node ID: %v\n", err)
 	}
 }
 
