@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.muxd.mobile", category: "MuxdClient")
 
 actor MuxdClient {
     private let baseURL: URL
@@ -19,13 +22,33 @@ actor MuxdClient {
         self.session = URLSession(configuration: config)
     }
 
+    init?(hubHost: String, hubPort: Int, nodeID: String, token: String) {
+        let sanitizedHost = hubHost.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? hubHost
+        guard let url = URL(string: "http://\(sanitizedHost):\(hubPort)/api/hub/proxy/\(nodeID)") else {
+            return nil
+        }
+        self.baseURL = url
+        self.authToken = token
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        self.session = URLSession(configuration: config)
+    }
+
     private func makeRequest(
         method: String,
         path: String,
         body: Data? = nil,
         queryItems: [URLQueryItem]? = nil
     ) throws -> URLRequest {
-        guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else {
+        // Build URL by appending path to base URL string directly.
+        // Using appendingPathComponent can mangle proxy URLs by percent-encoding slashes.
+        let basePath = baseURL.absoluteString.hasSuffix("/")
+            ? String(baseURL.absoluteString.dropLast())
+            : baseURL.absoluteString
+        let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
+        guard let fullURL = URL(string: basePath + cleanPath),
+              var components = URLComponents(url: fullURL, resolvingAgainstBaseURL: false) else {
             throw MuxdError.invalidResponse
         }
         components.queryItems = queryItems
@@ -33,6 +56,8 @@ actor MuxdClient {
         guard let url = components.url else {
             throw MuxdError.invalidResponse
         }
+
+        logger.info("🔗 \(method) \(url.absoluteString)")
 
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -48,11 +73,42 @@ actor MuxdClient {
 
     // MARK: - Health Check
 
-    func health() async throws -> Bool {
+    func healthCheck() async throws -> HealthResponse {
         var request = try makeRequest(method: "GET", path: "/api/health")
-        request.timeoutInterval = 5  // Short timeout for health checks
-        let (_, response) = try await session.data(for: request)
-        return (response as? HTTPURLResponse)?.statusCode == 200
+        request.timeoutInterval = 5
+        let (data, response) = try await session.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw MuxdError.connectionFailed
+        }
+        return try JSONDecoder().decode(HealthResponse.self, from: data)
+    }
+
+    func health() async throws -> Bool {
+        let resp = try await healthCheck()
+        return resp.status == "ok"
+    }
+
+    // MARK: - Hub
+
+    func listNodes() async throws -> [HubNode] {
+        let request = try makeRequest(method: "GET", path: "/api/hub/nodes")
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MuxdError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw MuxdError.unauthorized
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw MuxdError.serverError("Failed to list nodes")
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([HubNode].self, from: data)
     }
 
     // MARK: - Sessions

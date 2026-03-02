@@ -289,15 +289,38 @@ struct ClientsView: View {
                     }
                 }
             }
-            .navigationDestination(for: String.self) { _ in
-                SessionListView()
+            .navigationDestination(for: String.self) { destination in
+                switch destination {
+                case "nodePicker":
+                    NodePickerView(navigationPath: $navigationPath)
+                default:
+                    SessionListView()
+                }
+            }
+            .navigationDestination(for: Session.self) { session in
+                ChatView(session: session)
+            }
+        }
+        .onChange(of: appState.isConnected) { _, connected in
+            if !connected && appState.isHubConnected {
+                // Node deselected — pop back to node picker
+                // Path is ["nodePicker", "sessions"] or ["nodePicker", "sessions", Session...]
+                // Reset to just ["nodePicker"]
+                var newPath = NavigationPath()
+                newPath.append("nodePicker")
+                navigationPath = newPath
+            } else if !connected {
+                // Fully disconnected — pop to root
+                navigationPath = NavigationPath()
             }
         }
         .sheet(isPresented: $showScanner) {
             QRScannerView { info in
                 Task {
                     await appState.connect(with: info)
-                    if appState.isConnected {
+                    if appState.connectionMode == .hub {
+                        navigationPath.append("nodePicker")
+                    } else if appState.isConnected {
                         navigationPath.append("sessions")
                     }
                 }
@@ -307,7 +330,9 @@ struct ClientsView: View {
             ManualConnectionView { info in
                 Task {
                     await appState.connect(with: info)
-                    if appState.isConnected {
+                    if appState.connectionMode == .hub {
+                        navigationPath.append("nodePicker")
+                    } else if appState.isConnected {
                         navigationPath.append("sessions")
                     }
                 }
@@ -338,7 +363,9 @@ struct ClientsView: View {
             async let delay: () = Task.sleep(nanoseconds: 2_000_000_000)
             _ = await (connect, try? delay)
             connectingToID = nil
-            if appState.isConnected {
+            if appState.connectionMode == .hub {
+                navigationPath.append("nodePicker")
+            } else if appState.isConnected {
                 navigationPath.append("sessions")
             }
         }
@@ -360,14 +387,26 @@ struct ClientCardView: View {
     @State private var sessionCount: Int?
     @State private var latencyMs: Int?
     @State private var isHealthy: Bool?
+    @State private var detectedMode: ConnectionMode?
     @GestureState private var isPressed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "server.rack")
+                Image(systemName: detectedMode == .hub ? "point.3.connected.trianglepath.dotted" : "server.rack")
                     .font(.title2)
                     .foregroundColor(.accentColor)
+
+                if detectedMode == .hub {
+                    Text("Hub")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
 
                 Spacer()
 
@@ -393,7 +432,7 @@ struct ClientCardView: View {
 
             HStack {
                 if let count = sessionCount {
-                    Text("\(count) sessions")
+                    Text(detectedMode == .hub ? "\(count) nodes online" : "\(count) sessions")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
@@ -508,15 +547,17 @@ struct ClientCardView: View {
             return
         }
 
-        // Measure latency with health check
+        // Measure latency with health check and detect mode
         let start = Date()
         do {
-            let healthy = try await client.health()
+            let healthResp = try await client.healthCheck()
             let elapsed = Date().timeIntervalSince(start)
             let ms = Int(elapsed * 1000)
+            let mode: ConnectionMode = healthResp.isHub ? .hub : .daemon
             await MainActor.run {
-                isHealthy = healthy
+                isHealthy = healthResp.status == "ok"
                 latencyMs = ms
+                detectedMode = mode
             }
         } catch {
             await MainActor.run {
@@ -524,14 +565,30 @@ struct ClientCardView: View {
             }
         }
 
-        // Get session count
-        do {
-            let sessions = try await client.listSessions(project: nil, limit: 100)
-            await MainActor.run {
-                sessionCount = sessions.count
+        // Get session count (only for daemon mode)
+        if detectedMode != .hub {
+            do {
+                let sessions = try await client.listSessions(project: nil, limit: 100)
+                await MainActor.run {
+                    sessionCount = sessions.count
+                }
+            } catch {
+                // Ignore - won't show session count
             }
-        } catch {
-            // Ignore - won't show session count
+        } else {
+            // For hub mode, show node count instead
+            do {
+                let nodes = try await client.listNodes()
+                await MainActor.run {
+                    sessionCount = nil // Will use node count display below
+                }
+                let onlineCount = nodes.filter(\.isOnline).count
+                await MainActor.run {
+                    sessionCount = onlineCount // Reuse field for display
+                }
+            } catch {
+                // Ignore
+            }
         }
     }
 }

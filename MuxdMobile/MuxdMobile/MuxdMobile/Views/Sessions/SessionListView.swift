@@ -64,13 +64,24 @@ struct SessionListView: View {
 
     private var menuLabel: some View {
         HStack(spacing: 6) {
-            Image(systemName: "server.rack")
-            if let info = appState.connectionInfo {
-                Text(info.name != info.host ? info.name : info.host)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            if appState.connectionMode == .hub {
+                Image(systemName: "point.3.connected.trianglepath.dotted")
+                if let node = appState.selectedNode {
+                    Text(node.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                } else {
+                    Text("Hub")
+                }
             } else {
-                Text("Sessions")
+                Image(systemName: "server.rack")
+                if let info = appState.connectionInfo {
+                    Text(info.name != info.host ? info.name : info.host)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                } else {
+                    Text("Sessions")
+                }
             }
         }
     }
@@ -172,6 +183,15 @@ struct SessionListView: View {
                             }
                         }
 
+                        if appState.connectionMode == .hub, let node = appState.selectedNode {
+                            Section("Node") {
+                                Label(node.name, systemImage: "point.3.connected.trianglepath.dotted")
+                                if !node.version.isEmpty {
+                                    Label("v\(node.version)", systemImage: "tag")
+                                }
+                            }
+                        }
+
                         Section {
                             Label(isHealthy ? "Connected" : "Disconnected", systemImage: isHealthy ? "circle.fill" : "circle")
                             if let ms = latencyMs {
@@ -188,6 +208,13 @@ struct SessionListView: View {
                         }
 
                         Section {
+                            if appState.connectionMode == .hub {
+                                Button {
+                                    appState.deselectNode()
+                                } label: {
+                                    Label("Switch Node", systemImage: "arrow.triangle.swap")
+                                }
+                            }
                             Button {
                                 viewModel.showRenameConnection = true
                             } label: {
@@ -213,9 +240,6 @@ struct SessionListView: View {
                     Image(systemName: "plus")
                 }
             }
-        }
-        .navigationDestination(for: Session.self) { session in
-            ChatView(session: session)
         }
         .sheet(item: $viewModel.sessionToRename) { session in
             RenameSessionView(session: session) { newTitle in

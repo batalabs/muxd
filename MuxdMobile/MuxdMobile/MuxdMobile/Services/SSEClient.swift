@@ -22,11 +22,25 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         super.init()
     }
 
+    init?(hubHost: String, hubPort: Int, nodeID: String, token: String) {
+        let sanitizedHost = hubHost.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? hubHost
+        guard let url = URL(string: "http://\(sanitizedHost):\(hubPort)/api/hub/proxy/\(nodeID)") else {
+            return nil
+        }
+        self.baseURL = url
+        self.authToken = token
+        super.init()
+    }
+
     func submit(sessionID: String, text: String) {
         // Invalidate previous session to prevent memory leak
         session?.invalidateAndCancel()
 
-        let url = baseURL.appendingPathComponent("/api/sessions/\(sessionID)/submit")
+        // Build URL by string concatenation to avoid appendingPathComponent mangling proxy paths
+        let basePath = baseURL.absoluteString.hasSuffix("/")
+            ? String(baseURL.absoluteString.dropLast())
+            : baseURL.absoluteString
+        guard let url = URL(string: basePath + "/api/sessions/\(sessionID)/submit") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
