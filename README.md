@@ -24,11 +24,15 @@
 
 ## Why muxd?
 
-- **Persistent sessions** — conversations saved to local SQLite. Close your terminal, reboot, come back next week.
-- **Branch and fork** — explore alternatives without losing your current thread, like git branches.
+Most AI coding tools treat each conversation as disposable — close the window and it's gone. muxd saves everything to a local SQLite database so you can close your terminal, reboot, come back next week, and pick up exactly where you left off.
+
+- **Persistent sessions** — conversations survive restarts. Search, branch, and resume any session by project or ID.
+- **Branch and fork** — explore alternatives without losing your current thread, like git branches for conversations.
 - **Project memory** — the agent remembers your conventions, architecture decisions, and gotchas across sessions.
-- **Multi-channel** — same agent from terminal, hub, mobile app, or headless daemon.
-- **Any provider** — Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API.
+- **Hub architecture** — run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
+- **Multi-channel** — same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
+- **25 built-in tools** — file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
+- **Any provider** — Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API. Switch models mid-session.
 
 ---
 
@@ -36,6 +40,12 @@
 
 <p align="center">
   <img src="assets/muxd_intro.gif" alt="muxd demo" width="700">
+</p>
+
+<p align="center">
+  <img src="assets/mobile-clients.png" alt="muxd mobile - node picker" height="400">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/mobile-chat.png" alt="muxd mobile - chat" height="400">
 </p>
 
 ---
