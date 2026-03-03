@@ -4,11 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
-	"strings"
-	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
 )
@@ -64,30 +60,6 @@ func GenerateQRCodeASCII(host string, port int, token string) (string, error) {
 	}
 
 	return qr.ToSmallString(false), nil
-}
-
-// FetchPublicIP queries cloud metadata endpoints to discover the instance's
-// public IPv4 address. Returns an empty string on non-cloud machines or if the
-// metadata service is unavailable.
-func FetchPublicIP() string {
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get("http://169.254.169.254/latest/meta-data/public-ipv4")
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return ""
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return ""
-	}
-	ip := strings.TrimSpace(string(body))
-	if net.ParseIP(ip) == nil {
-		return ""
-	}
-	return ip
 }
 
 // GetLocalIPs returns non-loopback IPv4 addresses for LAN connections.
