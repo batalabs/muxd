@@ -53,8 +53,14 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 	a.mu.Unlock()
 
 	if a.store != nil && a.session != nil {
-		if err := a.store.AppendMessage(a.session.ID, "user", userMsg.Content, 0); err != nil {
-			fmt.Fprintf(os.Stderr, "agent: persist user message: %v\n", err)
+		if len(userMsg.Blocks) > 0 {
+			if err := a.store.AppendMessageBlocks(a.session.ID, "user", userMsg.Blocks, 0); err != nil {
+				fmt.Fprintf(os.Stderr, "agent: persist user message blocks: %v\n", err)
+			}
+		} else {
+			if err := a.store.AppendMessage(a.session.ID, "user", userMsg.Content, 0); err != nil {
+				fmt.Fprintf(os.Stderr, "agent: persist user message: %v\n", err)
+			}
 		}
 	}
 
