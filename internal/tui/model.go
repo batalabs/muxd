@@ -2632,6 +2632,17 @@ func (m Model) handleQRCommand(args []string) (tea.Model, tea.Cmd) {
 			lines = append(lines, FooterMeta.Render("Local IPs: "+strings.Join(ips, ", ")))
 		}
 		lines = append(lines, FooterMeta.Render(fmt.Sprintf("Server: %s:%d", bindAddr, lf.Port)))
+
+		// Show token for manual entry
+		lines = append(lines, "")
+		lines = append(lines, FooterMeta.Render("Token: "+m.Daemon.AuthToken()))
+
+		// Try to detect public IP (AWS/cloud metadata)
+		if pubIP := daemon.FetchPublicIP(); pubIP != "" {
+			lines = append(lines, FooterMeta.Render("Public IP: "+pubIP))
+			lines = append(lines, "")
+			lines = append(lines, FooterMeta.Render(fmt.Sprintf("Remote: muxd --remote %s:%d --token %s", pubIP, lf.Port, m.Daemon.AuthToken())))
+		}
 	}
 
 	return m, PrintToScrollback(strings.Join(lines, "\n"))
