@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 import MarkdownUI
+import PhotosUI
+import UniformTypeIdentifiers
 
 // Glass effect modifier with iOS 26+ liquid glass support
 struct GlassInputModifier: ViewModifier {
@@ -87,6 +89,18 @@ struct TintedGlassButtonStyle: ButtonStyle {
     }
 }
 
+struct ImageAttachmentPreview: Identifiable {
+    let id = UUID()
+    let thumbnail: UIImage
+    let attachment: ImageAttachment
+}
+
+struct FileAttachmentPreview: Identifiable {
+    let id = UUID()
+    let filename: String
+    let content: String
+}
+
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -98,6 +112,11 @@ struct ChatView: View {
     @State private var isStarred = false
     @State private var sessionTitle: String
     @State private var isReady = false
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var imageAttachments: [ImageAttachmentPreview] = []
+    @State private var fileAttachments: [FileAttachmentPreview] = []
+    @State private var showFileImporter = false
+    @State private var showPhotoPicker = false
     @FocusState private var inputFocused: Bool
 
     let session: Session
@@ -113,6 +132,10 @@ struct ChatView: View {
                 .truncationMode(.tail)
         }
         .frame(maxWidth: 200)
+    }
+
+    private var hasAttachments: Bool {
+        !inputText.isEmpty || !imageAttachments.isEmpty || !fileAttachments.isEmpty
     }
 
     init(session: Session) {
@@ -164,41 +187,134 @@ struct ChatView: View {
             .safeAreaInset(edge: .bottom) {
                 // Input bar with glass effect on entire container
                 VStack(spacing: 8) {
-                    HStack(spacing: 12) {
-                        TextField("Message", text: $inputText, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .font(.body)
-                            .lineLimit(1...6)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .modifier(GlassInputModifier())
-                            .focused($inputFocused)
-                            .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
-                            .onSubmit {
-                                sendMessage()
-                            }
-                            .onChange(of: speechRecognizer.transcript) { _, newValue in
-                                if !newValue.isEmpty {
-                                    inputText = newValue
+                    // Attachment previews (images + files)
+                    if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(imageAttachments) { preview in
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(uiImage: preview.thumbnail)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 60, height: 60)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        Button {
+                                            imageAttachments.removeAll { $0.id == preview.id }
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                        }
+                                        .offset(x: 4, y: -4)
+                                    }
+                                }
+                                ForEach(fileAttachments) { file in
+                                    ZStack(alignment: .topTrailing) {
+                                        VStack(spacing: 2) {
+                                            Image(systemName: "doc.text")
+                                                .font(.title3)
+                                            Text(file.filename)
+                                                .font(.system(size: 8))
+                                                .lineLimit(1)
+                                        }
+                                        .foregroundColor(.primary)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color(.systemGray5))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        Button {
+                                            fileAttachments.removeAll { $0.id == file.id }
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                        }
+                                        .offset(x: 4, y: -4)
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 16)
+                        }
+                    }
 
-                        // Mic button
-                        if speechRecognizer.isAuthorized && !viewModel.isStreaming {
-                            Button {
-                                speechRecognizer.toggleRecording()
-                            } label: {
-                                Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
+                    HStack(spacing: 8) {
+                        // Text field with inline trailing button
+                        HStack(spacing: 8) {
+                            TextField("Message", text: $inputText, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .font(.body)
+                                .lineLimit(1...6)
+                                .focused($inputFocused)
+                                .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
+                                .onSubmit {
+                                    sendMessage()
+                                }
+                                .onChange(of: speechRecognizer.transcript) { _, newValue in
+                                    if !newValue.isEmpty {
+                                        inputText = newValue
+                                    }
+                                }
+
+                            // Inline trailing button: mic → send arrow
+                            if viewModel.isStreaming {
+                                // Nothing inside the field while streaming
+                            } else if hasAttachments {
+                                // Send button
+                                Button(action: sendMessage) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.accentColor)
+                                }
+                            } else if speechRecognizer.isAuthorized {
+                                // Mic button
+                                Button {
+                                    speechRecognizer.toggleRecording()
+                                } label: {
+                                    Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
+                                        .font(.body)
+                                        .foregroundColor(speechRecognizer.isRecording ? .red : .secondary)
+                                }
                             }
-                            .buttonStyle(TintedGlassButtonStyle(tint: speechRecognizer.isRecording ? .red : .secondary))
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .modifier(GlassInputModifier())
 
-                        Button(action: viewModel.isStreaming ? cancelMessage : sendMessage) {
-                            Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.right")
+                        if viewModel.isStreaming {
+                            // Stop button while streaming
+                            Button(action: cancelMessage) {
+                                Image(systemName: "stop.fill")
+                            }
+                            .buttonStyle(TintedGlassButtonStyle(tint: .red))
+                        } else {
+                            // + attach menu
+                            Menu {
+                                Button {
+                                    showPhotoPicker = true
+                                } label: {
+                                    Label("Photo Library", systemImage: "photo.on.rectangle")
+                                }
+                                Button {
+                                    showFileImporter = true
+                                } label: {
+                                    Label("Files", systemImage: "paperclip")
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .background {
+                                        if #available(iOS 26.0, *) {
+                                            Circle().fill(.clear)
+                                                .glassEffect(.regular, in: .circle)
+                                        } else {
+                                            Circle().fill(.ultraThinMaterial)
+                                        }
+                                    }
+                            }
                         }
-                        .buttonStyle(TintedGlassButtonStyle(tint: viewModel.isStreaming ? .red : .accentColor))
-                        .disabled(inputText.isEmpty && !viewModel.isStreaming)
-                        .opacity(inputText.isEmpty && !viewModel.isStreaming ? 0.5 : 1)
                     }
 
                     // Token count badge
@@ -283,6 +399,13 @@ struct ChatView: View {
         } message: {
             Text(viewModel.error?.localizedDescription ?? "Unknown error")
         }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            handleImportedFiles(result)
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 5, matching: .images)
+        .onChange(of: selectedPhotos) { _, _ in
+            processSelectedPhotos()
+        }
         .task {
             viewModel.client = appState.getClient()
             viewModel.sseClient = appState.getSSEClient()
@@ -296,9 +419,77 @@ struct ChatView: View {
     }
 
     private func sendMessage() {
-        guard !inputText.isEmpty else { return }
-        viewModel.submit(text: inputText)
+        guard hasAttachments else { return }
+
+        // Build the text: user input + file contents
+        var fullText = inputText
+        for file in fileAttachments {
+            let fileBlock = "[\(file.filename)]\n```\n\(file.content)\n```"
+            if fullText.isEmpty {
+                fullText = fileBlock
+            } else {
+                fullText += "\n\n" + fileBlock
+            }
+        }
+
+        let images = imageAttachments.map { $0.attachment }
+        viewModel.submit(text: fullText, images: images)
         inputText = ""
+        imageAttachments = []
+        fileAttachments = []
+        selectedPhotos = []
+    }
+
+    private func handleImportedFiles(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result else { return }
+
+        for url in urls {
+            guard url.startAccessingSecurityScopedResource() else { continue }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            let filename = url.lastPathComponent
+            let uti = UTType(filenameExtension: url.pathExtension)
+
+            // Image files → route through image pipeline
+            if let uti, uti.conforms(to: .image) {
+                if let data = try? Data(contentsOf: url),
+                   let uiImage = UIImage(data: data),
+                   let prepared = ImageUtils.prepareForUpload(uiImage) {
+                    let base64 = prepared.data.base64EncodedString()
+                    let attachment = ImageAttachment(
+                        path: filename,
+                        mediaType: prepared.mediaType,
+                        data: base64
+                    )
+                    imageAttachments.append(ImageAttachmentPreview(thumbnail: uiImage, attachment: attachment))
+                }
+                continue
+            }
+
+            // Text-based files → read content
+            if let content = try? String(contentsOf: url, encoding: .utf8) {
+                fileAttachments.append(FileAttachmentPreview(filename: filename, content: content))
+            }
+        }
+    }
+
+    private func processSelectedPhotos() {
+        Task {
+            var previews: [ImageAttachmentPreview] = []
+            for item in selectedPhotos {
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let uiImage = UIImage(data: data),
+                      let prepared = ImageUtils.prepareForUpload(uiImage) else { continue }
+                let base64 = prepared.data.base64EncodedString()
+                let attachment = ImageAttachment(
+                    path: "photo_\(UUID().uuidString.prefix(8)).jpg",
+                    mediaType: prepared.mediaType,
+                    data: base64
+                )
+                previews.append(ImageAttachmentPreview(thumbnail: uiImage, attachment: attachment))
+            }
+            imageAttachments = previews
+        }
     }
 
     private func cancelMessage() {
@@ -349,6 +540,10 @@ struct MessageBubbleView: View {
     private var hasVisibleContent: Bool {
         // Has text content
         if !message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        // Has image blocks
+        if !message.imageBlocks.isEmpty {
             return true
         }
         // Has tool result blocks with actual content (these should show)
@@ -416,6 +611,13 @@ struct MessageBubbleView: View {
                             }
 
                         if !isActualUserMessage { Spacer(minLength: 20) }
+                    }
+                }
+
+                // Image blocks
+                if !message.imageBlocks.isEmpty {
+                    ForEach(message.imageBlocks) { block in
+                        ImageBlockView(block: block)
                     }
                 }
 
@@ -498,6 +700,27 @@ func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
     }
 
     return groups
+}
+
+struct ImageBlockView: View {
+    let block: ContentBlock
+
+    var body: some View {
+        if let data = block.decodedImageData, let uiImage = UIImage(data: data) {
+            VStack(alignment: .leading, spacing: 4) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 280, maxHeight: 350)
+                    .cornerRadius(12)
+                if let path = block.imagePath {
+                    Text(path)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
 }
 
 struct ToolResultBlockView: View {
@@ -997,11 +1220,28 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func submit(text: String) {
+    func submit(text: String, images: [ImageAttachment] = []) {
         guard let sseClient = sseClient else { return }
 
-        // Add user message immediately so it appears right away
-        let userMessage = TranscriptMessage(role: "user", content: text, blocks: nil)
+        // Build blocks for the user message preview
+        var blocks: [ContentBlock] = []
+        if !text.isEmpty {
+            blocks.append(ContentBlock(type: "text", text: text))
+        }
+        for img in images {
+            blocks.append(ContentBlock(
+                type: "image",
+                mediaType: img.mediaType,
+                base64Data: img.data,
+                imagePath: img.path
+            ))
+        }
+
+        let userMessage = TranscriptMessage(
+            role: "user",
+            content: text,
+            blocks: blocks.isEmpty ? nil : blocks
+        )
         messages.append(userMessage)
 
         streamingText = ""
@@ -1009,7 +1249,7 @@ class ChatViewModel: ObservableObject {
         activeTools = [:]
 
         setupSSEHandlers()
-        sseClient.submit(sessionID: sessionID, text: text)
+        sseClient.submit(sessionID: sessionID, text: text, images: images)
     }
 
     func cancel() {

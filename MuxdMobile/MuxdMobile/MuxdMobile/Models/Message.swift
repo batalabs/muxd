@@ -42,6 +42,10 @@ struct TranscriptMessage: Codable, Identifiable, Sendable {
         blocks?.filter { $0.type == "tool_result" } ?? []
     }
 
+    var imageBlocks: [ContentBlock] {
+        blocks?.filter { $0.type == "image" } ?? []
+    }
+
     /// Returns tool_result blocks with toolInputSummary populated from matching tool_use blocks
     func toolResultBlocksWithInput(from allMessages: [TranscriptMessage]) -> [ContentBlock] {
         let resultBlocks = toolResultBlocks
@@ -76,6 +80,9 @@ struct ContentBlock: Codable, Identifiable, Sendable {
     var toolInputSummary: String?  // e.g., file path for Read, command for Bash
     let toolResult: String?
     let isError: Bool?
+    let mediaType: String?
+    let base64Data: String?
+    let imagePath: String?
 
     var id: String {
         // Use toolUseID if available, otherwise generate stable ID from content
@@ -86,6 +93,9 @@ struct ContentBlock: Codable, Identifiable, Sendable {
         let textHash = (text ?? "").hashValue
         return "\(type)_\(textHash)"
     }
+
+    var isImageBlock: Bool { type == "image" && base64Data != nil }
+    var decodedImageData: Data? { Data(base64Encoded: base64Data ?? "") }
 
     // Check if tool result contains base64 image data
     var isImageResult: Bool {
@@ -118,6 +128,9 @@ struct ContentBlock: Codable, Identifiable, Sendable {
         case toolInput = "tool_input"
         case toolResult = "tool_result"
         case isError = "is_error"
+        case mediaType = "media_type"
+        case base64Data = "base64_data"
+        case imagePath = "image_path"
     }
 
     init(from decoder: Decoder) throws {
@@ -128,6 +141,9 @@ struct ContentBlock: Codable, Identifiable, Sendable {
         toolName = try container.decodeIfPresent(String.self, forKey: .toolName)
         toolResult = try container.decodeIfPresent(String.self, forKey: .toolResult)
         isError = try container.decodeIfPresent(Bool.self, forKey: .isError)
+        mediaType = try container.decodeIfPresent(String.self, forKey: .mediaType)
+        base64Data = try container.decodeIfPresent(String.self, forKey: .base64Data)
+        imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
 
         // Parse tool_input and extract summary
         if let toolInput = try container.decodeIfPresent([String: AnyCodable].self, forKey: .toolInput) {
@@ -145,7 +161,24 @@ struct ContentBlock: Codable, Identifiable, Sendable {
         try container.encodeIfPresent(toolName, forKey: .toolName)
         try container.encodeIfPresent(toolResult, forKey: .toolResult)
         try container.encodeIfPresent(isError, forKey: .isError)
+        try container.encodeIfPresent(mediaType, forKey: .mediaType)
+        try container.encodeIfPresent(base64Data, forKey: .base64Data)
+        try container.encodeIfPresent(imagePath, forKey: .imagePath)
         // Note: toolInputSummary is derived, not encoded
+    }
+
+    init(type: String, text: String? = nil, mediaType: String? = nil,
+         base64Data: String? = nil, imagePath: String? = nil) {
+        self.type = type
+        self.text = text
+        self.toolUseID = nil
+        self.toolName = nil
+        self.toolInputSummary = nil
+        self.toolResult = nil
+        self.isError = nil
+        self.mediaType = mediaType
+        self.base64Data = base64Data
+        self.imagePath = imagePath
     }
 
     /// Extracts a human-readable summary from tool input based on tool type

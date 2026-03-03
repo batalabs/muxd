@@ -1,5 +1,17 @@
 import Foundation
 
+struct ImageAttachment: Codable, Sendable {
+    let path: String
+    let mediaType: String
+    let data: String // base64-encoded
+
+    enum CodingKeys: String, CodingKey {
+        case path
+        case mediaType = "media_type"
+        case data
+    }
+}
+
 final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let baseURL: URL
     private let authToken: String
@@ -32,7 +44,7 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         super.init()
     }
 
-    func submit(sessionID: String, text: String) {
+    func submit(sessionID: String, text: String, images: [ImageAttachment] = []) {
         // Invalidate previous session to prevent memory leak
         session?.invalidateAndCancel()
 
@@ -47,8 +59,16 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
 
-        let body = ["text": text]
-        request.httpBody = try? JSONEncoder().encode(body)
+        if images.isEmpty {
+            let body = ["text": text]
+            request.httpBody = try? JSONEncoder().encode(body)
+        } else {
+            struct SubmitBody: Codable {
+                let text: String
+                let images: [ImageAttachment]
+            }
+            request.httpBody = try? JSONEncoder().encode(SubmitBody(text: text, images: images))
+        }
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 300 // 5 min for long operations
