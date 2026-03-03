@@ -1085,6 +1085,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case tea.KeySpace:
+		if !m.thinking {
+			m.dismissCompletions()
+			m.insertInputAtCursor(" ")
+			m.resetHistory()
+			m.lastKeypressTime = time.Now()
+		}
+		return m, nil
+
 	default:
 		if !m.thinking {
 			m.dismissCompletions()
