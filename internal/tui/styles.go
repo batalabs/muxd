@@ -37,4 +37,6 @@ var (
 
 	CompletionStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	CompletionSelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("62"))
+
+	HubStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))
 )

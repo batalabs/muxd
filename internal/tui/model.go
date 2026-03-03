@@ -136,6 +136,11 @@ type ShellResultMsg struct {
 	Err    error
 }
 
+// HubSyncMsg signals that new memory facts were synced from the hub.
+type HubSyncMsg struct {
+	Count int
+}
+
 // Checkpoint represents a snapshot of the working tree.
 type Checkpoint struct {
 	TurnNumber int
@@ -429,6 +434,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ShellResultMsg:
 		return m.handleShellResult(msg)
+
+	case HubSyncMsg:
+		text := fmt.Sprintf("[hub] synced %d memory facts", msg.Count)
+		return m, PrintToScrollback(HubStyle.Render(text))
 
 	case spinner.TickMsg:
 		if m.thinking {

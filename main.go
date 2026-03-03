@@ -266,7 +266,10 @@ func main() {
 				// Fetch and merge hub memory
 				mergeHubMemory(hubClient)
 
-				// Start heartbeat loop
+				// Start heartbeat loop with periodic memory sync
+				cwd, _ := os.Getwd()
+				mem := tools.NewProjectMemory(cwd)
+				syncCounter := 0
 				ticker := time.NewTicker(30 * time.Second)
 				defer ticker.Stop()
 				for {
@@ -274,6 +277,23 @@ func main() {
 					case <-ticker.C:
 						if err := hubClient.Heartbeat(nodeID); err != nil {
 							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+						}
+						syncCounter++
+						if syncCounter%2 == 0 {
+							oldFacts, _ := mem.Load()
+							hubFacts, err := hubClient.FetchMemory()
+							if err == nil && len(hubFacts) > 0 {
+								newCount := 0
+								for k, v := range hubFacts {
+									if old, ok := oldFacts[k]; !ok || old != v {
+										newCount++
+									}
+								}
+								if newCount > 0 {
+									mem.MergeHub(hubFacts)
+									fmt.Fprintf(os.Stderr, "hub: synced %d memory facts\n", newCount)
+								}
+							}
 						}
 					case <-ctx.Done():
 						return
@@ -368,6 +388,10 @@ func main() {
 				// Fetch and merge hub memory
 				mergeHubMemory(embeddedHubClient)
 
+				// Start heartbeat loop with periodic memory sync
+				cwd, _ := os.Getwd()
+				mem := tools.NewProjectMemory(cwd)
+				syncCounter := 0
 				ticker := time.NewTicker(30 * time.Second)
 				defer ticker.Stop()
 				for {
@@ -375,6 +399,25 @@ func main() {
 					case <-ticker.C:
 						if err := embeddedHubClient.Heartbeat(nodeID); err != nil {
 							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+						}
+						syncCounter++
+						if syncCounter%2 == 0 {
+							oldFacts, _ := mem.Load()
+							hubFacts, err := embeddedHubClient.FetchMemory()
+							if err == nil && len(hubFacts) > 0 {
+								newCount := 0
+								for k, v := range hubFacts {
+									if old, ok := oldFacts[k]; !ok || old != v {
+										newCount++
+									}
+								}
+								if newCount > 0 {
+									mem.MergeHub(hubFacts)
+									if tui.Prog != nil {
+										tui.Prog.Send(tui.HubSyncMsg{Count: newCount})
+									}
+								}
+							}
 						}
 					case <-embeddedHubDone:
 						return
