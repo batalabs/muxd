@@ -107,11 +107,15 @@ func (a *Service) llmTitle(userText, asstText, titleModel string) string {
 	return title
 }
 
-// Cancel signals the running Submit loop to stop at the next safe point.
+// Cancel signals the running Submit loop to stop at the next safe point
+// and cancels any in-progress tool execution (e.g. bash commands).
 func (a *Service) Cancel() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.cancelled = true
+	if a.cancelFunc != nil {
+		a.cancelFunc()
+	}
 }
 
 // Resume loads messages from the database for the current session.

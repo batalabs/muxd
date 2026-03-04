@@ -56,6 +56,7 @@ type MCPManager interface {
 
 // ToolContext provides shared state to tool implementations.
 type ToolContext struct {
+	Ctx                context.Context
 	Cwd                string
 	Todos              *TodoList
 	Memory             *ProjectMemory
@@ -423,7 +424,13 @@ func bashTool() ToolDef {
 				}
 			}
 
-			cmdCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+			var parent context.Context
+			if ctx != nil && ctx.Ctx != nil {
+				parent = ctx.Ctx
+			} else {
+				parent = context.Background()
+			}
+			cmdCtx, cancel := context.WithTimeout(parent, time.Duration(timeout)*time.Second)
 			defer cancel()
 
 			var cmd *exec.Cmd
@@ -452,6 +459,9 @@ func bashTool() ToolDef {
 			}
 
 			if err != nil {
+				if cmdCtx.Err() == context.Canceled {
+					return result + "\n(cancelled)", nil
+				}
 				if cmdCtx.Err() == context.DeadlineExceeded {
 					return result + "\n(command timed out after " + strconv.Itoa(timeout) + "s)", nil
 				}

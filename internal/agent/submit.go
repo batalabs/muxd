@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -39,11 +40,15 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 	a.running = true
 	a.cancelled = false
 	a.agentLoopCount = 0
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	a.cancelFunc = cancelCtx
 	a.mu.Unlock()
 
 	defer func() {
+		cancelCtx()
 		a.mu.Lock()
 		a.running = false
+		a.cancelFunc = nil
 		a.mu.Unlock()
 	}()
 
@@ -97,6 +102,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			mcpMgr = a.mcpManager
 		}
 		toolCtx := &tools.ToolContext{
+			Ctx:            ctx,
 			Cwd:            cwd,
 			Todos:          &a.todos,
 			Memory:         a.memory,
