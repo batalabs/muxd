@@ -26,14 +26,14 @@ struct NodePickerView: View {
                     Section {
                         ForEach(appState.hubNodes) { node in
                             Button {
-                                if node.isOnline && !appState.isConnected {
+                                if node.isOnline {
                                     appState.selectNode(node)
                                     navigationPath.append("sessions")
                                 }
                             } label: {
                                 NodeRowView(node: node)
                             }
-                            .disabled(!node.isOnline || appState.isConnected)
+                            .disabled(!node.isOnline)
                         }
                     } header: {
                         HStack {
@@ -106,6 +106,11 @@ struct NodePickerView: View {
                 RenameConnectionView(connection: info) { newName in
                     appState.renameConnection(id: info.id, name: newName)
                 }
+            }
+        }
+        .onAppear {
+            if appState.isConnected {
+                appState.deselectNode()
             }
         }
         .task {

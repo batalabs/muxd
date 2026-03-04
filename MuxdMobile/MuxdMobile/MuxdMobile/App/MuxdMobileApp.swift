@@ -145,6 +145,7 @@ struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @State private var showScanner = false
     @State private var showManual = false
+    @State private var scannedInfo: ConnectionInfo?
 
     var body: some View {
         NavigationStack {
@@ -172,7 +173,7 @@ struct HomeView: View {
                             .cornerRadius(12)
                     }
 
-                    Button(action: { showManual = true }) {
+                    Button(action: { scannedInfo = nil; showManual = true }) {
                         Label("Enter Manually", systemImage: "keyboard")
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -196,12 +197,19 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showScanner) {
             QRScannerView { info in
-                Task { await appState.connect(with: info) }
+                scannedInfo = info
             }
         }
         .sheet(isPresented: $showManual) {
-            ManualConnectionView { info in
-                Task { await appState.connect(with: info) }
+            ManualConnectionView(prefill: scannedInfo) { _ in
+                scannedInfo = nil
+            }
+        }
+        .onChange(of: showScanner) { _, isShowing in
+            if !isShowing && scannedInfo != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    showManual = true
+                }
             }
         }
         .alert(item: $appState.error) { error in
@@ -219,6 +227,8 @@ struct ClientsView: View {
     @State private var navigationPath = NavigationPath()
     @State private var showScanner = false
     @State private var showManual = false
+    @State private var showAddOptions = false
+    @State private var scannedInfo: ConnectionInfo?
     @State private var connectionToRename: ConnectionInfo?
     @State private var connectingToID: String? = nil
     @State private var tokenToShow: ConnectionInfo?
@@ -284,7 +294,9 @@ struct ClientsView: View {
                     .modifier(AppGlassModifier())
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showScanner = true }) {
+                    Button {
+                        showAddOptions = true
+                    } label: {
                         Image(systemName: "plus")
                     }
                 }
@@ -313,29 +325,36 @@ struct ClientsView: View {
                 navigationPath = NavigationPath()
             }
         }
+        .alert("Add Connection", isPresented: $showAddOptions) {
+            Button("Scan QR Code") {
+                showScanner = true
+            }
+            Button("Enter Manually") {
+                scannedInfo = nil
+                showManual = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(isPresented: $showScanner) {
             QRScannerView { info in
-                Task {
-                    await appState.connect(with: info)
-                    navigationPath = NavigationPath()
-                    if appState.connectionMode == .hub {
-                        navigationPath.append("nodePicker")
-                    } else if appState.isConnected {
-                        navigationPath.append("sessions")
-                    }
-                }
+                scannedInfo = info
             }
         }
         .sheet(isPresented: $showManual) {
-            ManualConnectionView { info in
-                Task {
-                    await appState.connect(with: info)
-                    navigationPath = NavigationPath()
-                    if appState.connectionMode == .hub {
-                        navigationPath.append("nodePicker")
-                    } else if appState.isConnected {
-                        navigationPath.append("sessions")
-                    }
+            ManualConnectionView(prefill: scannedInfo) { _ in
+                scannedInfo = nil
+                navigationPath = NavigationPath()
+                if appState.connectionMode == .hub {
+                    navigationPath.append("nodePicker")
+                } else if appState.isConnected {
+                    navigationPath.append("sessions")
+                }
+            }
+        }
+        .onChange(of: showScanner) { _, isShowing in
+            if !isShowing && scannedInfo != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    showManual = true
                 }
             }
         }

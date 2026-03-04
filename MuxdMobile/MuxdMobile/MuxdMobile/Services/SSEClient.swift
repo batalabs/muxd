@@ -102,8 +102,12 @@ final class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error = error {
-            // Ignore cancellation errors
-            if (error as NSError).code == NSURLErrorCancelled {
+            let nsError = error as NSError
+            // Ignore cancellation and network-lost errors (e.g. app backgrounded)
+            if nsError.code == NSURLErrorCancelled ||
+               nsError.code == NSURLErrorNetworkConnectionLost {
+                let callback = onComplete
+                DispatchQueue.main.async { callback?() }
                 return
             }
             let callback = onError

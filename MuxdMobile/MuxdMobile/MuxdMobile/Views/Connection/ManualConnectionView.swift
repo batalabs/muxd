@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ManualConnectionView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
     @State private var name = ""
     @State private var host = ""
     @State private var port = "4096"
@@ -9,7 +10,13 @@ struct ManualConnectionView: View {
     @State private var isConnecting = false
     @State private var error: String?
 
-    let onConnect: (ConnectionInfo) -> Void
+    var prefill: ConnectionInfo?
+    let onConnected: ((ConnectionInfo) -> Void)?
+
+    init(prefill: ConnectionInfo? = nil, onConnected: ((ConnectionInfo) -> Void)? = nil) {
+        self.prefill = prefill
+        self.onConnected = onConnected
+    }
 
     var isValid: Bool {
         !host.isEmpty && !port.isEmpty && !token.isEmpty
@@ -45,32 +52,55 @@ struct ManualConnectionView: View {
 
                 if let error = error {
                     Section {
-                        Text(error)
-                            .foregroundColor(.red)
+                        Label {
+                            Text(error)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
+
+                Section {
+                    Label {
+                        Text("Connections are unencrypted. Only connect over a trusted network such as a VPN or local network.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } icon: {
+                        Image(systemName: "lock.shield")
+                            .foregroundColor(.orange)
                     }
                 }
             }
-            .navigationTitle("Manual Connection")
+            .navigationTitle(prefill != nil ? "Confirm Connection" : "Manual Connection")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if let info = prefill {
+                    host = info.host
+                    port = String(info.port)
+                    token = info.token
+                    name = info.name != info.host ? info.name : ""
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isConnecting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Connect") {
-                        connect()
+                    if isConnecting {
+                        ProgressView()
+                    } else {
+                        Button("Connect") {
+                            connect()
+                        }
+                        .disabled(!isValid)
                     }
-                    .disabled(!isValid || isConnecting)
                 }
             }
-            .overlay {
-                if isConnecting {
-                    ProgressView("Connecting...")
-                        .padding()
-                        .background(.regularMaterial)
-                        .cornerRadius(8)
-                }
-            }
+            .disabled(isConnecting)
+            .interactiveDismissDisabled(isConnecting)
         }
     }
 
@@ -93,7 +123,18 @@ struct ManualConnectionView: View {
             name: serverName
         )
 
-        onConnect(info)
-        dismiss()
+        Task {
+            await appState.connect(with: info)
+
+            if appState.error != nil {
+                error = appState.error?.localizedDescription ?? "Connection failed"
+                appState.error = nil
+                isConnecting = false
+            } else {
+                isConnecting = false
+                onConnected?(info)
+                dismiss()
+            }
+        }
     }
 }

@@ -5,6 +5,8 @@ struct ConnectionView: View {
     @Binding var selectedTab: Int
     @State private var showScanner = false
     @State private var showManual = false
+    @State private var showAddOptions = false
+    @State private var scannedInfo: ConnectionInfo?
     @State private var connectionToRename: ConnectionInfo?
     @State private var connectingToID: String? = nil
 
@@ -41,7 +43,7 @@ struct ConnectionView: View {
                     }
                     .disabled(connectingToID != nil)
 
-                    Button(action: { showManual = true }) {
+                    Button(action: { scannedInfo = nil; showManual = true }) {
                         Label("Enter Manually", systemImage: "keyboard")
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -52,6 +54,16 @@ struct ConnectionView: View {
                     .disabled(connectingToID != nil)
                 }
                 .padding(.horizontal, 24)
+                .padding(.bottom, 12)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("Use on a trusted network (VPN or local)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 .padding(.bottom, 24)
 
                 // Saved connections (scrollable)
@@ -98,29 +110,41 @@ struct ConnectionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showScanner = true }) {
+                    Button {
+                        showAddOptions = true
+                    } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
         }
+        .confirmationDialog("Add Connection", isPresented: $showAddOptions) {
+            Button("Scan QR Code") {
+                showScanner = true
+            }
+            Button("Enter Manually") {
+                scannedInfo = nil
+                showManual = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(isPresented: $showScanner) {
             QRScannerView { info in
-                Task {
-                    await appState.connect(with: info)
-                    if appState.isConnected {
-                        selectedTab = 1 // Switch to Sessions tab
-                    }
+                scannedInfo = info
+            }
+        }
+        .onChange(of: showScanner) { _, isShowing in
+            if !isShowing && scannedInfo != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    showManual = true
                 }
             }
         }
         .sheet(isPresented: $showManual) {
-            ManualConnectionView { info in
-                Task {
-                    await appState.connect(with: info)
-                    if appState.isConnected {
-                        selectedTab = 1 // Switch to Sessions tab
-                    }
+            ManualConnectionView(prefill: scannedInfo) { _ in
+                scannedInfo = nil
+                if appState.isConnected {
+                    selectedTab = 1
                 }
             }
         }

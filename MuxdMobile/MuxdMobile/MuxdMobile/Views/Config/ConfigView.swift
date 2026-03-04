@@ -83,11 +83,7 @@ struct ConfigView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: {
-                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-                        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-                        return "\(version) (\(build))"
-                    }())
+                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                     Link(destination: URL(string: "https://www.muxd.sh/support")!) {
                         HStack {
                             Text("Get Help")

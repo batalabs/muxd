@@ -138,6 +138,167 @@ struct ChatView: View {
         !inputText.isEmpty || !imageAttachments.isEmpty || !fileAttachments.isEmpty
     }
 
+    @ViewBuilder
+    private var inputBar: some View {
+        VStack(spacing: 8) {
+            // Attachment previews (images + files)
+            if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
+                attachmentPreviews
+            }
+
+            HStack(spacing: 8) {
+                // Text field with inline trailing button
+                HStack(spacing: 8) {
+                    TextField("Message", text: $inputText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.body)
+                        .lineLimit(1...6)
+                        .focused($inputFocused)
+                        .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
+                        .onSubmit {
+                            sendMessage()
+                        }
+                        .onChange(of: speechRecognizer.transcript) { _, newValue in
+                            if !newValue.isEmpty {
+                                inputText = newValue
+                            }
+                        }
+
+                    // Inline trailing button: mic -> send arrow
+                    if viewModel.isStreaming {
+                        // Nothing inside the field while streaming
+                    } else if hasAttachments {
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.accentColor)
+                        }
+                    } else if speechRecognizer.isAuthorized {
+                        Button {
+                            speechRecognizer.toggleRecording()
+                        } label: {
+                            Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
+                                .font(.body)
+                                .foregroundColor(speechRecognizer.isRecording ? .red : .secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .modifier(GlassInputModifier())
+
+                if viewModel.isStreaming {
+                    Button(action: cancelMessage) {
+                        Image(systemName: "stop.fill")
+                    }
+                    .buttonStyle(TintedGlassButtonStyle(tint: .red))
+                } else {
+                    attachMenu
+                }
+            }
+
+            // Token count badge
+            if viewModel.inputTokens > 0 || viewModel.outputTokens > 0 || viewModel.isStreaming {
+                HStack {
+                    HStack(spacing: 4) {
+                        if viewModel.isStreaming {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                        }
+                        Text("\(viewModel.inputTokens) in / \(viewModel.outputTokens) out")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(12)
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var attachmentPreviews: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(imageAttachments) { preview in
+                    Image(uiImage: preview.thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(alignment: .topTrailing) {
+                            Button {
+                                imageAttachments.removeAll { $0.id == preview.id }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.white, Color.black.opacity(0.6))
+                            }
+                            .offset(x: 6, y: -6)
+                        }
+                        .padding(.top, 6)
+                }
+                ForEach(fileAttachments) { file in
+                    VStack(spacing: 2) {
+                        Image(systemName: "doc.text")
+                            .font(.title3)
+                        Text(file.filename)
+                            .font(.system(size: 8))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(.primary)
+                    .frame(width: 60, height: 60)
+                    .background(Color(.systemGray5))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            fileAttachments.removeAll { $0.id == file.id }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white, Color.black.opacity(0.6))
+                        }
+                        .offset(x: 6, y: -6)
+                    }
+                    .padding(.top, 6)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var attachMenu: some View {
+        Menu {
+            Button {
+                showPhotoPicker = true
+            } label: {
+                Label("Photo Library", systemImage: "photo.on.rectangle")
+            }
+            Button {
+                showFileImporter = true
+            } label: {
+                Label("Files", systemImage: "paperclip")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.title3.weight(.semibold))
+                .foregroundColor(.primary)
+                .frame(width: 44, height: 44)
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular, in: .circle)
+                    } else {
+                        Circle().fill(.ultraThinMaterial)
+                    }
+                }
+        }
+    }
+
     init(session: Session) {
         self.session = session
         _viewModel = StateObject(wrappedValue: ChatViewModel(sessionID: session.id))
@@ -185,160 +346,7 @@ struct ChatView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                // Input bar with glass effect on entire container
-                VStack(spacing: 8) {
-                    // Attachment previews (images + files)
-                    if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(imageAttachments) { preview in
-                                    ZStack(alignment: .topTrailing) {
-                                        Image(uiImage: preview.thumbnail)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 60, height: 60)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        Button {
-                                            imageAttachments.removeAll { $0.id == preview.id }
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.white)
-                                                .background(Circle().fill(Color.black.opacity(0.6)))
-                                        }
-                                        .offset(x: 4, y: -4)
-                                    }
-                                }
-                                ForEach(fileAttachments) { file in
-                                    ZStack(alignment: .topTrailing) {
-                                        VStack(spacing: 2) {
-                                            Image(systemName: "doc.text")
-                                                .font(.title3)
-                                            Text(file.filename)
-                                                .font(.system(size: 8))
-                                                .lineLimit(1)
-                                        }
-                                        .foregroundColor(.primary)
-                                        .frame(width: 60, height: 60)
-                                        .background(Color(.systemGray5))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        Button {
-                                            fileAttachments.removeAll { $0.id == file.id }
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.white)
-                                                .background(Circle().fill(Color.black.opacity(0.6)))
-                                        }
-                                        .offset(x: 4, y: -4)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        // Text field with inline trailing button
-                        HStack(spacing: 8) {
-                            TextField("Message", text: $inputText, axis: .vertical)
-                                .textFieldStyle(.plain)
-                                .font(.body)
-                                .lineLimit(1...6)
-                                .focused($inputFocused)
-                                .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
-                                .onSubmit {
-                                    sendMessage()
-                                }
-                                .onChange(of: speechRecognizer.transcript) { _, newValue in
-                                    if !newValue.isEmpty {
-                                        inputText = newValue
-                                    }
-                                }
-
-                            // Inline trailing button: mic → send arrow
-                            if viewModel.isStreaming {
-                                // Nothing inside the field while streaming
-                            } else if hasAttachments {
-                                // Send button
-                                Button(action: sendMessage) {
-                                    Image(systemName: "arrow.up.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.accentColor)
-                                }
-                            } else if speechRecognizer.isAuthorized {
-                                // Mic button
-                                Button {
-                                    speechRecognizer.toggleRecording()
-                                } label: {
-                                    Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
-                                        .font(.body)
-                                        .foregroundColor(speechRecognizer.isRecording ? .red : .secondary)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .modifier(GlassInputModifier())
-
-                        if viewModel.isStreaming {
-                            // Stop button while streaming
-                            Button(action: cancelMessage) {
-                                Image(systemName: "stop.fill")
-                            }
-                            .buttonStyle(TintedGlassButtonStyle(tint: .red))
-                        } else {
-                            // + attach menu
-                            Menu {
-                                Button {
-                                    showPhotoPicker = true
-                                } label: {
-                                    Label("Photo Library", systemImage: "photo.on.rectangle")
-                                }
-                                Button {
-                                    showFileImporter = true
-                                } label: {
-                                    Label("Files", systemImage: "paperclip")
-                                }
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 44, height: 44)
-                                    .background {
-                                        if #available(iOS 26.0, *) {
-                                            Circle().fill(.clear)
-                                                .glassEffect(.regular, in: .circle)
-                                        } else {
-                                            Circle().fill(.ultraThinMaterial)
-                                        }
-                                    }
-                            }
-                        }
-                    }
-
-                    // Token count badge
-                    if viewModel.inputTokens > 0 || viewModel.outputTokens > 0 || viewModel.isStreaming {
-                        HStack {
-                            HStack(spacing: 4) {
-                                if viewModel.isStreaming {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                }
-                                Text("\(viewModel.inputTokens) in / \(viewModel.outputTokens) out")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(12)
-                            Spacer()
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                inputBar
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -606,7 +614,7 @@ struct MessageBubbleView: View {
                                     let generator = UINotificationFeedbackGenerator()
                                     generator.notificationOccurred(.success)
                                 } label: {
-                                    Label("Copy", systemImage: "doc.on.doc")
+                                    Label("Copy", systemImage: "square.on.square")
                                 }
                             }
 
@@ -616,8 +624,14 @@ struct MessageBubbleView: View {
 
                 // Image blocks
                 if !message.imageBlocks.isEmpty {
-                    ForEach(message.imageBlocks) { block in
-                        ImageBlockView(block: block)
+                    HStack {
+                        if isActualUserMessage { Spacer(minLength: 60) }
+                        VStack(alignment: isActualUserMessage ? .trailing : .leading, spacing: 4) {
+                            ForEach(message.imageBlocks) { block in
+                                ImageBlockView(block: block, isUserMessage: isActualUserMessage)
+                            }
+                        }
+                        if !isActualUserMessage { Spacer(minLength: 20) }
                     }
                 }
 
@@ -704,10 +718,11 @@ func groupToolResults(_ blocks: [ContentBlock]) -> [GroupedToolResult] {
 
 struct ImageBlockView: View {
     let block: ContentBlock
+    var isUserMessage: Bool = false
 
     var body: some View {
         if let data = block.decodedImageData, let uiImage = UIImage(data: data) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: isUserMessage ? .trailing : .leading, spacing: 4) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -717,6 +732,7 @@ struct ImageBlockView: View {
                     Text(path)
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(isUserMessage ? .trailing : .leading)
                 }
             }
         }
@@ -781,11 +797,13 @@ struct ToolResultBlockView: View {
                                 copied = false
                             }
                         } label: {
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                .font(.caption2)
+                            Image(systemName: copied ? "checkmark.circle.fill" : "square.on.square")
+                                .font(.system(size: 14))
                                 .foregroundColor(copied ? .green : .secondary)
+                                .frame(width: 28, height: 28)
+                                .background(Color(.systemGray5))
+                                .clipShape(Circle())
                         }
-                        .buttonStyle(.plain)
                     }
 
                     Text(truncateToLines(result, maxLines: 5))
@@ -960,15 +978,13 @@ struct CodeBlockView: View {
                         copied = false
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.caption2)
-                        Text(copied ? "Copied" : "Copy")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(copied ? .green : .secondary)
+                    Image(systemName: copied ? "checkmark.circle.fill" : "square.on.square")
+                        .font(.system(size: 14))
+                        .foregroundColor(copied ? .green : .secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color(.systemGray5))
+                        .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 8)
             .padding(.top, 6)
