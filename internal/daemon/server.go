@@ -908,7 +908,7 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 			ag.SetTextbeltAPIKey(req.Value)
 		}
 	}
-	if req.Key == "tools.disabled" {
+	if req.Key == "tools.disabled" || req.Key == "tools.ask_user" {
 		disabled := s.prefs.DisabledToolsSet()
 		for _, ag := range s.agents {
 			ag.SetDisabledTools(disabled)
