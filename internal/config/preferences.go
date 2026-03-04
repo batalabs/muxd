@@ -38,6 +38,7 @@ type Preferences struct {
 	TextbeltAPIKey        string `json:"textbelt_api_key,omitempty"`
 	SchedulerAllowedTools string `json:"scheduler_allowed_tools,omitempty"`
 	ToolsDisabled         string `json:"tools_disabled,omitempty"`
+	ToolsAskUser          *bool  `json:"tools_ask_user,omitempty"`
 	OllamaURL             string `json:"ollama_url,omitempty"`
 
 	// Daemon settings
@@ -78,7 +79,7 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "tools",
-		Keys: []string{"brave.api_key", "textbelt.api_key", "scheduler.allowed_tools"},
+		Keys: []string{"tools.disabled", "tools.ask_user", "brave.api_key", "textbelt.api_key", "scheduler.allowed_tools"},
 	},
 	{
 		Name: "daemon",
@@ -433,6 +434,11 @@ func (p Preferences) Get(key string) string {
 		return p.SchedulerAllowedTools
 	case "tools.disabled":
 		return p.ToolsDisabled
+	case "tools.ask_user":
+		if p.ToolsAskUser != nil && !*p.ToolsAskUser {
+			return "false"
+		}
+		return "true"
 	case "ollama.url":
 		return p.OllamaURL
 	case "daemon.bind_address":
@@ -520,6 +526,12 @@ func (p *Preferences) Set(key, value string) error {
 		p.SchedulerAllowedTools = value
 	case "tools.disabled":
 		p.ToolsDisabled = value
+	case "tools.ask_user":
+		b, err := ParseBoolish(value)
+		if err != nil {
+			return err
+		}
+		p.ToolsAskUser = &b
 	case "ollama.url":
 		p.OllamaURL = value
 	case "daemon.bind_address":
@@ -712,18 +724,21 @@ func ParseBoolish(s string) (bool, error) {
 
 // DisabledToolsSet parses tools.disabled into a normalized set.
 // Format: comma-separated tool names (e.g. "sms_send,web_fetch").
+// Also includes ask_user when tools.ask_user is false.
 func (p Preferences) DisabledToolsSet() map[string]bool {
 	out := map[string]bool{}
 	raw := strings.TrimSpace(p.ToolsDisabled)
-	if raw == "" {
-		return out
-	}
-	for _, part := range strings.Split(raw, ",") {
-		name := strings.ToLower(strings.TrimSpace(part))
-		if name == "" {
-			continue
+	if raw != "" {
+		for _, part := range strings.Split(raw, ",") {
+			name := strings.ToLower(strings.TrimSpace(part))
+			if name == "" {
+				continue
+			}
+			out[name] = true
 		}
-		out[name] = true
+	}
+	if p.ToolsAskUser != nil && !*p.ToolsAskUser {
+		out["ask_user"] = true
 	}
 	return out
 }
