@@ -6,8 +6,8 @@ import (
 )
 
 // uiFileServer is a placeholder for the hub management UI.
-// To embed UI assets, place them in internal/hub/ui/ and build
-// with the hubui tag: go build -tags hubui .
+// To embed UI assets, place them in internal/hub/ui/ and replace
+// this stub with the embed version.
 type uiFileServer struct{}
 
 func newUIFileServer() (*uiFileServer, error) {
