@@ -357,7 +357,7 @@ func main() {
 		embeddedServer.SetLogger(logger)
 		go func() {
 			if err := embeddedServer.Start(4096); err != nil {
-				fmt.Fprintf(os.Stderr, "embedded server error: %v\n", err)
+				logStderr("embedded server error: %v", err)
 			}
 		}()
 		// Port() blocks until Start() has bound the listener, so no race.
@@ -379,11 +379,11 @@ func main() {
 				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
 				nodeID, err := embeddedHubClient.Register(name, regHost, port, version)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
+					logStderr("hub: registration failed: %v", err)
 					return
 				}
 				embeddedHubNodeID = nodeID
-				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
+				logStderr("hub: registered as node %s", nodeID)
 
 				// Fetch and merge hub memory
 				mergeHubMemory(embeddedHubClient)
@@ -398,7 +398,7 @@ func main() {
 					select {
 					case <-ticker.C:
 						if err := embeddedHubClient.Heartbeat(nodeID); err != nil {
-							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+							logStderr("hub: heartbeat failed: %v", err)
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
@@ -507,6 +507,18 @@ func resetTerminalForTUI() {
 	fmt.Println()
 }
 
+// logStderr prints a message to stderr. When the TUI is active, it uses
+// tui.Prog.Println so the output renders correctly in raw terminal mode
+// (plain \n doesn't do a carriage return on macOS in raw mode).
+func logStderr(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	if tui.Prog != nil {
+		tui.Prog.Println(msg)
+	} else {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+}
+
 func mustGetwd() string {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -544,7 +556,7 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 func mergeHubMemory(hubClient *hub.NodeClient) {
 	hubFacts, err := hubClient.FetchMemory()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "hub: fetch memory failed: %v\n", err)
+		logStderr("hub: fetch memory failed: %v", err)
 		return
 	}
 	if len(hubFacts) == 0 {
@@ -556,10 +568,10 @@ func mergeHubMemory(hubClient *hub.NodeClient) {
 	}
 	mem := tools.NewProjectMemory(cwd)
 	if err := mem.MergeHub(hubFacts); err != nil {
-		fmt.Fprintf(os.Stderr, "hub: merge memory failed: %v\n", err)
+		logStderr("hub: merge memory failed: %v", err)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "hub: merged %d memory facts\n", len(hubFacts))
+	logStderr("hub: merged %d memory facts", len(hubFacts))
 }
 
 // resolveHubRegistrationHost determines the host address to register with the hub.
