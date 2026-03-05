@@ -103,16 +103,17 @@ struct StreamingStatusView: View {
     }
 }
 
-/// Mimics the CLI's MiniDot spinner — a small pulsing circle
+/// Mimics the CLI's MiniDot spinner — now using the muxd logo
 struct MiniDotSpinner: View {
     @State private var phase = 0.0
 
     var body: some View {
-        Circle()
-            .fill(Color.purple)
-            .frame(width: 8, height: 8)
-            .scaleEffect(0.6 + 0.4 * sin(phase))
-            .opacity(0.5 + 0.5 * sin(phase))
+        Image("Logo")
+            .resizable()
+            .frame(width: 16, height: 16)
+            .cornerRadius(4)
+            .scaleEffect(0.8 + 0.2 * sin(phase))
+            .opacity(0.7 + 0.3 * sin(phase))
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                     phase = .pi

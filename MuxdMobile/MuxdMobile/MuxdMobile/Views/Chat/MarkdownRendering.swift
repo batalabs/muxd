@@ -813,12 +813,12 @@ struct CodeBlockView: View {
                         copied = false
                     }
                 } label: {
-                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    Image(systemName: copied ? "checkmark.circle.fill" : "square.on.square")
                         .font(.system(size: 13))
                         .foregroundColor(copied ? .green : Color(white: 0.55))
                         .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(6)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
                 }
             }
             .padding(.horizontal, 12)
@@ -827,7 +827,10 @@ struct CodeBlockView: View {
 
             // Code content with line highlights
             let codeLines = content.components(separatedBy: "\n")
-            let lineHeight = fontSize * 1.45
+            let baseFont = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+            // Calculate exact line height to match Text rendering
+            let lineHeight = baseFont.lineHeight * 1.15  // Small multiplier for line spacing
+            
             ZStack(alignment: .topLeading) {
                 // Alternating row backgrounds fill full width
                 VStack(spacing: 0) {
@@ -847,9 +850,9 @@ struct CodeBlockView: View {
                         VStack(alignment: .trailing, spacing: 0) {
                             ForEach(Array(codeLines.enumerated()), id: \.offset) { idx, _ in
                                 Text("\(idx + 1)")
-                                    .font(.system(size: fontSize, design: .monospaced))
+                                    .font(Font(baseFont))
                                     .foregroundColor(Color(white: 0.35))
-                                    .frame(height: lineHeight)
+                                    .frame(height: lineHeight, alignment: .center)
                             }
                         }
                         .padding(.leading, 10)
@@ -864,6 +867,9 @@ struct CodeBlockView: View {
 
                         // Code
                         Text(highlightedCode)
+                            .font(Font(baseFont))
+                            .lineSpacing(0)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 10)
                             .textSelection(.enabled)

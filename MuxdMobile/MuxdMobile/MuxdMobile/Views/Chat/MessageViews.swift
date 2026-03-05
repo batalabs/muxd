@@ -17,6 +17,7 @@ struct MessageBubbleView: View {
     let allMessages: [TranscriptMessage]
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
     @AppStorage("showLinkPreviews") private var showLinkPreviews = true
+    @AppStorage("showTools") private var showTools = true
 
     private var enrichedToolResultBlocks: [ContentBlock] {
         message.toolResultBlocksWithInput(from: allMessages)
@@ -86,10 +87,8 @@ struct MessageBubbleView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(Color(.systemGray5))
-                            .foregroundColor(.primary)
                             .cornerRadius(8)
                             .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-                            .padding(.bottom, 2)
                     }
                 }
 
@@ -119,7 +118,7 @@ struct MessageBubbleView: View {
                 }
 
                 // Tool uses
-                if !message.toolUseBlocks.isEmpty {
+                if showTools && !message.toolUseBlocks.isEmpty {
                     HStack(spacing: 8) {
                         ForEach(message.toolUseBlocks) { block in
                             HStack(spacing: 4) {
@@ -138,8 +137,10 @@ struct MessageBubbleView: View {
                 }
 
                 // Tool results with content (grouped when consecutive identical)
-                ForEach(groupToolResults(enrichedToolResultBlocks)) { group in
-                    ToolResultBlockView(block: group.block, count: group.count)
+                if showTools {
+                    ForEach(groupToolResults(enrichedToolResultBlocks)) { group in
+                        ToolResultBlockView(block: group.block, count: group.count)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: isActualUserMessage ? .trailing : .leading)
@@ -152,37 +153,35 @@ struct CollapsibleUserMessage: View {
     let scale: CGFloat
     @State private var isExpanded = false
 
-    /// Max lines before collapsing (approximate via character count)
     private let collapseThreshold = 300
-
-    private var isLong: Bool {
-        text.count > collapseThreshold
-    }
-
-    private var displayText: String {
-        if isLong && !isExpanded {
-            return String(text.prefix(collapseThreshold)) + "..."
-        }
-        return text
-    }
+    private var isLong: Bool { text.count > collapseThreshold }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(displayText)
-                .font(.system(size: 17 * scale))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.accentColor)
-                .foregroundColor(.white)
-                .cornerRadius(8)
-                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-                .padding(.bottom, 2)
+            if isLong && !isExpanded {
+                // Show truncated text with gray [truncated] label
+                Text(truncatedAttributedText)
+                    .font(.system(size: 17 * scale))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+            } else {
+                Text(text)
+                    .font(.system(size: 17 * scale))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+            }
 
             if isLong {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isExpanded.toggle()
-                    }
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
                 } label: {
                     Text(isExpanded ? "Show less" : "Show more")
                         .font(.caption)
@@ -191,7 +190,17 @@ struct CollapsibleUserMessage: View {
             }
         }
     }
+    
+    private var truncatedAttributedText: AttributedString {
+        var attributed = AttributedString(String(text.prefix(collapseThreshold)))
+        attributed.foregroundColor = .white
+        var truncatedLabel = AttributedString(" [truncated]")
+        truncatedLabel.foregroundColor = .secondary
+        attributed.append(truncatedLabel)
+        return attributed
+    }
 }
+
 
 struct GroupedToolResult: Identifiable {
     let block: ContentBlock
@@ -199,13 +208,28 @@ struct GroupedToolResult: Identifiable {
     var id: String { block.id }
 }
 
-/// Truncates text to a maximum number of lines, adding "... (truncated)" if truncated
+/// Truncates text to a maximum number of lines, adding "[truncated]" if truncated
 func truncateToLines(_ text: String, maxLines: Int) -> String {
     let lines = text.components(separatedBy: .newlines)
     if lines.count <= maxLines {
         return text
     }
-    return lines.prefix(maxLines).joined(separator: "\n") + "\n... (truncated)"
+    return lines.prefix(maxLines).joined(separator: "\n") + "\n[truncated]"
+}
+
+/// Returns attributed string with text truncated to max lines and gray "[truncated]" label
+func truncatedAttributedResult(text: String, maxLines: Int) -> AttributedString {
+    let lines = text.components(separatedBy: .newlines)
+    if lines.count <= maxLines {
+        return AttributedString(text)
+    }
+    
+    var attributed = AttributedString(lines.prefix(maxLines).joined(separator: "\n"))
+    // Add blank line then truncated label for spacing
+    var truncatedLabel = AttributedString("\n\n[truncated]")
+    truncatedLabel.foregroundColor = .secondary
+    attributed.append(truncatedLabel)
+    return attributed
 }
 
 /// Truncates path from the front, keeping the filename visible (e.g., "...internal/tools/tools.go")
@@ -271,6 +295,7 @@ struct ImageBlockView: View {
 struct ToolResultBlockView: View {
     let block: ContentBlock
     var count: Int = 1
+    @State private var isExpanded = false
 
     private var hasContent: Bool {
         if block.isImageResult && block.imageData != nil {
@@ -280,6 +305,15 @@ struct ToolResultBlockView: View {
             return true
         }
         return false
+    }
+
+    private var lineCount: Int {
+        guard let result = block.toolResult else { return 0 }
+        return result.components(separatedBy: .newlines).count
+    }
+
+    private var isLong: Bool {
+        lineCount > 2
     }
 
     var body: some View {
@@ -293,38 +327,54 @@ struct ToolResultBlockView: View {
                         .frame(maxWidth: 300, maxHeight: 400)
                         .cornerRadius(12)
                 } else if let result = block.toolResult, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    // Show text result
-                    HStack(spacing: 4) {
-                        Image(systemName: block.isError == true ? "xmark.circle.fill" : "checkmark.circle.fill")
-                            .foregroundColor(block.isError == true ? .red : .green)
-                            .font(.caption)
-                        Text(block.toolName ?? "Result")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        if let summary = block.toolInputSummary {
-                            Text(truncatePath(summary, maxLength: 30))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
+                    // Tool name badge
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wrench.fill")
+                                .font(.system(size: 10))
+                            Text(block.toolName ?? "Tool")
+                                .font(.system(size: 11, weight: .medium))
                         }
-                        Text("done")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        if count > 1 {
-                            Text("(\(count))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(6)
+                        
                         Spacer()
                     }
-
-                    Text(truncateToLines(result, maxLines: 5))
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                        .textSelection(.enabled)
+                    
+                    // Result content with optional truncation - tappable to expand/collapse
+                    Group {
+                        if isLong && !isExpanded {
+                            // Show truncated text (2 lines + truncated label on 3rd)
+                            Text(truncatedAttributedResult(text: result, maxLines: 2))
+                                .font(.system(size: 12, design: .monospaced))
+                                .lineLimit(4) // 2 content lines + blank + truncated line
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                                .textSelection(.enabled)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: true) {
+                                Text(result)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            .padding(8)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                            .textSelection(.enabled)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isLong {
+                            withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -35,6 +35,7 @@ struct ConfigView: View {
     @AppStorage("biometricLockEnabled") private var biometricEnabled = false
     @AppStorage("showLinkPreviews") private var showLinkPreviews = true
     @AppStorage("showCodeLanguage") private var showCodeLanguage = true
+    @AppStorage("showTools") private var showTools = true
     @State private var canUseBiometrics = false
     @State private var biometricType: LABiometryType = .none
 
@@ -89,6 +90,10 @@ struct ConfigView: View {
 
                     Toggle(isOn: $showCodeLanguage) {
                         Label("Code Language Label", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+
+                    Toggle(isOn: $showTools) {
+                        Label("Show Tool Calls", systemImage: "wrench.fill")
                     }
                 }
 

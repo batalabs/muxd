@@ -23,6 +23,7 @@ struct ChatView: View {
     @State private var contentOverflows = false
     @State private var contentHeight: CGFloat = 0
     @State private var frameHeight: CGFloat = 0
+    @AppStorage("showTools") private var showTools = true
     @FocusState private var inputFocused: Bool
 
     let session: Session
@@ -269,9 +270,11 @@ struct ChatView: View {
                     }
 
                     // Active tools (grouped by name+status)
-                    ForEach(groupActiveTools(Array(viewModel.activeTools.values)), id: \.tool.name) { group in
-                        ToolCallView(tool: group.tool, count: group.count)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    if showTools {
+                        ForEach(groupActiveTools(Array(viewModel.activeTools.values)), id: \.tool.name) { group in
+                            ToolCallView(tool: group.tool, count: group.count)
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        }
                     }
 
                     // CLI-style status indicator
