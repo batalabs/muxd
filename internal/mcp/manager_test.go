@@ -41,7 +41,10 @@ func setupTestServer(t *testing.T, serverName string, mcpTools []*mcpsdk.Tool, h
 		t.Fatalf("server connect: %v", err)
 	}
 
-	// Override newTransport to return the in-memory client transport.
+	// Override newTransport to return the in-memory client transport
+	// and skip command existence checks for the fake "unused" command.
+	origCheckCommand := checkCommand
+	checkCommand = false
 	origTransport := newTransport
 	newTransport = func(sc ServerConfig) (mcpsdk.Transport, context.CancelFunc) {
 		return clientTransport, func() {}
@@ -62,6 +65,7 @@ func setupTestServer(t *testing.T, serverName string, mcpTools []*mcpsdk.Tool, h
 		mgr.StopAll()
 		serverSession.Close()
 		newTransport = origTransport
+		checkCommand = origCheckCommand
 	}
 }
 
