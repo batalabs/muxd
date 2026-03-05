@@ -453,14 +453,36 @@ func bashTool() ToolDef {
 			cmd.Dir = cwd
 
 			// Kill the entire process group so child processes don't
-			// keep pipes open and cause CombinedOutput to hang.
+			// survive after cancellation.
 			setProcGroup(cmd)
 
-			// WaitDelay ensures CombinedOutput returns even if orphaned
-			// child processes hold stdout/stderr pipes open.
+			// Redirect stdout/stderr to a temp file instead of pipes.
+			// When output goes to an *os.File, Go passes the handle
+			// directly to the child process without creating I/O-copying
+			// goroutines. This means cmd.Wait() only blocks on process
+			// exit — not on pipe reads — and is fully cancellable by
+			// cmd.Cancel (taskkill on Windows, kill -PGID on Unix).
+			// With pipes, child processes that inherit the pipe handles
+			// (e.g. a launched browser) keep them open after the parent
+			// exits, causing CombinedOutput to hang indefinitely.
+			tmpFile, tmpErr := os.CreateTemp("", "muxd-bash-*.txt")
+			if tmpErr != nil {
+				return "", fmt.Errorf("creating temp file: %w", tmpErr)
+			}
+			tmpPath := tmpFile.Name()
+			defer os.Remove(tmpPath)
+
+			cmd.Stdout = tmpFile
+			cmd.Stderr = tmpFile
+
+			// WaitDelay as a safety net: if Cancel fails to kill the
+			// process, Wait returns after this delay regardless.
 			cmd.WaitDelay = 5 * time.Second
 
-			out, err := cmd.CombinedOutput()
+			err := cmd.Run()
+			tmpFile.Close()
+
+			out, _ := os.ReadFile(tmpPath)
 			result := string(out)
 			if len(result) > 50*1024 {
 				result = result[:50*1024] + "\n... (truncated at 50KB)"
