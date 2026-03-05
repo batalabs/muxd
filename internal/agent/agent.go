@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -123,6 +124,7 @@ type Service struct {
 
 	running     bool
 	cancelled   bool
+	cancelFunc  context.CancelFunc
 	titled      bool
 	userRenamed bool // true when user manually renamed the session
 
