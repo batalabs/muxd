@@ -387,6 +387,7 @@ func main() {
 
 				// Fetch and merge hub memory
 				mergeHubMemory(embeddedHubClient)
+				logStderr("")
 
 				// Start heartbeat loop with periodic memory sync
 				cwd, _ := os.Getwd()
