@@ -573,7 +573,9 @@ func anthropicStreamWithURL(
 		return nil, "", Usage{}, "", NewAPIError(resp.StatusCode, errType, errMessage, resp.Header)
 	}
 
-	blocks, stopReason, usage, newContainer, sseErr := parseAnthropicSSE(&lenientReader{r: resp.Body}, onDelta)
+	tr := newTimeoutReader(resp.Body)
+	defer tr.Close()
+	blocks, stopReason, usage, newContainer, sseErr := parseAnthropicSSE(&lenientReader{r: tr}, onDelta)
 	return blocks, stopReason, usage, newContainer, sseErr
 }
 

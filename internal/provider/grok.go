@@ -105,5 +105,7 @@ func (p *GrokProvider) StreamMessage(
 		return nil, "", Usage{}, NewAPIError(resp.StatusCode, errType, errMessage, resp.Header)
 	}
 
-	return parseOpenAISSE(resp.Body, onDelta)
+	tr := newTimeoutReader(resp.Body)
+	defer tr.Close()
+	return parseOpenAISSE(tr, onDelta)
 }
