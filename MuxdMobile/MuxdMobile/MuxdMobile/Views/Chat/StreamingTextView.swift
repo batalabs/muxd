@@ -19,8 +19,9 @@ struct StreamingTextView: View {
                 .foregroundColor(.secondary)
 
                 MarkdownText(text, scale: fontSize.scale)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
                     .background(Color(.systemGray5))
                     .cornerRadius(8)
                     .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)

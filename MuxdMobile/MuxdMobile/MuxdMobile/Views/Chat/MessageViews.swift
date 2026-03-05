@@ -84,8 +84,9 @@ struct MessageBubbleView: View {
                         }
                     } else {
                         MarkdownText(message.textContent, scale: fontSize.scale)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 6)
+                            .padding(.bottom, 12)
                             .background(Color(.systemGray5))
                             .cornerRadius(8)
                             .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
@@ -308,7 +309,7 @@ struct ToolResultBlockView: View {
     }
 
     private var lineCount: Int {
-        guard let result = block.toolResult else { return 0 }
+        guard let result = block.toolResult?.trimmingCharacters(in: .whitespacesAndNewlines) else { return 0 }
         return result.components(separatedBy: .newlines).count
     }
 
@@ -344,21 +345,30 @@ struct ToolResultBlockView: View {
                         Spacer()
                     }
                     
-                    // Result content with optional truncation - tappable to expand/collapse
+                    // Result content - tappable to expand/collapse
                     Group {
                         if isLong && !isExpanded {
-                            // Show truncated text (2 lines + truncated label on 3rd)
-                            Text(truncatedAttributedResult(text: result, maxLines: 2))
-                                .font(.system(size: 12, design: .monospaced))
-                                .lineLimit(4) // 2 content lines + blank + truncated line
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(8)
-                                .background(Color(.systemGray6))
-                                .cornerRadius(8)
-                                .textSelection(.enabled)
+                            let lines = result.components(separatedBy: .newlines)
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(lines.prefix(2).enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .lineLimit(1)
+                                }
+                                Text("")
+                                    .font(.system(size: 12, design: .monospaced))
+                                Text("[truncated]")
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
                         } else {
+                            let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
                             ScrollView(.horizontal, showsIndicators: true) {
-                                Text(result)
+                                Text(trimmed)
                                     .font(.system(size: 12, design: .monospaced))
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: true, vertical: false)

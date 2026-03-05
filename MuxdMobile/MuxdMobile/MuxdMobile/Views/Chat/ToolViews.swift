@@ -25,10 +25,28 @@ func groupActiveTools(_ tools: [ChatViewModel.ToolStatus]) -> [GroupedActiveTool
 struct ToolCallView: View {
     let tool: ChatViewModel.ToolStatus
     var count: Int = 1
+    @State private var isExpanded = false
+
+    private var hasResult: Bool {
+        if let result = tool.result, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return false
+    }
+
+    private var resultLineCount: Int {
+        guard let result = tool.result?.trimmingCharacters(in: .whitespacesAndNewlines) else { return 0 }
+        return result.components(separatedBy: .newlines).count
+    }
+
+    private var isLong: Bool {
+        resultLineCount > 2
+    }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
+            // Tool name badge
+            HStack {
                 HStack(spacing: 4) {
                     if tool.status == "running" {
                         ProgressView()
@@ -36,43 +54,74 @@ struct ToolCallView: View {
                     } else {
                         Image(systemName: tool.isError ? "xmark.circle.fill" : "checkmark.circle.fill")
                             .foregroundColor(tool.isError ? .red : .green)
-                            .font(.caption)
+                            .font(.system(size: 10))
                     }
-
                     Text(tool.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-
+                        .font(.system(size: 11, weight: .medium))
                     if let summary = tool.inputSummary {
-                        Text(truncatePath(summary, maxLength: 40))
-                            .font(.caption)
+                        Text(truncatePath(summary, maxLength: 30))
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-
-                    Text(tool.status)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-
                     if count > 1 {
                         Text("(\(count))")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
                     }
                 }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray5))
+                .cornerRadius(6)
 
-                if let result = tool.result, !result.isEmpty {
-                    Text(result.prefix(200) + (result.count > 200 ? "..." : ""))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(3)
+                Spacer()
+            }
+
+            // Result content with truncation
+            if hasResult, let result = tool.result {
+                Group {
+                    if isLong && !isExpanded {
+                        let lines = result.components(separatedBy: .newlines)
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(lines.prefix(2).enumerated()), id: \.offset) { _, line in
+                                Text(line)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .lineLimit(1)
+                            }
+                            Text("")
+                                .font(.system(size: 12, design: .monospaced))
+                            Text("[truncated]")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    } else {
+                        let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+                        ScrollView(.horizontal, showsIndicators: true) {
+                            Text(trimmed)
+                                .font(.system(size: 12, design: .monospaced))
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .textSelection(.enabled)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if isLong {
+                        withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+                    }
                 }
             }
-            .padding(8)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
-
-            Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
