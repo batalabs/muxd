@@ -33,6 +33,8 @@ struct ConfigView: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
     @AppStorage("biometricLockEnabled") private var biometricEnabled = false
+    @AppStorage("showLinkPreviews") private var showLinkPreviews = true
+    @AppStorage("showCodeLanguage") private var showCodeLanguage = true
     @State private var canUseBiometrics = false
     @State private var biometricType: LABiometryType = .none
 
@@ -79,6 +81,14 @@ struct ConfigView: View {
                         ForEach(AppFontSize.allCases, id: \.self) { size in
                             Text(size.rawValue).tag(size)
                         }
+                    }
+
+                    Toggle(isOn: $showLinkPreviews) {
+                        Label("Link Previews", systemImage: "link")
+                    }
+
+                    Toggle(isOn: $showCodeLanguage) {
+                        Label("Code Language Label", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                 }
 
