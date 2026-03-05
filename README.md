@@ -78,11 +78,11 @@ muxd -service install             # install as system service
 
 The hub is a central coordinator that manages multiple muxd daemons (called nodes) across different machines. You run one hub and point your daemons at it. The [mobile app](https://github.com/batalabs/muxd-mobile) connects to the hub and lets you pick which node to talk to.
 
-```
-Mobile App / TUI ──> Hub (:4097) ──> Node A (desktop)
-                                 ──> Node B (laptop)
-                                 ──> Node C (server)
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/hub-architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/hub-architecture.svg">
+  <img src="assets/hub-architecture.svg" alt="Hub architecture diagram showing mobile app and TUI connecting to a central hub, which routes to multiple nodes" width="700">
+</picture>
 
 **Start a hub:**
 ```bash

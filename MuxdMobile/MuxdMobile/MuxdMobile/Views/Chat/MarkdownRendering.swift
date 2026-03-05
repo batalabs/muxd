@@ -785,12 +785,15 @@ struct CodeBlockView: View {
         }
     }
 
-    private var highlightedCode: AttributedString {
-        // Always highlight as dark since code blocks are always on dark bg
-        SyntaxHighlighter.highlight(content, language: language, fontSize: fontSize, isDark: true)
+    private func highlightedLine(_ line: String) -> AttributedString {
+        SyntaxHighlighter.highlight(line, language: language, fontSize: fontSize, isDark: true)
     }
 
     var body: some View {
+        let codeLines = content.components(separatedBy: "\n")
+        let baseFont = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let lineHeight = baseFont.lineHeight
+
         VStack(alignment: .leading, spacing: 0) {
             // Header bar
             HStack {
@@ -825,57 +828,43 @@ struct CodeBlockView: View {
             .padding(.vertical, 8)
             .background(headerBg)
 
-            // Code content with line highlights
-            let codeLines = content.components(separatedBy: "\n")
-            let baseFont = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-            // Calculate exact line height to match Text rendering
-            let lineHeight = baseFont.lineHeight * 1.15  // Small multiplier for line spacing
-            
-            ZStack(alignment: .topLeading) {
-                // Alternating row backgrounds fill full width
-                VStack(spacing: 0) {
-                    ForEach(Array(codeLines.enumerated()), id: \.offset) { idx, _ in
-                        Rectangle()
-                            .fill(idx % 2 == 0 ? Color.clear : Color.white.opacity(0.03))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: lineHeight)
-                    }
-                }
-                .padding(.vertical, 10)
-
-                // Scrollable code + line numbers
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 0) {
-                        // Line numbers
-                        VStack(alignment: .trailing, spacing: 0) {
-                            ForEach(Array(codeLines.enumerated()), id: \.offset) { idx, _ in
-                                Text("\(idx + 1)")
-                                    .font(Font(baseFont))
-                                    .foregroundColor(Color(white: 0.35))
-                                    .frame(height: lineHeight, alignment: .center)
-                            }
+            // Code content — per-line rendering for perfect alignment
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 0) {
+                    // Line numbers
+                    VStack(alignment: .trailing, spacing: 0) {
+                        ForEach(Array(codeLines.enumerated()), id: \.offset) { idx, _ in
+                            Text("\(idx + 1)")
+                                .font(Font(baseFont))
+                                .foregroundColor(Color(white: 0.35))
+                                .frame(height: lineHeight)
                         }
-                        .padding(.leading, 10)
-                        .padding(.trailing, 6)
-                        .padding(.vertical, 10)
-
-                        // Separator
-                        Rectangle()
-                            .fill(Color(white: 0.25))
-                            .frame(width: 0.5)
-                            .padding(.vertical, 8)
-
-                        // Code
-                        Text(highlightedCode)
-                            .font(Font(baseFont))
-                            .lineSpacing(0)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 10)
-                            .textSelection(.enabled)
                     }
-                    .background(NoBounceHelper())
+                    .padding(.leading, 10)
+                    .padding(.trailing, 6)
+                    .padding(.vertical, 10)
+
+                    // Separator
+                    Rectangle()
+                        .fill(Color(white: 0.25))
+                        .frame(width: 0.5)
+                        .padding(.vertical, 8)
+
+                    // Code lines — each line is its own Text for exact alignment
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(codeLines.enumerated()), id: \.offset) { idx, line in
+                            Text(highlightedLine(line.isEmpty ? " " : line))
+                                .font(Font(baseFont))
+                                .fixedSize(horizontal: true, vertical: false)
+                                .frame(height: lineHeight)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .textSelection(.enabled)
                 }
+                .background(NoBounceHelper())
             }
             .background(codeBg)
         }
