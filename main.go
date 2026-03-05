@@ -264,7 +264,9 @@ func main() {
 				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
 
 				// Fetch and merge hub memory
-				mergeHubMemory(hubClient)
+				if msg := mergeHubMemoryMsg(hubClient); msg != "" {
+					fmt.Fprintf(os.Stderr, "%s\n", msg)
+				}
 
 				// Start heartbeat loop with periodic memory sync
 				cwd, _ := os.Getwd()
@@ -383,11 +385,14 @@ func main() {
 					return
 				}
 				embeddedHubNodeID = nodeID
-				logStderr("hub: registered as node %s", nodeID)
 
-				// Fetch and merge hub memory
-				mergeHubMemory(embeddedHubClient)
-				logStderr("")
+				// Fetch and merge hub memory (batched into one print to avoid View flicker)
+				regMsg := fmt.Sprintf("hub: registered as node %s", nodeID)
+				if mergeMsg := mergeHubMemoryMsg(embeddedHubClient); mergeMsg != "" {
+					logStderr("%s\n%s", regMsg, mergeMsg)
+				} else {
+					logStderr("%s", regMsg)
+				}
 
 				// Start heartbeat loop with periodic memory sync
 				cwd, _ := os.Getwd()
@@ -552,27 +557,25 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 	}
 }
 
-// mergeHubMemory fetches shared memory facts from the hub and merges them into
-// the local project memory. Called once after successful hub registration.
-func mergeHubMemory(hubClient *hub.NodeClient) {
+// mergeHubMemoryMsg fetches shared memory facts from the hub and merges them
+// into the local project memory. Returns a status message (empty if nothing to report).
+func mergeHubMemoryMsg(hubClient *hub.NodeClient) string {
 	hubFacts, err := hubClient.FetchMemory()
 	if err != nil {
-		logStderr("hub: fetch memory failed: %v", err)
-		return
+		return fmt.Sprintf("hub: fetch memory failed: %v", err)
 	}
 	if len(hubFacts) == 0 {
-		return
+		return ""
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return
+		return ""
 	}
 	mem := tools.NewProjectMemory(cwd)
 	if err := mem.MergeHub(hubFacts); err != nil {
-		logStderr("hub: merge memory failed: %v", err)
-		return
+		return fmt.Sprintf("hub: merge memory failed: %v", err)
 	}
-	logStderr("hub: merged %d memory facts", len(hubFacts))
+	return fmt.Sprintf("hub: merged %d memory facts", len(hubFacts))
 }
 
 // resolveHubRegistrationHost determines the host address to register with the hub.
