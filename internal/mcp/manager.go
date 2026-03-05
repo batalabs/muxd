@@ -123,7 +123,18 @@ func defaultNewTransport(sc ServerConfig) (mcpsdk.Transport, context.CancelFunc)
 	}
 }
 
+// checkCommand controls whether connectServer verifies the command exists in
+// PATH before launching. Tests set this to false when using a mock transport.
+var checkCommand = true
+
 func (m *Manager) connectServer(ctx context.Context, conn *serverConn) error {
+	// For stdio servers, verify the command exists before trying to connect.
+	if checkCommand && (conn.config.Type == "" || conn.config.Type == "stdio") {
+		if _, lookErr := exec.LookPath(conn.config.Command); lookErr != nil {
+			return fmt.Errorf("%q not found in PATH — install it or check your MCP config", conn.config.Command)
+		}
+	}
+
 	client := mcpsdk.NewClient(&mcpsdk.Implementation{
 		Name:    "muxd",
 		Version: "1.0",
@@ -137,7 +148,7 @@ func (m *Manager) connectServer(ctx context.Context, conn *serverConn) error {
 	session, err := client.Connect(connCtx, transport, nil)
 	if err != nil {
 		killFunc()
-		return fmt.Errorf("connecting: %w", err)
+		return fmt.Errorf("%s", diagnoseMCPError(conn.config, err))
 	}
 
 	conn.cancel = killFunc
@@ -307,4 +318,31 @@ func (m *Manager) ServerStatuses() map[string]string {
 		statuses[name] = s
 	}
 	return statuses
+}
+
+// diagnoseMCPError translates raw connection errors into actionable messages.
+func diagnoseMCPError(sc ServerConfig, err error) string {
+	msg := err.Error()
+
+	// EOF during initialize means the server process exited immediately.
+	if strings.Contains(msg, "EOF") {
+		for _, arg := range sc.Args {
+			if !strings.HasPrefix(arg, "-") {
+				return fmt.Sprintf("server process exited — %q may not exist on npm (package removed or renamed)", arg)
+			}
+		}
+		return "server process exited before responding — the npm package may be missing or renamed"
+	}
+
+	// Context deadline exceeded means the server took too long to start.
+	if strings.Contains(msg, "context deadline exceeded") {
+		return fmt.Sprintf("connection timed out after %s — the server may be slow to install or start", connectTimeout)
+	}
+
+	// Connection refused for HTTP servers.
+	if strings.Contains(msg, "connection refused") {
+		return fmt.Sprintf("connection refused at %s — is the server running?", sc.URL)
+	}
+
+	return msg
 }

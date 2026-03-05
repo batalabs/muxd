@@ -452,6 +452,14 @@ func bashTool() ToolDef {
 			cwd, _ := Getwd()
 			cmd.Dir = cwd
 
+			// Kill the entire process group so child processes don't
+			// keep pipes open and cause CombinedOutput to hang.
+			setProcGroup(cmd)
+
+			// WaitDelay ensures CombinedOutput returns even if orphaned
+			// child processes hold stdout/stderr pipes open.
+			cmd.WaitDelay = 5 * time.Second
+
 			out, err := cmd.CombinedOutput()
 			result := string(out)
 			if len(result) > 50*1024 {

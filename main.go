@@ -264,7 +264,9 @@ func main() {
 				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
 
 				// Fetch and merge hub memory
-				mergeHubMemory(hubClient)
+				if msg := mergeHubMemoryMsg(hubClient); msg != "" {
+					fmt.Fprintf(os.Stderr, "%s\n", msg)
+				}
 
 				// Start heartbeat loop with periodic memory sync
 				cwd, _ := os.Getwd()
@@ -357,7 +359,7 @@ func main() {
 		embeddedServer.SetLogger(logger)
 		go func() {
 			if err := embeddedServer.Start(4096); err != nil {
-				fmt.Fprintf(os.Stderr, "embedded server error: %v\n", err)
+				logStderr("embedded server error: %v", err)
 			}
 		}()
 		// Port() blocks until Start() has bound the listener, so no race.
@@ -379,14 +381,18 @@ func main() {
 				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
 				nodeID, err := embeddedHubClient.Register(name, regHost, port, version)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
+					logStderr("hub: registration failed: %v", err)
 					return
 				}
 				embeddedHubNodeID = nodeID
-				fmt.Fprintf(os.Stderr, "hub: registered as node %s\n", nodeID)
 
-				// Fetch and merge hub memory
-				mergeHubMemory(embeddedHubClient)
+				// Fetch and merge hub memory (batched into one print to avoid View flicker)
+				regMsg := fmt.Sprintf("hub: registered as node %s", nodeID)
+				if mergeMsg := mergeHubMemoryMsg(embeddedHubClient); mergeMsg != "" {
+					logStderr("%s\n%s", regMsg, mergeMsg)
+				} else {
+					logStderr("%s", regMsg)
+				}
 
 				// Start heartbeat loop with periodic memory sync
 				cwd, _ := os.Getwd()
@@ -398,7 +404,7 @@ func main() {
 					select {
 					case <-ticker.C:
 						if err := embeddedHubClient.Heartbeat(nodeID); err != nil {
-							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+							logStderr("hub: heartbeat failed: %v", err)
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
@@ -507,6 +513,18 @@ func resetTerminalForTUI() {
 	fmt.Println()
 }
 
+// logStderr prints a message to stderr. When the TUI is active, it uses
+// tui.Prog.Println so the output renders correctly in raw terminal mode
+// (plain \n doesn't do a carriage return on macOS in raw mode).
+func logStderr(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	if tui.Prog != nil {
+		tui.Prog.Println(msg)
+	} else {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+}
+
 func mustGetwd() string {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -539,27 +557,25 @@ func saveHubTokenIfNew(prefs *config.Preferences, token string) {
 	}
 }
 
-// mergeHubMemory fetches shared memory facts from the hub and merges them into
-// the local project memory. Called once after successful hub registration.
-func mergeHubMemory(hubClient *hub.NodeClient) {
+// mergeHubMemoryMsg fetches shared memory facts from the hub and merges them
+// into the local project memory. Returns a status message (empty if nothing to report).
+func mergeHubMemoryMsg(hubClient *hub.NodeClient) string {
 	hubFacts, err := hubClient.FetchMemory()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "hub: fetch memory failed: %v\n", err)
-		return
+		return fmt.Sprintf("hub: fetch memory failed: %v", err)
 	}
 	if len(hubFacts) == 0 {
-		return
+		return ""
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return
+		return ""
 	}
 	mem := tools.NewProjectMemory(cwd)
 	if err := mem.MergeHub(hubFacts); err != nil {
-		fmt.Fprintf(os.Stderr, "hub: merge memory failed: %v\n", err)
-		return
+		return fmt.Sprintf("hub: merge memory failed: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "hub: merged %d memory facts\n", len(hubFacts))
+	return fmt.Sprintf("hub: merged %d memory facts", len(hubFacts))
 }
 
 // resolveHubRegistrationHost determines the host address to register with the hub.
