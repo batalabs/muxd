@@ -109,7 +109,7 @@ func TestBuildSystemPrompt(t *testing.T) {
 		if !strings.Contains(prompt, "Tools available (26)") {
 			t.Error("expected 26 tools")
 		}
-		if strings.Contains(prompt, "MCP:") {
+		if strings.Contains(prompt, "MCP Servers:") {
 			t.Error("should not contain MCP section without tools")
 		}
 		if strings.Contains(prompt, "Project Memory:") {
@@ -122,7 +122,7 @@ func TestBuildSystemPrompt(t *testing.T) {
 		if !strings.Contains(prompt, "Tools available (28)") {
 			t.Error("expected 28 tools (26 + 2 MCP)")
 		}
-		if !strings.Contains(prompt, "MCP:") {
+		if !strings.Contains(prompt, "MCP Servers:") {
 			t.Error("expected MCP section")
 		}
 		if !strings.Contains(prompt, "mcp__fs__read") {

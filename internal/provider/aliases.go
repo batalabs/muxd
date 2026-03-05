@@ -86,7 +86,7 @@ func ModelCostWithCache(modelID string, inputTokens, outputTokens, cacheCreation
 func BuildSystemPrompt(cwd string, mcpToolNames []string, memory string) string {
 	mcpSection := ""
 	if len(mcpToolNames) > 0 {
-		mcpSection = fmt.Sprintf("\n  MCP:         %s\n", strings.Join(mcpToolNames, ", "))
+		mcpSection = fmt.Sprintf("\n  MCP Servers: %s\n\nYou have %d MCP tools connected via external servers. These are fully available alongside built-in tools.\n", strings.Join(mcpToolNames, ", "), len(mcpToolNames))
 	}
 	toolCount := 26 + len(mcpToolNames)
 
