@@ -12,13 +12,6 @@ import (
 )
 
 func (h *Hub) registerRoutes(mux *http.ServeMux) {
-	// UI routes - serve the embedded hub management interface
-	if uiServer, err := newUIFileServer(); err == nil {
-		mux.Handle("/{$}", uiServer)
-		mux.Handle("/", uiServer)
-	}
-
-	// API routes
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("POST /api/hub/nodes/register", h.withAuth(h.handleRegisterNode))
 	mux.HandleFunc("DELETE /api/hub/nodes/{id}", h.withAuth(h.handleDeregisterNode))
