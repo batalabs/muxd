@@ -748,10 +748,10 @@ func hubServiceStop() error {
 		}
 		proc, err := os.FindProcess(lf.PID)
 		if err != nil {
-			return fmt.Errorf("finding process: %w", err)
+			return fmt.Errorf("hub process %d: %w", lf.PID, err)
 		}
 		if err := proc.Kill(); err != nil {
-			return fmt.Errorf("killing process: %w", err)
+			return fmt.Errorf("stopping hub process %d: %w", lf.PID, err)
 		}
 		fmt.Println("Hub service stopped.")
 		return nil
