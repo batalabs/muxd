@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -32,12 +33,16 @@ func (h *Hub) registerRoutes(mux *http.ServeMux) {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	v := h.version
+	if v == "" {
+		v = "dev"
+	}
 	writeHubJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"mode":    "hub",
 		"pid":     os.Getpid(),
 		"port":    h.port,
-		"version": "0.1.0", // TODO: use actual version from build
+		"version": v,
 	})
 }
 
@@ -126,41 +131,50 @@ type aggregatedSession struct {
 func (h *Hub) handleAggregatedSessions(w http.ResponseWriter, r *http.Request) {
 	nodes := h.listNodes()
 	var results []aggregatedSession
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	for _, node := range nodes {
 		if node.Status != StatusOnline {
 			continue
 		}
-		url := fmt.Sprintf("http://%s:%d/api/sessions", node.Host, node.Port)
-		req, err := http.NewRequestWithContext(r.Context(), "GET", url, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("Authorization", "Bearer "+node.Token)
-		resp, err := client.Do(req)
-		if err != nil {
-			h.logf("session aggregation: node %s: %v", node.ID, err)
-			continue
-		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-		// body is a JSON array of sessions
-		var sessions []json.RawMessage
-		if err := json.Unmarshal(body, &sessions); err != nil {
-			continue
-		}
-		for _, s := range sessions {
-			results = append(results, aggregatedSession{
-				NodeID:   node.ID,
-				NodeName: node.Name,
-				Session:  s,
-			})
-		}
+		wg.Add(1)
+		go func(node *Node) {
+			defer wg.Done()
+			url := fmt.Sprintf("http://%s:%d/api/sessions", node.Host, node.Port)
+			req, err := http.NewRequestWithContext(r.Context(), "GET", url, nil)
+			if err != nil {
+				return
+			}
+			req.Header.Set("Authorization", "Bearer "+node.Token)
+			resp, err := client.Do(req)
+			if err != nil {
+				h.logf("session aggregation: node %s: %v", node.ID, err)
+				return
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return
+			}
+			// body is a JSON array of sessions
+			var sessions []json.RawMessage
+			if err := json.Unmarshal(body, &sessions); err != nil {
+				return
+			}
+			mu.Lock()
+			for _, s := range sessions {
+				results = append(results, aggregatedSession{
+					NodeID:   node.ID,
+					NodeName: node.Name,
+					Session:  s,
+				})
+			}
+			mu.Unlock()
+		}(node)
 	}
+	wg.Wait()
 	if results == nil {
 		results = []aggregatedSession{}
 	}

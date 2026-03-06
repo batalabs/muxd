@@ -180,32 +180,107 @@ func TestDaemonClientWaitReady(t *testing.T) {
 	}
 }
 
-func TestParseSSEEvent(t *testing.T) {
-	tests := []struct {
-		name      string
-		eventType string
-		data      string
-		wantType  string
-	}{
-		{"delta", "delta", `{"text":"hi"}`, "delta"},
-		{"tool_start", "tool_start", `{"tool_use_id":"t1","tool_name":"bash"}`, "tool_start"},
-		{"tool_done", "tool_done", `{"tool_use_id":"t1","tool_name":"bash","result":"ok","is_error":false}`, "tool_done"},
-		{"stream_done", "stream_done", `{"input_tokens":100,"output_tokens":50,"stop_reason":"end_turn"}`, "stream_done"},
-		{"ask_user", "ask_user", `{"ask_id":"a1","prompt":"Question?"}`, "ask_user"},
-		{"turn_done", "turn_done", `{"stop_reason":"end_turn"}`, "turn_done"},
-		{"error", "error", `{"error":"bad stuff"}`, "error"},
-		{"compacted", "compacted", `{}`, "compacted"},
-		{"unknown", "unknown_event", `{}`, ""},
-		{"invalid json", "delta", `not json`, ""},
+func TestParseSSEEvent_delta(t *testing.T) {
+	evt := ParseSSEEvent("delta", `{"text":"Hello, world!"}`)
+	if evt.Type != "delta" {
+		t.Errorf("Type = %q, want %q", evt.Type, "delta")
 	}
+	if evt.DeltaText != "Hello, world!" {
+		t.Errorf("DeltaText = %q, want %q", evt.DeltaText, "Hello, world!")
+	}
+}
 
+func TestParseSSEEvent_tool_start(t *testing.T) {
+	evt := ParseSSEEvent("tool_start", `{"tool_use_id":"tu_abc123","tool_name":"file_read"}`)
+	if evt.Type != "tool_start" {
+		t.Errorf("Type = %q, want %q", evt.Type, "tool_start")
+	}
+	if evt.ToolUseID != "tu_abc123" {
+		t.Errorf("ToolUseID = %q, want %q", evt.ToolUseID, "tu_abc123")
+	}
+	if evt.ToolName != "file_read" {
+		t.Errorf("ToolName = %q, want %q", evt.ToolName, "file_read")
+	}
+}
+
+func TestParseSSEEvent_tool_done(t *testing.T) {
+	tests := []struct {
+		name        string
+		data        string
+		wantResult  string
+		wantIsError bool
+	}{
+		{
+			name:        "success result",
+			data:        `{"tool_use_id":"t1","tool_name":"bash","result":"file contents here","is_error":false}`,
+			wantResult:  "file contents here",
+			wantIsError: false,
+		},
+		{
+			name:        "error result",
+			data:        `{"tool_use_id":"t1","tool_name":"bash","result":"command failed","is_error":true}`,
+			wantResult:  "command failed",
+			wantIsError: true,
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			evt := ParseSSEEvent(tt.eventType, tt.data)
-			if evt.Type != tt.wantType {
-				t.Errorf("ParseSSEEvent(%q, %q).Type = %q, want %q", tt.eventType, tt.data, evt.Type, tt.wantType)
+			evt := ParseSSEEvent("tool_done", tt.data)
+			if evt.Type != "tool_done" {
+				t.Errorf("Type = %q, want %q", evt.Type, "tool_done")
+			}
+			if evt.ToolResult != tt.wantResult {
+				t.Errorf("ToolResult = %q, want %q", evt.ToolResult, tt.wantResult)
+			}
+			if evt.ToolIsError != tt.wantIsError {
+				t.Errorf("ToolIsError = %v, want %v", evt.ToolIsError, tt.wantIsError)
 			}
 		})
+	}
+}
+
+func TestParseSSEEvent_stream_done(t *testing.T) {
+	evt := ParseSSEEvent("stream_done", `{"input_tokens":500,"output_tokens":200,"cache_creation_input_tokens":30,"cache_read_input_tokens":150,"stop_reason":"end_turn"}`)
+	if evt.Type != "stream_done" {
+		t.Errorf("Type = %q, want %q", evt.Type, "stream_done")
+	}
+	if evt.InputTokens != 500 {
+		t.Errorf("InputTokens = %d, want 500", evt.InputTokens)
+	}
+	if evt.OutputTokens != 200 {
+		t.Errorf("OutputTokens = %d, want 200", evt.OutputTokens)
+	}
+	if evt.CacheCreationInputTokens != 30 {
+		t.Errorf("CacheCreationInputTokens = %d, want 30", evt.CacheCreationInputTokens)
+	}
+	if evt.CacheReadInputTokens != 150 {
+		t.Errorf("CacheReadInputTokens = %d, want 150", evt.CacheReadInputTokens)
+	}
+	if evt.StopReason != "end_turn" {
+		t.Errorf("StopReason = %q, want %q", evt.StopReason, "end_turn")
+	}
+}
+
+func TestParseSSEEvent_ask_user(t *testing.T) {
+	evt := ParseSSEEvent("ask_user", `{"ask_id":"ask_xyz","prompt":"Allow file write to main.go?"}`)
+	if evt.Type != "ask_user" {
+		t.Errorf("Type = %q, want %q", evt.Type, "ask_user")
+	}
+	if evt.AskID != "ask_xyz" {
+		t.Errorf("AskID = %q, want %q", evt.AskID, "ask_xyz")
+	}
+	if evt.AskPrompt != "Allow file write to main.go?" {
+		t.Errorf("AskPrompt = %q, want %q", evt.AskPrompt, "Allow file write to main.go?")
+	}
+}
+
+func TestParseSSEEvent_error(t *testing.T) {
+	evt := ParseSSEEvent("error", `{"error":"rate limit exceeded"}`)
+	if evt.Type != "error" {
+		t.Errorf("Type = %q, want %q", evt.Type, "error")
+	}
+	if evt.ErrorMsg != "rate limit exceeded" {
+		t.Errorf("ErrorMsg = %q, want %q", evt.ErrorMsg, "rate limit exceeded")
 	}
 }
 
@@ -525,31 +600,34 @@ func TestDaemonClientWaitReady_timeout(t *testing.T) {
 }
 
 func TestParseSSEEvent_titled(t *testing.T) {
-	evt := ParseSSEEvent("titled", `{"title":"My Session","tags":"go,test"}`)
+	evt := ParseSSEEvent("titled", `{"title":"My Session","tags":"go,test","model":"claude-sonnet-4-20250514"}`)
 	if evt.Type != "titled" {
-		t.Errorf("expected titled, got %q", evt.Type)
+		t.Errorf("Type = %q, want %q", evt.Type, "titled")
 	}
 	if evt.Title != "My Session" {
-		t.Errorf("expected title 'My Session', got %q", evt.Title)
+		t.Errorf("Title = %q, want %q", evt.Title, "My Session")
 	}
 	if evt.Tags != "go,test" {
-		t.Errorf("expected tags 'go,test', got %q", evt.Tags)
+		t.Errorf("Tags = %q, want %q", evt.Tags, "go,test")
+	}
+	if evt.ModelUsed != "claude-sonnet-4-20250514" {
+		t.Errorf("ModelUsed = %q, want %q", evt.ModelUsed, "claude-sonnet-4-20250514")
 	}
 }
 
 func TestParseSSEEvent_retrying(t *testing.T) {
-	evt := ParseSSEEvent("retrying", `{"attempt":2,"wait_ms":5000,"message":"rate limited"}`)
+	evt := ParseSSEEvent("retrying", `{"attempt":3,"wait_ms":10000,"message":"overloaded, backing off"}`)
 	if evt.Type != "retrying" {
-		t.Errorf("expected retrying, got %q", evt.Type)
+		t.Errorf("Type = %q, want %q", evt.Type, "retrying")
 	}
-	if evt.RetryAttempt != 2 {
-		t.Errorf("expected attempt 2, got %d", evt.RetryAttempt)
+	if evt.RetryAttempt != 3 {
+		t.Errorf("RetryAttempt = %d, want 3", evt.RetryAttempt)
 	}
-	if evt.RetryWaitMs != 5000 {
-		t.Errorf("expected wait_ms 5000, got %d", evt.RetryWaitMs)
+	if evt.RetryWaitMs != 10000 {
+		t.Errorf("RetryWaitMs = %d, want 10000", evt.RetryWaitMs)
 	}
-	if evt.RetryMessage != "rate limited" {
-		t.Errorf("expected message 'rate limited', got %q", evt.RetryMessage)
+	if evt.RetryMessage != "overloaded, backing off" {
+		t.Errorf("RetryMessage = %q, want %q", evt.RetryMessage, "overloaded, backing off")
 	}
 }
 
@@ -601,22 +679,112 @@ func TestSetBaseURL(t *testing.T) {
 	}
 }
 
-func TestParseSSEEvent_streamDone_allFields(t *testing.T) {
-	evt := ParseSSEEvent("stream_done", `{"input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":10,"cache_read_input_tokens":20,"stop_reason":"end_turn"}`)
-	if evt.InputTokens != 100 {
-		t.Errorf("InputTokens = %d, want 100", evt.InputTokens)
+func TestParseSSEEvent_unknown_event(t *testing.T) {
+	evt := ParseSSEEvent("something_new", `{"foo":"bar"}`)
+	if evt != (SSEEvent{}) {
+		t.Errorf("expected zero SSEEvent for unknown type, got %+v", evt)
 	}
-	if evt.OutputTokens != 50 {
-		t.Errorf("OutputTokens = %d, want 50", evt.OutputTokens)
+}
+
+func TestParseSSEEvent_invalid_json(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{"not json at all", `not json`},
+		{"truncated json", `{"text": "hel`},
+		{"empty string", ``},
 	}
-	if evt.CacheCreationInputTokens != 10 {
-		t.Errorf("CacheCreationInputTokens = %d, want 10", evt.CacheCreationInputTokens)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evt := ParseSSEEvent("delta", tt.data)
+			if evt != (SSEEvent{}) {
+				t.Errorf("expected zero SSEEvent for invalid JSON %q, got %+v", tt.data, evt)
+			}
+		})
 	}
-	if evt.CacheReadInputTokens != 20 {
-		t.Errorf("CacheReadInputTokens = %d, want 20", evt.CacheReadInputTokens)
+}
+
+func TestParseSSEEvent_missing_fields(t *testing.T) {
+	// Valid JSON but none of the expected fields present — all should be zero values.
+	tests := []struct {
+		name      string
+		eventType string
+	}{
+		{"delta with empty object", "delta"},
+		{"tool_start with empty object", "tool_start"},
+		{"tool_done with empty object", "tool_done"},
+		{"stream_done with empty object", "stream_done"},
+		{"ask_user with empty object", "ask_user"},
+		{"error with empty object", "error"},
+		{"titled with empty object", "titled"},
+		{"retrying with empty object", "retrying"},
 	}
-	if evt.StopReason != "end_turn" {
-		t.Errorf("StopReason = %q, want end_turn", evt.StopReason)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evt := ParseSSEEvent(tt.eventType, `{}`)
+			if evt.Type != tt.eventType {
+				t.Errorf("Type = %q, want %q", evt.Type, tt.eventType)
+			}
+			// All fields except Type should be zero values.
+			if evt.DeltaText != "" {
+				t.Errorf("DeltaText = %q, want empty", evt.DeltaText)
+			}
+			if evt.ToolUseID != "" {
+				t.Errorf("ToolUseID = %q, want empty", evt.ToolUseID)
+			}
+			if evt.ToolName != "" {
+				t.Errorf("ToolName = %q, want empty", evt.ToolName)
+			}
+			if evt.ToolResult != "" {
+				t.Errorf("ToolResult = %q, want empty", evt.ToolResult)
+			}
+			if evt.ToolIsError != false {
+				t.Errorf("ToolIsError = %v, want false", evt.ToolIsError)
+			}
+			if evt.InputTokens != 0 {
+				t.Errorf("InputTokens = %d, want 0", evt.InputTokens)
+			}
+			if evt.OutputTokens != 0 {
+				t.Errorf("OutputTokens = %d, want 0", evt.OutputTokens)
+			}
+			if evt.CacheCreationInputTokens != 0 {
+				t.Errorf("CacheCreationInputTokens = %d, want 0", evt.CacheCreationInputTokens)
+			}
+			if evt.CacheReadInputTokens != 0 {
+				t.Errorf("CacheReadInputTokens = %d, want 0", evt.CacheReadInputTokens)
+			}
+			if evt.StopReason != "" {
+				t.Errorf("StopReason = %q, want empty", evt.StopReason)
+			}
+			if evt.AskID != "" {
+				t.Errorf("AskID = %q, want empty", evt.AskID)
+			}
+			if evt.AskPrompt != "" {
+				t.Errorf("AskPrompt = %q, want empty", evt.AskPrompt)
+			}
+			if evt.ErrorMsg != "" {
+				t.Errorf("ErrorMsg = %q, want empty", evt.ErrorMsg)
+			}
+			if evt.Title != "" {
+				t.Errorf("Title = %q, want empty", evt.Title)
+			}
+			if evt.Tags != "" {
+				t.Errorf("Tags = %q, want empty", evt.Tags)
+			}
+			if evt.ModelUsed != "" {
+				t.Errorf("ModelUsed = %q, want empty", evt.ModelUsed)
+			}
+			if evt.RetryAttempt != 0 {
+				t.Errorf("RetryAttempt = %d, want 0", evt.RetryAttempt)
+			}
+			if evt.RetryWaitMs != 0 {
+				t.Errorf("RetryWaitMs = %d, want 0", evt.RetryWaitMs)
+			}
+			if evt.RetryMessage != "" {
+				t.Errorf("RetryMessage = %q, want empty", evt.RetryMessage)
+			}
+		})
 	}
 }
 

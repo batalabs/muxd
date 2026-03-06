@@ -48,6 +48,7 @@ type Hub struct {
 	prefs     *config.Preferences
 	mu        sync.RWMutex
 	nodes     map[string]*Node
+	version   string
 	logBroker *logBroker
 	server    *http.Server
 	port      int
@@ -102,6 +103,9 @@ func (h *Hub) Port() int {
 	<-h.ready
 	return h.port
 }
+
+// SetVersion sets the version string reported by the health endpoint.
+func (h *Hub) SetVersion(v string) { h.version = v }
 
 // SetBindAddress sets the network interface to bind to.
 func (h *Hub) SetBindAddress(addr string) { h.bindAddr = addr }

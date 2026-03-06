@@ -97,6 +97,7 @@ func main() {
 		}
 
 		h := hub.NewHub(hubDB, &prefs, logger, explicitHubToken)
+		h.SetVersion(version)
 		saveHubTokenIfNew(&prefs, h.AuthToken())
 
 		hubBind := *hubBindFlag
