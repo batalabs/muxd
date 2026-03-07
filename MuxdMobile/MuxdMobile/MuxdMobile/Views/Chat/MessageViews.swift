@@ -118,29 +118,12 @@ struct MessageBubbleView: View {
                     }
                 }
 
-                // Tool uses
-                if showTools && !message.toolUseBlocks.isEmpty {
-                    HStack(spacing: 8) {
-                        ForEach(message.toolUseBlocks) { block in
-                            HStack(spacing: 4) {
-                                Image(systemName: "wrench.fill")
-                                    .font(.caption2)
-                                Text(block.toolName ?? "Tool")
-                                    .font(.caption)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                    }
-                    .foregroundColor(.secondary)
-                }
-
                 // Tool results with content (grouped when consecutive identical)
                 if showTools {
-                    ForEach(groupToolResults(enrichedToolResultBlocks)) { group in
-                        ToolResultBlockView(block: group.block, count: group.count)
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(groupToolResults(enrichedToolResultBlocks)) { group in
+                            ToolResultBlockView(block: group.block, count: group.count)
+                        }
                     }
                 }
             }
@@ -348,18 +331,18 @@ struct ToolResultBlockView: View {
                     // Result content - tappable to expand/collapse
                     Group {
                         if isLong && !isExpanded {
-                            let lines = result.components(separatedBy: .newlines)
+                            let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let lines = Array(trimmed.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.prefix(2))
                             VStack(alignment: .leading, spacing: 0) {
-                                ForEach(Array(lines.prefix(2).enumerated()), id: \.offset) { _, line in
+                                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                                     Text(line)
                                         .font(.system(size: 12, design: .monospaced))
                                         .lineLimit(1)
                                 }
-                                Text("")
-                                    .font(.system(size: 12, design: .monospaced))
                                 Text("[truncated]")
                                     .font(.system(size: 12, design: .monospaced))
                                     .foregroundColor(.secondary)
+                                    .padding(.top, 2)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(8)

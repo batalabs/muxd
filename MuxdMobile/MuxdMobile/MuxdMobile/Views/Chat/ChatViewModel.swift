@@ -116,6 +116,7 @@ class ChatViewModel: ObservableObject {
         sseClient?.onComplete = { [weak self] in
             Task { @MainActor [weak self] in
                 self?.isStreaming = false
+                self?.activeTools = [:]
                 await self?.loadMessages()
             }
         }
@@ -159,6 +160,7 @@ class ChatViewModel: ObservableObject {
 
         case .turnDone:
             isStreaming = false
+            activeTools = [:]
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             Task { await loadMessages() }
 

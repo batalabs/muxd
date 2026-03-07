@@ -83,18 +83,18 @@ struct ToolCallView: View {
             if hasResult, let result = tool.result {
                 Group {
                     if isLong && !isExpanded {
-                        let lines = result.components(separatedBy: .newlines)
+                        let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let lines = Array(trimmed.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.prefix(2))
                         VStack(alignment: .leading, spacing: 0) {
-                            ForEach(Array(lines.prefix(2).enumerated()), id: \.offset) { _, line in
+                            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                                 Text(line)
                                     .font(.system(size: 12, design: .monospaced))
                                     .lineLimit(1)
                             }
-                            Text("")
-                                .font(.system(size: 12, design: .monospaced))
                             Text("[truncated]")
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundColor(.secondary)
+                                .padding(.top, 2)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
