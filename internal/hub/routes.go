@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const sessionAggregationTimeout = 5 * time.Second
+
 func (h *Hub) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("POST /api/hub/nodes/register", h.withAuth(h.handleRegisterNode))
@@ -134,7 +136,7 @@ func (h *Hub) handleAggregatedSessions(w http.ResponseWriter, r *http.Request) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: sessionAggregationTimeout}
 	for _, node := range nodes {
 		if node.Status != StatusOnline {
 			continue

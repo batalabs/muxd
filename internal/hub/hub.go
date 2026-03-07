@@ -25,6 +25,10 @@ type NodeStatus string
 const (
 	StatusOnline  NodeStatus = "online"
 	StatusOffline NodeStatus = "offline"
+
+	healthCheckInterval = 30 * time.Second
+	offlineCutoff       = 90 * time.Second
+	purgeCutoff         = 1 * time.Hour
 )
 
 // Node represents a registered muxd instance.
@@ -131,7 +135,7 @@ func (h *Hub) Start(port int) error {
 	close(h.ready)
 
 	if err := writeHubLockfile(h.port, h.token, bindAddr); err != nil {
-		ln.Close()
+		_ = ln.Close()
 		return fmt.Errorf("writing hub lockfile: %w", err)
 	}
 
@@ -283,7 +287,7 @@ func (h *Hub) listNodes() []*Node {
 // ---------------------------------------------------------------------------
 
 func (h *Hub) startHealthChecker() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(healthCheckInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -297,19 +301,19 @@ func (h *Hub) startHealthChecker() {
 
 func (h *Hub) sweepOfflineNodes() {
 	now := time.Now().UTC()
-	offlineCutoff := now.Add(-90 * time.Second)
-	purgeCutoff := now.Add(-1 * time.Hour)
+	offlineAt := now.Add(-offlineCutoff)
+	purgeAt := now.Add(-purgeCutoff)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for id, n := range h.nodes {
-		if n.Status == StatusOnline && n.LastSeenAt.Before(offlineCutoff) {
+		if n.Status == StatusOnline && n.LastSeenAt.Before(offlineAt) {
 			n.Status = StatusOffline
 			h.db.Exec(
 				`UPDATE nodes SET status = ? WHERE id = ?`,
 				string(StatusOffline), n.ID,
 			)
 			h.logf("node %s marked offline (last seen %s)", n.ID, n.LastSeenAt.Format(time.RFC3339))
-		} else if n.Status == StatusOffline && n.LastSeenAt.Before(purgeCutoff) {
+		} else if n.Status == StatusOffline && n.LastSeenAt.Before(purgeAt) {
 			// Purge nodes that have been offline for over 1 hour.
 			h.db.Exec(`DELETE FROM nodes WHERE id = ?`, id)
 			delete(h.nodes, id)
@@ -324,9 +328,9 @@ func (h *Hub) sweepOfflineNodes() {
 
 func (h *Hub) loadNodes() {
 	// Purge stale nodes on startup -nodes offline for over 1 hour.
-	purgeCutoff := time.Now().UTC().Add(-1 * time.Hour)
+	purgeAt := time.Now().UTC().Add(-purgeCutoff)
 	h.db.Exec(`DELETE FROM nodes WHERE status = ? AND last_seen_at < ?`,
-		string(StatusOffline), purgeCutoff.Format(time.RFC3339))
+		string(StatusOffline), purgeAt.Format(time.RFC3339))
 
 	// Mark all remaining nodes as offline on startup -they must re-register
 	// or heartbeat to prove they're alive.

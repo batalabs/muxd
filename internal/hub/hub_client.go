@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const hubClientTimeout = 10 * time.Second
+
 // HubClient is used by the TUI to communicate with a hub for node listing.
 // Once a node is selected, all session/agent traffic goes through the existing
 // DaemonClient with a proxy-prefixed baseURL.
@@ -21,7 +23,7 @@ func NewHubClient(baseURL, token string) *HubClient {
 	return &HubClient{
 		baseURL:   baseURL,
 		authToken: token,
-		client:    &http.Client{Timeout: 10 * time.Second},
+		client:    &http.Client{Timeout: hubClientTimeout},
 	}
 }
 

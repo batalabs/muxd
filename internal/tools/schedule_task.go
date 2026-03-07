@@ -153,7 +153,7 @@ func scheduleCancelTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "schedule_cancel",
-			Description: "Cancel a scheduled job by ID. Use schedule_list to find job IDs. Only pending or failed jobs can be cancelled.",
+			Description: "Cancel a scheduled job by ID. Use schedule_list to find job IDs. Only pending or failed jobs can be canceled.",
 			Properties: map[string]provider.ToolProp{
 				"id": {Type: "string", Description: "The job ID to cancel"},
 			},
@@ -170,10 +170,10 @@ func scheduleCancelTool() ToolDef {
 			}
 
 			if err := ctx.CancelScheduledJob(id); err != nil {
-				return "", fmt.Errorf("cancelling job: %w", err)
+				return "", fmt.Errorf("canceling job: %w", err)
 			}
 
-			return fmt.Sprintf("Cancelled scheduled job %s", id), nil
+			return fmt.Sprintf("Canceled scheduled job %s", id), nil
 		},
 	}
 }

@@ -12,8 +12,10 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 )
 
+const smsTimeout = 15 * time.Second
+
 // smsHTTPClient is overridable in tests.
-var smsHTTPClient = &http.Client{Timeout: 15 * time.Second}
+var smsHTTPClient = &http.Client{Timeout: smsTimeout}
 
 // smsTextURL is the Textbelt endpoint for sending SMS.
 var smsTextURL = "https://textbelt.com/text"
@@ -52,7 +54,7 @@ func smsSendTool() ToolDef {
 				apiKey = ctx.TextbeltAPIKey
 			}
 			if apiKey == "" {
-				return "", fmt.Errorf("Textbelt API key not configured. Use /config set textbelt.api_key <key>")
+				return "", fmt.Errorf("textbelt API key not configured, use /config set textbelt.api_key <key>")
 			}
 
 			return textbeltSend(phone, message, apiKey)
@@ -197,7 +199,7 @@ func smsScheduleTool() ToolDef {
 				apiKey = ctx.TextbeltAPIKey
 			}
 			if apiKey == "" {
-				return "", fmt.Errorf("Textbelt API key not configured. Use /config set textbelt.api_key <key>")
+				return "", fmt.Errorf("textbelt API key not configured, use /config set textbelt.api_key <key>")
 			}
 
 			scheduledFor, err := parseScheduleTime(timeStr)

@@ -29,6 +29,12 @@ import (
 	"github.com/batalabs/muxd/internal/tui"
 )
 
+const (
+	shutdownTimeout         = 5 * time.Second
+	embeddedShutdownTimeout = 2 * time.Second
+	heartbeatInterval       = 30 * time.Second
+)
+
 var version = "dev"
 
 func init() {
@@ -74,7 +80,7 @@ func main() {
 	if *serviceCmd != "" {
 		if err := service.HandleCommand(*serviceCmd); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+			os.Exit(1) //nolint:gocritic // logger defer is acceptable to skip on fatal exit
 		}
 		return
 	}
@@ -112,7 +118,7 @@ func main() {
 		defer cancel()
 		go func() {
 			<-ctx.Done()
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer shutdownCancel()
 			if err := h.Shutdown(shutdownCtx); err != nil {
 				fmt.Fprintf(os.Stderr, "hub: shutdown: %v\n", err)
@@ -213,7 +219,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	// Agent factory for the daemon server
 	agentFactory := func(key, mID, mLabel string, s *store.Store, sess *domain.Session, p provider.Provider) *agent.Service {
@@ -273,7 +279,7 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
-				ticker := time.NewTicker(30 * time.Second)
+				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
@@ -293,7 +299,7 @@ func main() {
 									}
 								}
 								if newCount > 0 {
-									mem.MergeHub(hubFacts)
+									_ = mem.MergeHub(hubFacts)
 									fmt.Fprintf(os.Stderr, "hub: synced %d memory facts\n", newCount)
 								}
 							}
@@ -313,7 +319,7 @@ func main() {
 					fmt.Fprintf(os.Stderr, "hub: deregister failed: %v\n", err)
 				}
 			}
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer shutdownCancel()
 			if err := srv.Shutdown(shutdownCtx); err != nil {
 				fmt.Fprintf(os.Stderr, "daemon: shutdown: %v\n", err)
@@ -399,7 +405,7 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
-				ticker := time.NewTicker(30 * time.Second)
+				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
@@ -419,7 +425,7 @@ func main() {
 									}
 								}
 								if newCount > 0 {
-									mem.MergeHub(hubFacts)
+									_ = mem.MergeHub(hubFacts)
 									if tui.Prog != nil {
 										tui.Prog.Send(tui.HubSyncMsg{Count: newCount})
 									}
@@ -500,7 +506,7 @@ func main() {
 		if embeddedHubDone != nil {
 			close(embeddedHubDone)
 		}
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), embeddedShutdownTimeout)
 		defer shutdownCancel()
 		if err := embeddedServer.Shutdown(shutdownCtx); err != nil {
 			fmt.Fprintf(os.Stderr, "embedded server: shutdown: %v\n", err)
@@ -612,7 +618,7 @@ func resolveHubRegistrationHost(bindAddr, hubURL string) string {
 		}
 		return bindAddr
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()
 }

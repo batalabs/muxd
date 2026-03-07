@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/batalabs/muxd/internal/domain"
 )
@@ -36,7 +35,7 @@ func (p *OpenAIProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, erro
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: fetchModelsTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
@@ -148,7 +147,7 @@ func (p *OpenAIProvider) StreamMessage(
 	}
 
 	tr := newTimeoutReader(resp.Body)
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	return parseOpenAISSE(tr, onDelta)
 }
 

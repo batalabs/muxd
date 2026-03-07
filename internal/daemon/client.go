@@ -16,6 +16,12 @@ import (
 	"github.com/batalabs/muxd/internal/domain"
 )
 
+const (
+	clientTimeout      = 10 * time.Second
+	healthCheckTimeout = 2 * time.Second
+	pollInterval       = 50 * time.Millisecond
+)
+
 // SSEEvent represents a parsed server-sent event from the daemon.
 type SSEEvent struct {
 	Type                     string // "delta", "tool_start", "tool_done", "stream_done", "ask_user", "turn_done", "error", "compacted", "titled", "retrying"
@@ -51,7 +57,7 @@ type DaemonClient struct {
 func NewDaemonClient(port int) *DaemonClient {
 	return &DaemonClient{
 		baseURL:    fmt.Sprintf("http://localhost:%d", port),
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: &http.Client{Timeout: clientTimeout},
 	}
 }
 
@@ -102,7 +108,7 @@ func (c *DaemonClient) Health() error {
 
 // HealthCheck returns detailed health info from the daemon.
 func (c *DaemonClient) HealthCheck() (*HealthInfo, error) {
-	client := &http.Client{Timeout: 2 * time.Second}
+	client := &http.Client{Timeout: healthCheckTimeout}
 	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/api/health", nil)
 	if err != nil {
 		return nil, fmt.Errorf("health check: %w", err)
@@ -282,7 +288,7 @@ func (c *DaemonClient) Cancel(sessionID string) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.do(req)
 	if err != nil {
-		return fmt.Errorf("cancelling: %w", err)
+		return fmt.Errorf("canceling: %w", err)
 	}
 	resp.Body.Close()
 	return nil
@@ -429,7 +435,7 @@ func (c *DaemonClient) WaitReady(timeout time.Duration) error {
 		if err := c.Health(); err == nil {
 			return nil
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(pollInterval)
 	}
 	return fmt.Errorf("daemon not ready after %v", timeout)
 }
@@ -452,9 +458,7 @@ func (c *DaemonClient) BranchSession(sessionID string, atSequence int) (*domain.
 		var errResp struct {
 			Error string `json:"error"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-			// best-effort error body parsing; fallback message used regardless
-		}
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return nil, fmt.Errorf("branching session: %s", errResp.Error)
 	}
 

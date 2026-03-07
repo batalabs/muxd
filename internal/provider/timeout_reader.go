@@ -15,9 +15,9 @@ const streamIdleTimeout = 3 * time.Minute
 // for longer than the configured idle timeout. This prevents SSE stream
 // parsers from hanging indefinitely when the API stalls mid-stream.
 type timeoutReader struct {
-	rc      io.ReadCloser
-	timer   *time.Timer
-	once    sync.Once
+	rc    io.ReadCloser
+	timer *time.Timer
+	once  sync.Once
 }
 
 func newTimeoutReader(rc io.ReadCloser) *timeoutReader {

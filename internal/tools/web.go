@@ -12,6 +12,11 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 )
 
+const (
+	braveSearchTimeout = 15 * time.Second
+	webFetchTimeout    = 30 * time.Second
+)
+
 // ---------------------------------------------------------------------------
 // web_search -Brave Search API
 // ---------------------------------------------------------------------------
@@ -51,7 +56,7 @@ func webSearchTool() ToolDef {
 }
 
 // braveSearchHTTPClient is overridable in tests.
-var braveSearchHTTPClient = &http.Client{Timeout: 15 * time.Second}
+var braveSearchHTTPClient = &http.Client{Timeout: braveSearchTimeout}
 
 // braveSearchURL is the base URL for the Brave Search API. Override in tests.
 var braveSearchURL = "https://api.search.brave.com/res/v1/web/search"
@@ -67,7 +72,7 @@ func braveSearch(query string, count int, configKey string) (string, error) {
 		apiKey = configKey
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("BRAVE_SEARCH_API_KEY not set. Use /config set brave.api_key <key> or set the BRAVE_SEARCH_API_KEY environment variable.")
+		return "", fmt.Errorf("BRAVE_SEARCH_API_KEY not set, use /config set brave.api_key <key> or set the BRAVE_SEARCH_API_KEY environment variable")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, braveSearchURL, nil)
@@ -94,7 +99,7 @@ func braveSearch(query string, count int, configKey string) (string, error) {
 	}
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("Brave Search API error (HTTP %d): %s", resp.StatusCode, truncate(string(body), 500))
+		return "", fmt.Errorf("brave search API error (HTTP %d): %s", resp.StatusCode, truncate(string(body), 500))
 	}
 
 	var result braveSearchResponse
@@ -153,7 +158,7 @@ func webFetchTool() ToolDef {
 }
 
 // webFetchHTTPClient is overridable in tests.
-var webFetchHTTPClient = &http.Client{Timeout: 30 * time.Second}
+var webFetchHTTPClient = &http.Client{Timeout: webFetchTimeout}
 
 // fetchAndExtractText fetches a URL and returns the text content.
 func fetchAndExtractText(rawURL string) (string, error) {

@@ -27,6 +27,10 @@ import (
 	"github.com/batalabs/muxd/internal/tools"
 )
 
+const (
+	schedulerPollInterval = time.Minute
+)
+
 // errSessionNotFound is returned when a session ID does not exist in the store.
 var errSessionNotFound = errors.New("session not found")
 
@@ -170,7 +174,7 @@ func (s *Server) initMCP() {
 	cwd, _ := tools.Getwd()
 	cfg, err := mcp.LoadMCPConfig(cwd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "mcp: config error: %v\n", err)
+		s.logf("mcp: config error: %v", err)
 		return
 	}
 	if len(cfg.MCPServers) == 0 {
@@ -180,7 +184,7 @@ func (s *Server) initMCP() {
 	mgr := mcp.NewManager()
 	ctx := context.Background()
 	if err := mgr.StartAll(ctx, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "mcp: startup error: %v\n", err)
+		s.logf("mcp: startup error: %v", err)
 	}
 	s.mu.Lock()
 	s.mcpManager = mgr
@@ -220,7 +224,7 @@ func (s *Server) Start(port int) error {
 	close(s.ready) // signal that port is assigned
 
 	if err := WriteLockfile(s.port, s.token, bindAddr); err != nil {
-		ln.Close()
+		_ = ln.Close()
 		return fmt.Errorf("writing lockfile: %w", err)
 	}
 
@@ -229,7 +233,7 @@ func (s *Server) Start(port int) error {
 
 	s.sched = tools.NewToolCallScheduler(
 		daemonScheduledToolStore{st: s.store},
-		time.Minute,
+		schedulerPollInterval,
 		func() *tools.ToolContext {
 			cwd, _ := tools.Getwd()
 			s.mu.Lock()
@@ -299,6 +303,9 @@ func (s *Server) Start(port int) error {
 			return result, isErr, nil
 		},
 	)
+	if s.logger != nil {
+		s.sched.SetLogFunc(s.logger.Printf)
+	}
 	s.sched.Start()
 
 	mux := http.NewServeMux()
@@ -328,7 +335,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		err = s.server.Shutdown(ctx)
 	}
 	if err := RemoveLockfile(); err != nil {
-		fmt.Fprintf(os.Stderr, "daemon: remove lockfile: %v\n", err)
+		s.logf("daemon: remove lockfile: %v", err)
 	}
 	return err
 }
@@ -736,7 +743,7 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ag.Cancel()
-	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "canceled"})
 }
 
 func (s *Server) handleAskResponse(w http.ResponseWriter, r *http.Request) {
@@ -813,7 +820,7 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		ag.SetModel(req.Label, req.ModelID)
 	} else {
 		if err := s.store.UpdateSessionModel(sessionID, req.ModelID); err != nil {
-			fmt.Fprintf(os.Stderr, "daemon: update session model: %v\n", err)
+			s.logf("daemon: update session model: %v", err)
 		}
 	}
 
@@ -1009,7 +1016,7 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	// Try to resume messages from DB
 	if msgs, err := s.store.GetMessages(sessionID); err == nil && len(msgs) > 0 {
 		if err := ag.Resume(); err != nil {
-			fmt.Fprintf(os.Stderr, "daemon: resume agent %s: %v\n", sessionID, err)
+			s.logf("daemon: resume agent %s: %v", sessionID, err)
 		}
 	}
 
@@ -1022,6 +1029,9 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 // configureAgent sets up credentials, disabled tools, MCP, git, and memory
 // on an agent. Must be called with s.mu held.
 func (s *Server) configureAgent(ag *agent.Service) {
+	if s.logger != nil {
+		ag.SetLogger(s.logger)
+	}
 	if s.prefs != nil && s.prefs.BraveAPIKey != "" {
 		ag.SetBraveAPIKey(s.prefs.BraveAPIKey)
 	}
@@ -1142,20 +1152,4 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, data an
 	}
 	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, string(b))
 	flusher.Flush()
-}
-
-// sseKeepAlive sends periodic SSE comments to keep the connection alive.
-// Not currently used but available for future long-polling scenarios.
-func sseKeepAlive(w http.ResponseWriter, flusher http.Flusher, done <-chan struct{}) {
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-done:
-			return
-		case <-ticker.C:
-			fmt.Fprint(w, ": keepalive\n\n")
-			flusher.Flush()
-		}
-	}
 }

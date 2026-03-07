@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const nodeClientTimeout = 10 * time.Second
+
 // NodeClient is used by muxd daemon instances to communicate with the hub.
 type NodeClient struct {
 	baseURL   string
@@ -22,7 +24,7 @@ func NewNodeClient(hubURL, hubToken, nodeToken string) *NodeClient {
 		baseURL:   hubURL,
 		hubToken:  hubToken,
 		nodeToken: nodeToken,
-		client:    &http.Client{Timeout: 10 * time.Second},
+		client:    &http.Client{Timeout: nodeClientTimeout},
 	}
 }
 

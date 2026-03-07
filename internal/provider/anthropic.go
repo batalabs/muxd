@@ -15,6 +15,13 @@ import (
 	"github.com/batalabs/muxd/internal/domain"
 )
 
+const (
+	tlsHandshakeTimeout   = 30 * time.Second
+	responseHeaderTimeout = 2 * time.Minute
+	idleConnTimeout       = 90 * time.Second
+	fetchModelsTimeout    = 15 * time.Second
+)
+
 // streamHTTPClient is shared across all streaming API calls (Anthropic + OpenAI).
 // A single shared Transport reuses connections and avoids ephemeral port
 // exhaustion on Windows. DisableCompression prevents gzip-over-chunked
@@ -23,9 +30,9 @@ import (
 // avoiding Go 1.25+'s strict bare-LF rejection (CVE-2025-22871).
 var streamHTTPClient = &http.Client{
 	Transport: &http.Transport{
-		TLSHandshakeTimeout:   30 * time.Second,
-		ResponseHeaderTimeout: 2 * time.Minute,
-		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   tlsHandshakeTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+		IdleConnTimeout:       idleConnTimeout,
 		DisableCompression:    true,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConnsPerHost:   4,
@@ -110,7 +117,7 @@ func (p *AnthropicProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, e
 	httpReq.Header.Set("x-api-key", apiKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: fetchModelsTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
@@ -574,7 +581,7 @@ func anthropicStreamWithURL(
 	}
 
 	tr := newTimeoutReader(resp.Body)
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	blocks, stopReason, usage, newContainer, sseErr := parseAnthropicSSE(&lenientReader{r: tr}, onDelta)
 	return blocks, stopReason, usage, newContainer, sseErr
 }

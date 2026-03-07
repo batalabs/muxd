@@ -65,8 +65,12 @@ func NewManager() *Manager {
 	}
 }
 
-// connectTimeout is the timeout for connecting to a single MCP server.
-var connectTimeout = 30 * time.Second
+const (
+	// connectTimeout is the timeout for connecting to a single MCP server.
+	connectTimeout = 30 * time.Second
+	// callTimeout is the timeout for a single MCP tool invocation.
+	callTimeout = 30 * time.Second
+)
 
 // StartAll connects to all configured MCP servers. Errors for individual
 // servers are logged to stderr but do not prevent other servers from starting.
@@ -249,7 +253,7 @@ func (m *Manager) CallTool(ctx context.Context, serverName, toolName string, arg
 		return errMsg, true
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
 
 	result, err := conn.session.CallTool(callCtx, &mcpsdk.CallToolParams{
@@ -258,7 +262,7 @@ func (m *Manager) CallTool(ctx context.Context, serverName, toolName string, arg
 	})
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
-			return "MCP tool call timed out after 30s", true
+			return fmt.Sprintf("MCP tool call timed out after %s", callTimeout), true
 		}
 		return fmt.Sprintf("MCP tool call failed: %v", err), true
 	}

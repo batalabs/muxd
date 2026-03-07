@@ -19,6 +19,8 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 )
 
+const bashWaitDelay = 5 * time.Second
+
 // nowFunc is overridable in tests.
 var nowFunc = time.Now
 
@@ -477,7 +479,7 @@ func bashTool() ToolDef {
 
 			// WaitDelay as a safety net: if Cancel fails to kill the
 			// process, Wait returns after this delay regardless.
-			cmd.WaitDelay = 5 * time.Second
+			cmd.WaitDelay = bashWaitDelay
 
 			err := cmd.Run()
 			tmpFile.Close()
@@ -490,7 +492,7 @@ func bashTool() ToolDef {
 
 			if err != nil {
 				if cmdCtx.Err() == context.Canceled {
-					return result + "\n(cancelled)", nil
+					return result + "\n(canceled)", nil
 				}
 				if cmdCtx.Err() == context.DeadlineExceeded {
 					return result + "\n(command timed out after " + strconv.Itoa(timeout) + "s)", nil
@@ -699,11 +701,7 @@ func IsDeniedConfigFile(path string) bool {
 	// Check config.json in current working directory
 	cwd, _ := Getwd()
 	configInCwd := filepath.Clean(filepath.Join(cwd, "config.json"))
-	if absPath == configInCwd {
-		return true
-	}
-
-	return false
+	return absPath == configInCwd
 }
 
 // IsBinary reports whether data looks like binary content.
