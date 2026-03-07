@@ -1,0 +1,9 @@
+# Normalize line endings to LF in the repository
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.db binary

@@ -796,6 +796,7 @@ func ConfigFilePath() string {
 }
 
 // PreferencesFilePath is an alias for ConfigFilePath (legacy name).
+//
 // Deprecated: use ConfigFilePath.
 func PreferencesFilePath() string {
 	return ConfigFilePath()
