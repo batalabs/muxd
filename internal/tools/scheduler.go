@@ -1,8 +1,6 @@
 package tools
 
 import (
-	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +45,7 @@ type ToolCallScheduler struct {
 	stopCh      chan struct{}
 	doneCh      chan struct{}
 	running     bool
+	logFunc     func(string, ...any)
 }
 
 // NewToolCallScheduler creates a generic scheduled tool-call engine.
@@ -59,6 +58,20 @@ func NewToolCallScheduler(store ScheduledToolCallStore, interval time.Duration, 
 		interval:    interval,
 		ctxProvider: ctxProvider,
 		executor:    executor,
+	}
+}
+
+// SetLogFunc sets a logging function for background errors.
+func (s *ToolCallScheduler) SetLogFunc(fn func(string, ...any)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logFunc = fn
+}
+
+// logf writes a log line if a log function is configured.
+func (s *ToolCallScheduler) logf(format string, args ...any) {
+	if s.logFunc != nil {
+		s.logFunc(format, args...)
 	}
 }
 
@@ -81,7 +94,7 @@ func (s *ToolCallScheduler) Start() {
 		ticker := time.NewTicker(s.interval)
 		defer ticker.Stop()
 		if err := s.RunOnce(); err != nil {
-			fmt.Fprintf(os.Stderr, "scheduler: initial run: %v\n", err)
+			s.logf("scheduler: initial run: %v", err)
 		}
 		for {
 			select {
@@ -89,7 +102,7 @@ func (s *ToolCallScheduler) Start() {
 				return
 			case <-ticker.C:
 				if err := s.RunOnce(); err != nil {
-					fmt.Fprintf(os.Stderr, "scheduler: tick run: %v\n", err)
+					s.logf("scheduler: tick run: %v", err)
 				}
 			}
 		}
@@ -131,7 +144,7 @@ func (s *ToolCallScheduler) RunOnce() error {
 
 		if !isSchedulerAllowed(call.ToolName, ctx) {
 			if err := s.store.MarkScheduledToolCallFailed(call, "scheduled tool is not allowed by policy", "", attempted); err != nil {
-				fmt.Fprintf(os.Stderr, "scheduler: mark failed (policy): %v\n", err)
+				s.logf("scheduler: mark failed (policy): %v", err)
 			}
 			continue
 		}
@@ -139,23 +152,23 @@ func (s *ToolCallScheduler) RunOnce() error {
 		result, isToolError, execErr := s.executor(call, ctx)
 		if execErr != nil {
 			if err := s.store.MarkScheduledToolCallFailed(call, execErr.Error(), result, attempted); err != nil {
-				fmt.Fprintf(os.Stderr, "scheduler: mark failed (exec): %v\n", err)
+				s.logf("scheduler: mark failed (exec): %v", err)
 			}
 			continue
 		}
 		if isToolError {
 			if err := s.store.MarkScheduledToolCallFailed(call, "tool execution returned an error result", result, attempted); err != nil {
-				fmt.Fprintf(os.Stderr, "scheduler: mark failed (tool error): %v\n", err)
+				s.logf("scheduler: mark failed (tool error): %v", err)
 			}
 			continue
 		}
 		if err := s.store.MarkScheduledToolCallSucceeded(call, result, attempted); err != nil {
-			fmt.Fprintf(os.Stderr, "scheduler: mark succeeded: %v\n", err)
+			s.logf("scheduler: mark succeeded: %v", err)
 		}
 		next, recurring := nextRecurringTime(call.Recurrence, call.ScheduledFor)
 		if recurring {
 			if err := s.store.RescheduleScheduledToolCall(call, next); err != nil {
-				fmt.Fprintf(os.Stderr, "scheduler: reschedule: %v\n", err)
+				s.logf("scheduler: reschedule: %v", err)
 			}
 		}
 	}

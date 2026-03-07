@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 
 // Submit sends a user message and runs the full agent loop synchronously.
 // The caller should wrap this in a goroutine. Events are delivered via onEvent.
-// Submit blocks until the turn is complete or cancelled.
+// Submit blocks until the turn is complete or canceled.
 func (a *Service) Submit(userText string, onEvent EventFunc) {
 	userMsg := domain.TranscriptMessage{Role: "user", Content: userText}
 	a.submitMessage(userMsg, onEvent)
@@ -38,7 +37,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 		return
 	}
 	a.running = true
-	a.cancelled = false
+	a.canceled = false
 	a.agentLoopCount = 0
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	a.cancelFunc = cancelCtx
@@ -60,11 +59,11 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 	if a.store != nil && a.session != nil {
 		if len(userMsg.Blocks) > 0 {
 			if err := a.store.AppendMessageBlocks(a.session.ID, "user", userMsg.Blocks, 0); err != nil {
-				fmt.Fprintf(os.Stderr, "agent: persist user message blocks: %v\n", err)
+				a.logf("agent: persist user message blocks: %v", err)
 			}
 		} else {
 			if err := a.store.AppendMessage(a.session.ID, "user", userMsg.Content, 0); err != nil {
-				fmt.Fprintf(os.Stderr, "agent: persist user message: %v\n", err)
+				a.logf("agent: persist user message: %v", err)
 			}
 		}
 	}
@@ -84,7 +83,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 		// Build ToolContext each iteration so hot-reloaded config
 		// (e.g. config changes mid-loop) is picked up.
 		a.mu.Lock()
-		if a.cancelled {
+		if a.canceled {
 			a.mu.Unlock()
 			return
 		}
@@ -202,7 +201,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			a.mu.Unlock()
 			if a.store != nil && a.session != nil {
 				if err := a.store.AppendMessage(a.session.ID, "assistant", errMsg.Content, 0); err != nil {
-					fmt.Fprintf(os.Stderr, "agent: persist error message: %v\n", err)
+					a.logf("agent: persist error message: %v", err)
 				}
 			}
 			return
@@ -228,15 +227,15 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 		if a.store != nil && a.session != nil {
 			if len(blocks) > 0 {
 				if err := a.store.AppendMessageBlocks(a.session.ID, "assistant", blocks, usage.OutputTokens); err != nil {
-					fmt.Fprintf(os.Stderr, "agent: persist assistant blocks: %v\n", err)
+					a.logf("agent: persist assistant blocks: %v", err)
 				}
 			} else {
 				if err := a.store.AppendMessage(a.session.ID, "assistant", asstMsg.Content, usage.OutputTokens); err != nil {
-					fmt.Fprintf(os.Stderr, "agent: persist assistant message: %v\n", err)
+					a.logf("agent: persist assistant message: %v", err)
 				}
 			}
 			if err := a.store.UpdateSessionTokens(a.session.ID, a.inputTokens, a.outputTokens); err != nil {
-				fmt.Fprintf(os.Stderr, "agent: update session tokens: %v\n", err)
+				a.logf("agent: update session tokens: %v", err)
 			}
 		}
 
@@ -300,7 +299,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 					cp.SHA = sha
 					ref := fmt.Sprintf("refs/muxd/%s/%d", a.session.ID[:8], loopCount)
 					if err := checkpoint.GitUpdateRef(ref, sha); err != nil {
-						fmt.Fprintf(os.Stderr, "agent: git update-ref: %v\n", err)
+						a.logf("agent: git update-ref: %v", err)
 					}
 				}
 				a.mu.Lock()
@@ -332,7 +331,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			// Sequential path: ask_user requires blocking for user input
 			for _, b := range toolUseBlocks {
 				a.mu.Lock()
-				if a.cancelled {
+				if a.canceled {
 					a.mu.Unlock()
 					return
 				}
@@ -359,7 +358,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 						AskPrompt:   question,
 						AskResponse: respCh,
 					})
-					// Block until user responds or agent is cancelled
+					// Block until user responds or agent is canceled
 					select {
 					case answer := <-respCh:
 						result = answer
@@ -369,9 +368,9 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 						go func() {
 							for {
 								a.mu.Lock()
-								cancelled := a.cancelled
+								canceled := a.canceled
 								a.mu.Unlock()
-								if cancelled {
+								if canceled {
 									close(ch)
 									return
 								}
@@ -414,7 +413,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 
 			for i, b := range toolUseBlocks {
 				a.mu.Lock()
-				if a.cancelled {
+				if a.canceled {
 					a.mu.Unlock()
 					return
 				}
@@ -465,7 +464,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 
 		if a.store != nil && a.session != nil {
 			if err := a.store.AppendMessageBlocks(a.session.ID, "user", toolResults, 0); err != nil {
-				fmt.Fprintf(os.Stderr, "agent: persist tool results: %v\n", err)
+				a.logf("agent: persist tool results: %v", err)
 			}
 		}
 

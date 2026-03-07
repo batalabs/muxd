@@ -2,7 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/batalabs/muxd/internal/domain"
@@ -49,7 +48,7 @@ func (a *Service) generateAndSetTitle(asstText string, onEvent EventFunc) {
 	a.mu.Unlock()
 
 	if err := a.store.UpdateSessionTitle(a.session.ID, title); err != nil {
-		fmt.Fprintf(os.Stderr, "agent: update session title: %v\n", err)
+		a.logf("agent: update session title: %v", err)
 	}
 
 	onEvent(Event{Kind: EventToolDone, ToolUseID: "internal_title", ToolName: "generate_title", ToolResult: title + " (model: " + titleModel + ")"})
@@ -112,7 +111,7 @@ func (a *Service) llmTitle(userText, asstText, titleModel string) string {
 func (a *Service) Cancel() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.cancelled = true
+	a.canceled = true
 	if a.cancelFunc != nil {
 		a.cancelFunc()
 	}
@@ -175,7 +174,7 @@ func (a *Service) SetModel(label, id string) {
 	a.modelID = id
 	if a.store != nil && a.session != nil {
 		if err := a.store.UpdateSessionModel(a.session.ID, id); err != nil {
-			fmt.Fprintf(os.Stderr, "agent: update session model: %v\n", err)
+			a.logf("agent: update session model: %v", err)
 		}
 	}
 }

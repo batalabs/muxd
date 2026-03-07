@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/batalabs/muxd/internal/checkpoint"
+	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/domain"
 	"github.com/batalabs/muxd/internal/mcp"
 	"github.com/batalabs/muxd/internal/provider"
@@ -123,7 +124,7 @@ type Service struct {
 	agentLoopCount  int
 
 	running     bool
-	cancelled   bool
+	canceled    bool
 	cancelFunc  context.CancelFunc
 	titled      bool
 	userRenamed bool // true when user manually renamed the session
@@ -166,6 +167,9 @@ type Service struct {
 
 	// pushHubMemory is called to push shared facts to the hub.
 	pushHubMemory func(facts map[string]string) error
+
+	// logger writes background errors to the muxd log file.
+	logger *config.Logger
 }
 
 // NewService creates a new Service for the given session.
@@ -185,5 +189,19 @@ func NewService(apiKey, modelID, modelLabel string, store Store, session *domain
 		inputTokens:   inTok,
 		outputTokens:  outTok,
 		disabledTools: map[string]bool{},
+	}
+}
+
+// SetLogger sets the logger for background error logging.
+func (a *Service) SetLogger(l *config.Logger) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.logger = l
+}
+
+// logf writes a log line if a logger is configured.
+func (a *Service) logf(format string, args ...any) {
+	if a.logger != nil {
+		a.logger.Printf(format, args...)
 	}
 }

@@ -2,7 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/batalabs/muxd/internal/domain"
@@ -137,7 +136,7 @@ func (a *Service) persistCompaction(summary string) {
 		return
 	}
 	if err := a.store.SaveCompaction(a.session.ID, summary, cutoff); err != nil {
-		fmt.Fprintf(os.Stderr, "agent: save compaction: %v\n", err)
+		a.logf("agent: save compaction: %v", err)
 	}
 }
 
