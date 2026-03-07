@@ -1396,18 +1396,22 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 		}
 
 		// Check for API key before sending to the daemon
-		if m.APIKey == "" {
-			provName := ""
-			if m.Provider != nil {
-				provName = m.Provider.Name()
+		provName := ""
+		if m.Provider != nil {
+			provName = m.Provider.Name()
+		}
+		if provName != "ollama" && provName != "" {
+			// Re-resolve from prefs in case the key was set after startup
+			if key, err := config.LoadProviderAPIKey(m.Prefs, provName); err == nil {
+				m.APIKey = key
 			}
-			if provName != "ollama" {
-				if provName == "" {
-					provName = "your_provider"
-				}
+			if m.APIKey == "" {
 				hint := fmt.Sprintf("No API key set. Use /config set %s.api_key <key>", provName)
 				return m, PrintToScrollback(m.renderError(hint))
 			}
+		} else if m.APIKey == "" && provName == "" {
+			hint := "No API key set. Use /config set your_provider.api_key <key>"
+			return m, PrintToScrollback(m.renderError(hint))
 		}
 	}
 

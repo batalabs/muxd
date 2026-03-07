@@ -902,7 +902,14 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(req.Key, ".api_key") {
 		provName := strings.TrimSuffix(req.Key, ".api_key")
 		if key, err := config.LoadProviderAPIKey(*s.prefs, provName); err == nil {
-			s.apiKey = key
+			// Only update the server's active key if this is the active provider
+			if s.provider != nil && s.provider.Name() == provName {
+				s.apiKey = key
+				// Update all existing agents with the new key
+				for _, ag := range s.agents {
+					ag.SetProvider(s.provider, key)
+				}
+			}
 		}
 	}
 	if req.Key == "ollama.url" {
