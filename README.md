@@ -32,7 +32,7 @@ Most AI coding tools treat each conversation as disposable -close the window and
 - **Hub architecture** -run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
 - **Multi-channel** -same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
 - **27 built-in tools** -file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
-- **Any provider** -Claude, GPT, Mistral, Grok, Fireworks, Ollama, and any OpenAI-compatible API. Switch models mid-session.
+- **Any provider** -Claude, GPT, Mistral, Grok, Fireworks, DeepInfra, Ollama, and any OpenAI-compatible API. Switch models mid-session.
 
 ---
 
