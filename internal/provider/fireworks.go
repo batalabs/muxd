@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/batalabs/muxd/internal/domain"
 )
@@ -14,6 +15,19 @@ var fireworksAPIBaseURL = "https://api.fireworks.ai/inference/v1"
 
 // setFireworksBaseURL overrides the base URL (used in tests).
 func setFireworksBaseURL(url string) { fireworksAPIBaseURL = url }
+
+const fireworksModelPrefix = "accounts/fireworks/models/"
+
+// normalizeFireworksModelID ensures the model ID uses the full
+// "accounts/fireworks/models/" path that the Fireworks API expects.
+// Users can specify just "fireworks/kimi-k2p5" and the provider
+// auto-expands to the full path.
+func normalizeFireworksModelID(id string) string {
+	if strings.HasPrefix(id, fireworksModelPrefix) {
+		return id
+	}
+	return fireworksModelPrefix + id
+}
 
 // FireworksProvider implements Provider for Fireworks AI's chat API.
 // It uses OpenAI-compatible request/stream formats.
@@ -65,7 +79,7 @@ func (p *FireworksProvider) StreamMessage(
 	}{IncludeUsage: true}
 
 	reqBody := openaiRequest{
-		Model:         modelID,
+		Model:         normalizeFireworksModelID(modelID),
 		Messages:      msgs,
 		Stream:        true,
 		Tools:         toOpenAITools(tools),

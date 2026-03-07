@@ -9,6 +9,26 @@ import (
 	"github.com/batalabs/muxd/internal/domain"
 )
 
+func TestNormalizeFireworksModelID(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"kimi-k2p5", "accounts/fireworks/models/kimi-k2p5"},
+		{"llama-v3p1-70b-instruct", "accounts/fireworks/models/llama-v3p1-70b-instruct"},
+		{"accounts/fireworks/models/kimi-k2p5", "accounts/fireworks/models/kimi-k2p5"},
+		{"accounts/fireworks/models/llama-v3p1-70b-instruct", "accounts/fireworks/models/llama-v3p1-70b-instruct"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := normalizeFireworksModelID(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeFireworksModelID(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFireworksProvider_Name(t *testing.T) {
 	p := &FireworksProvider{}
 	if got := p.Name(); got != "fireworks" {
