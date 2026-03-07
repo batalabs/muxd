@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --fix
+    vet:
+      glob: "*.go"
+      run: go vet ./...
+    trailing-whitespace:
+      run: git diff --cached --check
+    large-files:
+      run: git diff --cached --diff-filter=d --name-only | xargs -I {} sh -c 'test $(wc -c < "{}") -lt 1048576 || (echo "File {} exceeds 1MB" && exit 1)'

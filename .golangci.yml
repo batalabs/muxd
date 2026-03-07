@@ -1,0 +1,91 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+linters:
+  enable:
+    - errcheck
+    - gocritic
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+    - revive
+
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+      disabled-tags:
+        - style
+        - performance
+        - experimental
+        - opinionated
+
+    errcheck:
+      exclude-functions:
+        # Builders / writers where errors are always nil or irrelevant
+        - strings.Builder.WriteString
+        - strings.Builder.Write
+        - strings.Builder.WriteByte
+        - strings.Builder.WriteRune
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        # Close / cleanup — errors are almost never actionable
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Tx).Rollback
+        - (*net/http.Response).Body.Close
+        # Fire-and-forget OS ops
+        - os.Remove
+        - os.WriteFile
+        - os.Chdir
+        # HTTP response writers in handlers
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - (*encoding/json.Decoder).Decode
+        # Syscall cleanup
+        - syscall.CloseHandle
+        # DB exec (fire-and-forget cleanup queries)
+        - (*database/sql.DB).Exec
+
+    misspell:
+      locale: US
+
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+
+  exclusions:
+    rules:
+      # Test files: relax errcheck, revive, and staticcheck
+      - path: _test\.go
+        linters:
+          - errcheck
+          - revive
+          - staticcheck
+
+      # Skip generated files
+      - path: ".*\\.gen\\.go$"
+        linters:
+          - gocritic
+          - govet
+          - errcheck
+          - staticcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
