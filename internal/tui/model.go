@@ -2167,7 +2167,9 @@ func (m *Model) applyConfigSetting(key, value string) {
 		m.modelLabel = name
 		// Keep prefs.Provider in sync so restarts resolve correctly.
 		m.Prefs.Provider = newProvName
-		config.SavePreferences(m.Prefs)
+		if err := config.SavePreferences(m.Prefs); err != nil {
+			fmt.Fprintf(os.Stderr, "tui: save prefs: %v\n", err)
+		}
 		if m.Daemon != nil && m.Session != nil {
 			if err := m.Daemon.SetModel(m.Session.ID, name, newID); err != nil {
 				fmt.Fprintf(os.Stderr, "tui: set model: %v\n", err)
