@@ -15,11 +15,12 @@ var ProviderEnvVars = map[string]string{
 	"mistral":   "MISTRAL_API_KEY",
 	"openai":    "OPENAI_API_KEY",
 	"google":    "GOOGLE_API_KEY",
-	"fireworks": "FIREWORKS_API_KEY",
+	"fireworks":  "FIREWORKS_API_KEY",
+	"deepinfra":  "DEEPINFRA_API_KEY",
 }
 
 // KnownProviders lists valid provider names for validation.
-var KnownProviders = []string{"anthropic", "zai", "grok", "mistral", "openai", "google", "ollama", "fireworks"}
+var KnownProviders = []string{"anthropic", "zai", "grok", "mistral", "openai", "google", "ollama", "fireworks", "deepinfra"}
 
 // configDirOverride is set by tests to redirect ConfigDir.
 var configDirOverride string
@@ -96,6 +97,10 @@ func LoadProviderAPIKey(prefs Preferences, providerName string) (string, error) 
 		if key := strings.TrimSpace(prefs.FireworksAPIKey); key != "" {
 			return key, nil
 		}
+	case "deepinfra":
+		if key := strings.TrimSpace(prefs.DeepInfraAPIKey); key != "" {
+			return key, nil
+		}
 	}
 
 	return "", fmt.Errorf("no API key found for %s: set %s or use /config set %s.api_key <key>",
@@ -137,6 +142,10 @@ func ResolveAPIKeySource(prefs Preferences, providerName string) string {
 		}
 	case "fireworks":
 		if prefs.FireworksAPIKey != "" {
+			return "config"
+		}
+	case "deepinfra":
+		if prefs.DeepInfraAPIKey != "" {
 			return "config"
 		}
 	}

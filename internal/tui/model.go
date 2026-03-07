@@ -2857,6 +2857,9 @@ func (m Model) handleStreamDone(msg StreamDoneMsg) (tea.Model, tea.Cmd) {
 		m.streamFlushedLen = 0
 		m.appendRuntimeLog("stream_error: " + msg.Err.Error())
 		errText := "Error: " + msg.Err.Error()
+		if strings.Contains(msg.Err.Error(), "session not found") || strings.Contains(msg.Err.Error(), "no rows in result set") {
+			errText += "\nhint: session may have been lost. Use /new to start a new session."
+		}
 		return m, PrintToScrollback(m.renderError(errText))
 	}
 

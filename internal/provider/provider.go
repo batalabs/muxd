@@ -98,8 +98,10 @@ func GetProvider(name string) (Provider, error) {
 		return &OllamaProvider{}, nil
 	case "fireworks":
 		return &FireworksProvider{}, nil
+	case "deepinfra":
+		return &DeepInfraProvider{}, nil
 	default:
-		return nil, fmt.Errorf("unknown provider: %s (supported: anthropic, zai, grok, mistral, openai, ollama, fireworks)", name)
+		return nil, fmt.Errorf("unknown provider: %s (supported: anthropic, zai, grok, mistral, openai, ollama, fireworks, deepinfra)", name)
 	}
 }
 
@@ -132,13 +134,13 @@ func ResolveProviderAndModel(spec string, currentProvider string) (string, strin
 			return "zai", model
 		case "grok", "xai":
 			return "grok", model
-		case "mistral", "openai", "google", "ollama", "fireworks":
+		case "mistral", "openai", "google", "ollama", "fireworks", "deepinfra":
 			return prefix, model
 		}
 		// Unknown prefix (e.g. "accounts/fireworks/models/...") --
 		// scan all path segments for a known provider name
 		lower := strings.ToLower(spec)
-		for _, prov := range []string{"fireworks", "anthropic", "openai", "mistral", "google", "grok", "ollama", "zai"} {
+		for _, prov := range []string{"fireworks", "deepinfra", "anthropic", "openai", "mistral", "google", "grok", "ollama", "zai"} {
 			if strings.Contains(lower, "/"+prov+"/") || strings.HasPrefix(lower, prov+"/") {
 				return prov, spec
 			}

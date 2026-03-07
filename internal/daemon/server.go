@@ -15,6 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"database/sql"
+	"errors"
+
 	"github.com/batalabs/muxd/internal/agent"
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/domain"
@@ -23,6 +26,9 @@ import (
 	"github.com/batalabs/muxd/internal/store"
 	"github.com/batalabs/muxd/internal/tools"
 )
+
+// errSessionNotFound is returned when a session ID does not exist in the store.
+var errSessionNotFound = errors.New("session not found")
 
 // AgentFactory creates an agent.Service for a session.
 type AgentFactory func(apiKey, modelID, modelLabel string, st *store.Store, sess *domain.Session, prov provider.Provider) *agent.Service
@@ -600,7 +606,11 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 
 	ag, err := s.getOrCreateAgent(sessionID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if errors.Is(err, errSessionNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -976,6 +986,9 @@ func (s *Server) getOrCreateAgent(sessionID string) (*agent.Service, error) {
 	}
 
 	sess, err := s.store.GetSession(sessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("%w: %s", errSessionNotFound, sessionID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("loading session: %w", err)
 	}

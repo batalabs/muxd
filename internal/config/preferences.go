@@ -34,6 +34,7 @@ type Preferences struct {
 	OpenAIAPIKey          string `json:"openai_api_key,omitempty"`
 	GoogleAPIKey          string `json:"google_api_key,omitempty"`
 	FireworksAPIKey       string `json:"fireworks_api_key,omitempty"`
+	DeepInfraAPIKey       string `json:"deepinfra_api_key,omitempty"`
 	BraveAPIKey           string `json:"brave_api_key,omitempty"`
 	TextbeltAPIKey        string `json:"textbelt_api_key,omitempty"`
 	SchedulerAllowedTools string `json:"scheduler_allowed_tools,omitempty"`
@@ -75,7 +76,7 @@ type ConfigGroupDef struct {
 var ConfigGroupDefs = []ConfigGroupDef{
 	{
 		Name: "models",
-		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "ollama.url"},
+		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "deepinfra.api_key", "ollama.url"},
 	},
 	{
 		Name: "tools",
@@ -223,6 +224,9 @@ func mergePreferences(dst, src *Preferences) {
 	}
 	if src.FireworksAPIKey != "" {
 		dst.FireworksAPIKey = src.FireworksAPIKey
+	}
+	if src.DeepInfraAPIKey != "" {
+		dst.DeepInfraAPIKey = src.DeepInfraAPIKey
 	}
 	if src.BraveAPIKey != "" {
 		dst.BraveAPIKey = src.BraveAPIKey
@@ -374,6 +378,7 @@ func (p Preferences) All() []PrefEntry {
 		{"openai.api_key", resolveKeyDisplay(p.OpenAIAPIKey, "OPENAI_API_KEY")},
 		{"google.api_key", resolveKeyDisplay(p.GoogleAPIKey, "GOOGLE_API_KEY")},
 		{"fireworks.api_key", resolveKeyDisplay(p.FireworksAPIKey, "FIREWORKS_API_KEY")},
+		{"deepinfra.api_key", resolveKeyDisplay(p.DeepInfraAPIKey, "DEEPINFRA_API_KEY")},
 		{"brave.api_key", resolveKeyDisplay(p.BraveAPIKey, "BRAVE_SEARCH_API_KEY")},
 		{"textbelt.api_key", MaskKey(p.TextbeltAPIKey)},
 		{"scheduler.allowed_tools", p.SchedulerAllowedTools},
@@ -426,6 +431,8 @@ func (p Preferences) Get(key string) string {
 		return MaskKey(p.GoogleAPIKey)
 	case "fireworks.api_key":
 		return MaskKey(p.FireworksAPIKey)
+	case "deepinfra.api_key":
+		return MaskKey(p.DeepInfraAPIKey)
 	case "brave.api_key":
 		return MaskKey(p.BraveAPIKey)
 	case "textbelt.api_key":
@@ -518,6 +525,8 @@ func (p *Preferences) Set(key, value string) error {
 		p.GoogleAPIKey = value
 	case "fireworks.api_key":
 		p.FireworksAPIKey = value
+	case "deepinfra.api_key":
+		p.DeepInfraAPIKey = value
 	case "brave.api_key":
 		p.BraveAPIKey = value
 	case "textbelt.api_key":
@@ -603,6 +612,7 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.OpenAIAPIKey)
 	sanitize(&p.GoogleAPIKey)
 	sanitize(&p.FireworksAPIKey)
+	sanitize(&p.DeepInfraAPIKey)
 	sanitize(&p.BraveAPIKey)
 	sanitize(&p.TextbeltAPIKey)
 	sanitize(&p.SchedulerAllowedTools)
