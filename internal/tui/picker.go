@@ -304,9 +304,7 @@ func fuzzyMatch(s domain.Session, lower string) bool {
 
 // View renders the picker as a string.
 func (p *SessionPicker) View(width int) string {
-	if width < 40 {
-		width = 40
-	}
+	_ = width // reserved for future layout use
 
 	var b strings.Builder
 

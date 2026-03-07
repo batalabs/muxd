@@ -91,7 +91,7 @@ func (a *Service) callProviderWithRetry(
 		})
 
 		if !a.sleepWithCancel(retryWait) {
-			return nil, "", provider.Usage{}, fmt.Errorf("cancelled during retry wait")
+			return nil, "", provider.Usage{}, fmt.Errorf("canceled during retry wait")
 		}
 
 		// Exponential backoff for next attempt
@@ -122,14 +122,14 @@ func isStreamError(err error) bool {
 }
 
 // sleepWithCancel waits for the given duration, checking for cancellation
-// every 100ms. Returns true if the sleep completed, false if cancelled.
+// every 100ms. Returns true if the sleep completed, false if canceled.
 func (a *Service) sleepWithCancel(d time.Duration) bool {
 	deadline := time.Now().Add(d)
 	for time.Now().Before(deadline) {
 		a.mu.Lock()
-		cancelled := a.cancelled
+		canceled := a.canceled
 		a.mu.Unlock()
-		if cancelled {
+		if canceled {
 			return false
 		}
 		remaining := time.Until(deadline)

@@ -137,7 +137,7 @@ func streamOllamaChat(
 	toolBuilders := make(map[int]*toolBuilder)
 
 	tr := newTimeoutReader(resp.Body)
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	scanner := bufio.NewScanner(tr)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {

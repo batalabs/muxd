@@ -15,8 +15,8 @@ var ProviderEnvVars = map[string]string{
 	"mistral":   "MISTRAL_API_KEY",
 	"openai":    "OPENAI_API_KEY",
 	"google":    "GOOGLE_API_KEY",
-	"fireworks":  "FIREWORKS_API_KEY",
-	"deepinfra":  "DEEPINFRA_API_KEY",
+	"fireworks": "FIREWORKS_API_KEY",
+	"deepinfra": "DEEPINFRA_API_KEY",
 }
 
 // KnownProviders lists valid provider names for validation.

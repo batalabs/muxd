@@ -91,9 +91,7 @@ func (p *NodePicker) applyFilter() {
 
 // View renders the picker as a string.
 func (p *NodePicker) View(width int) string {
-	if width < 40 {
-		width = 40
-	}
+	_ = width // reserved for future layout use
 
 	var b strings.Builder
 

@@ -12,9 +12,6 @@ import (
 
 var deepinfraAPIBaseURL = "https://api.deepinfra.com/v1/openai"
 
-// setDeepInfraBaseURL overrides the base URL (used in tests).
-func setDeepInfraBaseURL(url string) { deepinfraAPIBaseURL = url }
-
 // DeepInfraProvider implements Provider for DeepInfra's chat API.
 // It uses OpenAI-compatible request/stream formats.
 type DeepInfraProvider struct{}
@@ -112,6 +109,6 @@ func (p *DeepInfraProvider) StreamMessage(
 	}
 
 	tr := newTimeoutReader(resp.Body)
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	return parseOpenAISSE(tr, onDelta)
 }

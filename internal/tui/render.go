@@ -279,20 +279,29 @@ func isLastNonEmptyLine(rawLines []string, i int) bool {
 	return true
 }
 
+// countLeadingWhitespace returns the number of visual spaces at the start of
+// a line (tabs count as 2 spaces).
+func countLeadingWhitespace(line string) int {
+	n := 0
+	for i := 0; i < len(line); i++ {
+		switch line[i] {
+		case ' ':
+			n++
+		case '\t':
+			n += 2
+		default:
+			return n
+		}
+	}
+	return n
+}
+
 // ParseBulletLine detects a bullet list line (-, +, or *) with optional
 // leading whitespace for nesting. Returns the indent level in spaces,
 // the item text, and whether it matched.
 func ParseBulletLine(line string) (indent int, item string, ok bool) {
 	// Count leading whitespace.
-	for _, ch := range line {
-		if ch == ' ' {
-			indent++
-		} else if ch == '\t' {
-			indent += 2
-		} else {
-			break
-		}
-	}
+	indent = countLeadingWhitespace(line)
 	rest := line[indent:]
 	if strings.HasPrefix(rest, "- ") || strings.HasPrefix(rest, "+ ") {
 		return indent, strings.TrimSpace(rest[2:]), true
@@ -478,9 +487,7 @@ func TruncateToWidth(s string, maxWidth int) string {
 // renderHighlightedCodeBlock syntax-highlights a fenced code block using
 // Chroma and prepends subtle line numbers with a gutter.
 func renderHighlightedCodeBlock(lang string, code string, width int) []string {
-	if width < 20 {
-		width = 20
-	}
+	_ = width // reserved for future line-wrapping
 	if lang == "" || lang == "text" {
 		lang = "plaintext"
 	}
@@ -488,9 +495,7 @@ func renderHighlightedCodeBlock(lang string, code string, width int) []string {
 	var highlighted bytes.Buffer
 	if err := quick.Highlight(&highlighted, code, lang, "terminal256", "dracula"); err != nil {
 		highlighted.Reset()
-		if err := quick.Highlight(&highlighted, code, "plaintext", "terminal256", "dracula"); err != nil {
-			// plaintext highlight fallback; nothing further to do
-		}
+		_ = quick.Highlight(&highlighted, code, "plaintext", "terminal256", "dracula")
 	}
 	hlLines := strings.Split(strings.TrimSuffix(highlighted.String(), "\n"), "\n")
 	if len(hlLines) == 0 {

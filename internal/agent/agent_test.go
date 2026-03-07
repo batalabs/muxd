@@ -221,7 +221,8 @@ func fakeSSEServer(t *testing.T, blocks []domain.ContentBlock, stopReason string
 			fmt.Fprintf(w, "data: %s\n\n", data)
 
 			// content_block_delta
-			if b.Type == "text" {
+			switch b.Type {
+			case "text":
 				deltaEvt := map[string]any{
 					"type":  "content_block_delta",
 					"index": i,
@@ -232,7 +233,7 @@ func fakeSSEServer(t *testing.T, blocks []domain.ContentBlock, stopReason string
 				}
 				data, _ = json.Marshal(deltaEvt)
 				fmt.Fprintf(w, "data: %s\n\n", data)
-			} else if b.Type == "tool_use" {
+			case "tool_use":
 				inputJSON, _ := json.Marshal(b.ToolInput)
 				deltaEvt := map[string]any{
 					"type":  "content_block_delta",
@@ -461,8 +462,8 @@ func TestService_Cancel(t *testing.T) {
 		modelID: "fake",
 	}
 	svc.Cancel()
-	if !svc.cancelled {
-		t.Error("expected cancelled=true after Cancel()")
+	if !svc.canceled {
+		t.Error("expected canceled=true after Cancel()")
 	}
 }
 
@@ -1091,7 +1092,7 @@ func TestRepairDanglingToolUseMessages(t *testing.T) {
 					{Type: "tool_result", ToolUseID: "u1", ToolName: "file_read", ToolResult: "ok"},
 				},
 			},
-			{Role: "assistant", Content: "Error: cancelled"},
+			{Role: "assistant", Content: "Error: canceled"},
 		}
 
 		got, changed := repairDanglingToolUseMessages(msgs)

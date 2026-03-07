@@ -878,18 +878,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingAskID = ""
 			m.toolStatus = ""
 			if m.Daemon != nil {
-				go m.Daemon.Cancel(m.Session.ID)
+				go func() { _ = m.Daemon.Cancel(m.Session.ID) }()
 			}
-			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop cancelled."))
+			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop canceled."))
 		}
 		if m.thinking {
 			m.thinking = false
 			m.streaming = false
 			m.toolStatus = ""
 			if m.Daemon != nil {
-				go m.Daemon.Cancel(m.Session.ID)
+				go func() { _ = m.Daemon.Cancel(m.Session.ID) }()
 			}
-			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop cancelled."))
+			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop canceled."))
 		}
 		return m, tea.Quit
 
@@ -903,18 +903,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingAskID = ""
 			m.toolStatus = ""
 			if m.Daemon != nil {
-				go m.Daemon.Cancel(m.Session.ID)
+				go func() { _ = m.Daemon.Cancel(m.Session.ID) }()
 			}
-			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop cancelled."))
+			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop canceled."))
 		}
 		if m.thinking {
 			m.thinking = false
 			m.streaming = false
 			m.toolStatus = ""
 			if m.Daemon != nil {
-				go m.Daemon.Cancel(m.Session.ID)
+				go func() { _ = m.Daemon.Cancel(m.Session.ID) }()
 			}
-			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop cancelled."))
+			return m, PrintToScrollback(WelcomeStyle.Render("Agent loop canceled."))
 		}
 		return m, tea.Quit
 
@@ -1935,7 +1935,7 @@ func (m Model) handleScheduleCommand(args []string) (tea.Model, tea.Cmd) {
 		if err := m.Store.CancelScheduledToolJob(args[1]); err != nil {
 			return m, PrintToScrollback(m.renderError("Failed to cancel job: " + err.Error()))
 		}
-		return m, PrintToScrollback(WelcomeStyle.Render("Cancelled scheduled job: " + args[1]))
+		return m, PrintToScrollback(WelcomeStyle.Render("Canceled scheduled job: " + args[1]))
 	case "add":
 		if len(args) < 4 {
 			return m, PrintToScrollback(m.renderError("Usage: /schedule add <tool> <HH:MM|RFC3339> <json> [--daily|--hourly]"))
@@ -2031,7 +2031,7 @@ func (m Model) handleToolPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.toolPicker.ResetToBaseline()
 				m.toolPicker.Dismiss()
 				m.toolPicker = nil
-				return m, PrintToScrollback(WelcomeStyle.Render("Cancelled tool changes."))
+				return m, PrintToScrollback(WelcomeStyle.Render("Canceled tool changes."))
 			case 'p', 'P':
 				// Cycle: safe -> coder -> research -> safe
 				cur := m.toolPicker.DisabledMap()
@@ -2084,7 +2084,7 @@ func (m Model) handleEmojiPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Prefs.FooterEmoji = emoji
 		m.emojiPicker.Dismiss()
 		m.emojiPicker = nil
-		config.SavePreferences(m.Prefs)
+		_ = config.SavePreferences(m.Prefs)
 		if name == "none" {
 			return m, PrintToScrollback(WelcomeStyle.Render("Footer emoji removed."))
 		}
@@ -3296,9 +3296,7 @@ func (m Model) appendRuntimeLog(msg string) {
 	}
 	defer f.Close()
 	ts := time.Now().Format("2006-01-02 15:04:05.000")
-	if _, err := fmt.Fprintf(f, "%s %s\n", ts, msg); err != nil {
-		// log file write failure; nothing further to do
-	}
+	_, _ = fmt.Fprintf(f, "%s %s\n", ts, msg)
 }
 
 func summarizeForLog(s string) string {

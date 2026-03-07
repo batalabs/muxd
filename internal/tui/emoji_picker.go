@@ -86,9 +86,7 @@ func (p *EmojiPicker) SelectedName() string {
 }
 
 func (p *EmojiPicker) View(width int) string {
-	if width < 40 {
-		width = 40
-	}
+	_ = width // reserved for future layout use
 	var b strings.Builder
 	b.WriteString(FooterHead.Render("Emoji Picker"))
 	b.WriteString("\n")

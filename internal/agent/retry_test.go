@@ -34,7 +34,7 @@ func TestIsStreamError(t *testing.T) {
 }
 
 func TestSleepWithCancel(t *testing.T) {
-	t.Run("completes when not cancelled", func(t *testing.T) {
+	t.Run("completes when not canceled", func(t *testing.T) {
 		svc := &Service{}
 		// Very short sleep
 		if !svc.sleepWithCancel(1) {
@@ -42,10 +42,10 @@ func TestSleepWithCancel(t *testing.T) {
 		}
 	})
 
-	t.Run("returns false when cancelled", func(t *testing.T) {
-		svc := &Service{cancelled: true}
+	t.Run("returns false when canceled", func(t *testing.T) {
+		svc := &Service{canceled: true}
 		if svc.sleepWithCancel(1_000_000_000) {
-			t.Error("expected sleepWithCancel to return false (cancelled)")
+			t.Error("expected sleepWithCancel to return false (canceled)")
 		}
 	})
 }

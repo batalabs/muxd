@@ -244,12 +244,12 @@ func (f *fakeProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, error)
 }
 
 // errorProvider implements provider.Provider and always returns an error.
-// Used by tests that need the provider call to fail (e.g., cancelled-before-loop).
+// Used by tests that need the provider call to fail (e.g., canceled-before-loop).
 type errorProvider struct{}
 
 func (p *errorProvider) Name() string { return "error" }
 func (p *errorProvider) StreamMessage(apiKey, modelID string, msgs []domain.TranscriptMessage, tools []provider.ToolSpec, system string, onDelta func(string)) ([]domain.ContentBlock, string, provider.Usage, error) {
-	return nil, "", provider.Usage{}, fmt.Errorf("cancelled")
+	return nil, "", provider.Usage{}, fmt.Errorf("canceled")
 }
 func (p *errorProvider) FetchModels(apiKey string) ([]domain.APIModelInfo, error) {
 	return nil, nil

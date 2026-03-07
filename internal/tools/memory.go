@@ -364,6 +364,6 @@ func pushSharedFacts(mem *ProjectMemory, push func(map[string]string) error) {
 		}
 	}
 	if len(shared) > 0 {
-		push(shared)
+		_ = push(shared)
 	}
 }

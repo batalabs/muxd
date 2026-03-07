@@ -112,6 +112,6 @@ func (p *FireworksProvider) StreamMessage(
 	}
 
 	tr := newTimeoutReader(resp.Body)
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	return parseOpenAISSE(tr, onDelta)
 }

@@ -24,7 +24,7 @@ func TestSmsSendTool(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error for missing API key")
 		}
-		if !strings.Contains(err.Error(), "Textbelt API key") {
+		if !strings.Contains(err.Error(), "textbelt API key") {
 			t.Errorf("expected API key error, got: %v", err)
 		}
 	})

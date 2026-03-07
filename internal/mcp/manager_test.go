@@ -322,8 +322,8 @@ func TestManager_CallTool_Unavailable(t *testing.T) {
 	mgr := NewManager()
 	mgr.mu.Lock()
 	mgr.servers["broken"] = &serverConn{
-		name:   "broken",
-		status: statusError,
+		name:    "broken",
+		status:  statusError,
 		lastErr: fmt.Errorf("connection refused"),
 	}
 	mgr.mu.Unlock()

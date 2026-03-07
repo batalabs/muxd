@@ -157,9 +157,7 @@ func (p *ConfigPicker) CommitEdit() (key, value string, ok bool) {
 }
 
 func (p *ConfigPicker) View(width int) string {
-	if width < 40 {
-		width = 40
-	}
+	_ = width // reserved for future layout use
 	var b strings.Builder
 	b.WriteString(FooterHead.Render("Config Picker"))
 	b.WriteString("\n")

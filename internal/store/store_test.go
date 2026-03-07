@@ -952,7 +952,7 @@ func TestStore_UpdateScheduledToolJob(t *testing.T) {
 		}
 		got, _ := items[0].ToolInput["text"].(string)
 		if got == "should not work" {
-			t.Error("should not have updated a cancelled job")
+			t.Error("should not have updated a canceled job")
 		}
 	})
 

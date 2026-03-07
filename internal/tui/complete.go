@@ -75,7 +75,7 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 		sub := strings.ToLower(fields[1])
 		if sub == "set" {
 			// /config set <key> -complete key names
-			if len(fields) <= 3 && !(len(fields) == 3 && strings.HasSuffix(input, " ")) {
+			if len(fields) <= 3 && (len(fields) != 3 || !strings.HasSuffix(input, " ")) {
 				partial := ""
 				if len(fields) >= 3 {
 					partial = strings.ToLower(fields[2])
@@ -117,7 +117,7 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 		sub := strings.ToLower(fields[1])
 		switch sub {
 		case "enable", "disable", "toggle":
-			if len(fields) <= 3 && !(len(fields) == 3 && strings.HasSuffix(input, " ")) {
+			if len(fields) <= 3 && (len(fields) != 3 || !strings.HasSuffix(input, " ")) {
 				partial := ""
 				if len(fields) >= 3 {
 					partial = strings.ToLower(fields[2])
@@ -147,7 +147,7 @@ func ComputeCompletions(input string, extraModelIDs []string) []string {
 		}
 		sub := strings.ToLower(fields[1])
 		if sub == "add" {
-			if len(fields) <= 3 && !(len(fields) == 3 && strings.HasSuffix(input, " ")) {
+			if len(fields) <= 3 && (len(fields) != 3 || !strings.HasSuffix(input, " ")) {
 				partial := ""
 				if len(fields) >= 3 {
 					partial = strings.ToLower(fields[2])

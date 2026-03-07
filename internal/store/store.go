@@ -103,19 +103,13 @@ func (s *Store) migrate() error {
 		`ALTER TABLE sessions ADD COLUMN tags TEXT NOT NULL DEFAULT ''`,
 	} {
 		// ALTER TABLE errors expected -column may already exist.
-		if _, err := s.db.Exec(q); err != nil {
-			// expected: column already exists
-		}
+		_, _ = s.db.Exec(q)
 	}
 
 	// Migrate from old 'message_text' column to 'content', then drop the old column.
 	// This handles databases created with an older schema.
-	if _, err := s.db.Exec(`UPDATE messages SET content = message_text WHERE content = '' AND message_text IS NOT NULL AND message_text != ''`); err != nil {
-		// expected: message_text column may not exist
-	}
-	if _, err := s.db.Exec(`ALTER TABLE messages DROP COLUMN message_text`); err != nil {
-		// expected: column may not exist or already dropped
-	}
+	_, _ = s.db.Exec(`UPDATE messages SET content = message_text WHERE content = '' AND message_text IS NOT NULL AND message_text != ''`)
+	_, _ = s.db.Exec(`ALTER TABLE messages DROP COLUMN message_text`)
 
 	// Compactions table for persistent compaction state.
 	if _, err := s.db.Exec(`
@@ -533,7 +527,7 @@ func (s *Store) DueScheduledToolJobs(now time.Time, limit int) ([]ScheduledToolJ
 	return scanScheduledToolJobs(rows)
 }
 
-// CancelScheduledToolJob marks a job as cancelled.
+// CancelScheduledToolJob marks a job as canceled.
 func (s *Store) CancelScheduledToolJob(id string) error {
 	_, err := s.db.Exec(
 		`UPDATE scheduled_tool_jobs

@@ -314,10 +314,7 @@ func serviceStatus() error {
 		return nil
 
 	case "linux":
-		out, err := exec.Command("systemctl", "--user", "status", "muxd").CombinedOutput()
-		if err != nil {
-			// systemctl status returns non-zero for inactive services; output still useful
-		}
+		out, _ := exec.Command("systemctl", "--user", "status", "muxd").CombinedOutput()
 		fmt.Println(string(out))
 		return nil
 
@@ -647,10 +644,7 @@ func hubServiceStatus() error {
 		return nil
 
 	case "linux":
-		out, err := exec.Command("systemctl", "--user", "status", "muxd-hub").CombinedOutput()
-		if err != nil {
-			// systemctl status returns non-zero for inactive services; output still useful
-		}
+		out, _ := exec.Command("systemctl", "--user", "status", "muxd-hub").CombinedOutput()
 		fmt.Println(string(out))
 		return nil
 
