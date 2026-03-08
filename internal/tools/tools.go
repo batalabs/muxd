@@ -236,7 +236,7 @@ func fileReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "file_read",
-			Description: "Read a file's contents with line numbers. Supports text files and PDFs. Use offset and limit for large files. Read before editing to get exact text.",
+			Description: "Read a file's contents with line numbers. Use offset and limit for large files. Read before editing to get exact text.",
 			Properties: map[string]provider.ToolProp{
 				"path":   {Type: "string", Description: "Absolute or relative file path to read"},
 				"offset": {Type: "integer", Description: "Line number to start reading from (1-based, default: 1)"},
@@ -262,14 +262,6 @@ func fileReadTool() ToolDef {
 			limit := 0
 			if v, ok := input["limit"].(float64); ok && v > 0 {
 				limit = int(v)
-			}
-
-			// PDF files: extract text with page markers
-			if strings.EqualFold(filepath.Ext(path), ".pdf") {
-				if limit == 0 {
-					limit = 1 << 30 // effectively unlimited
-				}
-				return readPDFText(path, offset, limit)
 			}
 
 			data, err := os.ReadFile(path)
