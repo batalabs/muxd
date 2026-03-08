@@ -1,30 +1,19 @@
 import SwiftUI
-import Combine
-import PhotosUI
-import UniformTypeIdentifiers
 
 struct ChatView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ChatViewModel
-    @StateObject private var speechRecognizer = SpeechRecognizer()
-    @State private var inputText = ""
     @State private var showRenameSheet = false
     @State private var showDeleteConfirmation = false
     @State private var isStarred = false
     @State private var sessionTitle: String
     @State private var isReady = false
-    @State private var selectedPhotos: [PhotosPickerItem] = []
-    @State private var imageAttachments: [ImageAttachmentPreview] = []
-    @State private var fileAttachments: [FileAttachmentPreview] = []
-    @State private var showFileImporter = false
-    @State private var showPhotoPicker = false
     @State private var userHasScrolledUp = false
     @State private var contentOverflows = false
     @State private var contentHeight: CGFloat = 0
     @State private var frameHeight: CGFloat = 0
     @AppStorage("showTools") private var showTools = true
-    @FocusState private var inputFocused: Bool
 
     let session: Session
 
@@ -42,210 +31,19 @@ struct ChatView: View {
     }
 
     private var streamingPhase: StreamingStatusView.StreamingPhase {
-        // Check if any tool is currently running
         if let running = viewModel.activeTools.values.first(where: { $0.status == "running" }) {
             return .running(tool: running.name, summary: running.inputSummary)
         }
-        // Streaming text is arriving
         if !viewModel.streamingText.isEmpty {
             return .streaming
         }
-        // Waiting for first response
         return .thinking
-    }
-
-    private var hasAttachments: Bool {
-        !inputText.isEmpty || !imageAttachments.isEmpty || !fileAttachments.isEmpty
-    }
-
-    @ViewBuilder
-    private func inputBarWithScroll(proxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 8) {
-            // Scroll-to-bottom button above input row, right-aligned
-            if userHasScrolledUp && contentOverflows {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            userHasScrolledUp = false
-                            proxy.scrollTo("bottom", anchor: .bottom)
-                        }
-                    } label: {
-                        Image(systemName: "arrow.down")
-                            .font(.title3.weight(.semibold))
-                            .foregroundColor(.accentColor)
-                            .frame(width: 44, height: 44)
-                            .background {
-                                if #available(iOS 26.0, *) {
-                                    Circle().fill(.clear)
-                                        .glassEffect(.regular, in: .circle)
-                                } else {
-                                    Circle().fill(.ultraThinMaterial)
-                                }
-                            }
-                    }
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            // Attachment previews (images + files)
-            if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
-                attachmentPreviews
-            }
-
-            HStack(spacing: 8) {
-                // Text field with inline trailing button
-                HStack(spacing: 8) {
-                    TextField("Message", text: $inputText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.body)
-                        .lineLimit(1...6)
-                        .focused($inputFocused)
-                        .disabled(viewModel.isStreaming || speechRecognizer.isRecording)
-                        .onSubmit {
-                            sendMessage()
-                        }
-                        .onChange(of: speechRecognizer.transcript) { _, newValue in
-                            if !newValue.isEmpty {
-                                inputText = newValue
-                            }
-                        }
-
-                    // Inline trailing button: mic -> send arrow
-                    if viewModel.isStreaming {
-                        // Nothing inside the field while streaming
-                    } else if hasAttachments {
-                        Button(action: sendMessage) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.accentColor)
-                        }
-                    } else if speechRecognizer.isAuthorized {
-                        Button {
-                            speechRecognizer.toggleRecording()
-                        } label: {
-                            Image(systemName: speechRecognizer.isRecording ? "mic.fill" : "mic")
-                                .font(.body)
-                                .foregroundColor(speechRecognizer.isRecording ? .red : .secondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .modifier(GlassInputModifier())
-
-                if viewModel.isStreaming {
-                    Button(action: cancelMessage) {
-                        Image(systemName: "stop.fill")
-                    }
-                    .buttonStyle(TintedGlassButtonStyle(tint: .red))
-                } else {
-                    attachMenu
-                }
-            }
-
-            // Token count badge
-            if viewModel.inputTokens > 0 || viewModel.outputTokens > 0 || viewModel.isStreaming {
-                HStack {
-                    HStack(spacing: 4) {
-                        if viewModel.isStreaming {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                        }
-                        Text("\(viewModel.inputTokens) in / \(viewModel.outputTokens) out")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(12)
-                    Spacer()
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var attachmentPreviews: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(imageAttachments) { preview in
-                    Image(uiImage: preview.thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(alignment: .topTrailing) {
-                            Button {
-                                imageAttachments.removeAll { $0.id == preview.id }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(.white, Color.black.opacity(0.6))
-                            }
-                        }
-                }
-                ForEach(fileAttachments) { file in
-                    VStack(spacing: 2) {
-                        Image(systemName: "doc.text")
-                            .font(.title3)
-                        Text(file.filename)
-                            .font(.system(size: 8))
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(.primary)
-                    .frame(width: 60, height: 60)
-                    .background(Color(.systemGray5))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(alignment: .topTrailing) {
-                        Button {
-                            fileAttachments.removeAll { $0.id == file.id }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(.white, Color.black.opacity(0.6))
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-
-    private var attachMenu: some View {
-        Menu {
-            Button {
-                showPhotoPicker = true
-            } label: {
-                Label("Photo Library", systemImage: "photo.on.rectangle")
-            }
-            Button {
-                showFileImporter = true
-            } label: {
-                Label("Files", systemImage: "paperclip")
-            }
-        } label: {
-            Image(systemName: "plus")
-                .font(.title3.weight(.semibold))
-                .foregroundColor(.primary)
-                .frame(width: 44, height: 44)
-                .background {
-                    if #available(iOS 26.0, *) {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular, in: .circle)
-                    } else {
-                        Circle().fill(.ultraThinMaterial)
-                    }
-                }
-        }
     }
 
     init(session: Session) {
         self.session = session
         _viewModel = StateObject(wrappedValue: ChatViewModel(sessionID: session.id))
-        _sessionTitle = State(initialValue: session.displayTitle)
+        _sessionTitle = State(initialValue: session.title ?? "New Chat")
         _isStarred = State(initialValue: session.tags?.contains("starred") ?? false)
     }
 
@@ -253,9 +51,33 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(viewModel.messages.enumerated()), id: \.offset) { index, message in
+                    // Load older messages button at top
+                    if viewModel.hasOlderMessages {
+                        Button {
+                            viewModel.loadOlderMessages()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.up.circle")
+                                    Text("Load older messages")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(20)
+                                Spacer()
+                            }
+                        }
+                        .padding(.bottom, 8)
+                    }
+                    
+                    // Windowed messages for display
+                    ForEach(Array(viewModel.visibleMessages.enumerated()), id: \.offset) { index, message in
                         MessageBubbleView(message: message, allMessages: viewModel.messages)
-                            .id(index)
+                            .id("visible_\(index)")
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .move(edge: .bottom)),
                                 removal: .opacity
@@ -286,7 +108,7 @@ struct ChatView: View {
                     // Invisible anchor at the very bottom
                     Color.clear.frame(height: 1).id("bottom")
                 }
-                .animation(.easeOut(duration: 0.25), value: viewModel.messages.count)
+                .animation(.easeOut(duration: 0.25), value: viewModel.visibleMessages.count)
                 .animation(.easeOut(duration: 0.2), value: viewModel.isStreaming)
                 .padding()
                 .background(
@@ -313,7 +135,7 @@ struct ChatView: View {
                 frameHeight = value
                 contentOverflows = contentHeight > frameHeight
             }
-            .onChange(of: viewModel.messages.count) { oldCount, newCount in
+            .onChange(of: viewModel.visibleMessages.count) { oldCount, newCount in
                 if oldCount > 0 && newCount > oldCount && !userHasScrolledUp {
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
@@ -321,13 +143,11 @@ struct ChatView: View {
                 }
             }
             .onChange(of: viewModel.streamingText) { _, newValue in
-                // Only scroll on meaningful chunks to avoid jitter
                 if viewModel.isStreaming && !userHasScrolledUp && newValue.count % 50 < 5 {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
             }
             .onChange(of: viewModel.isStreaming) { _, isStreaming in
-                // Scroll to bottom when streaming starts or ends
                 if !userHasScrolledUp {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
@@ -341,7 +161,25 @@ struct ChatView: View {
                     }
             )
             .safeAreaInset(edge: .bottom) {
-                inputBarWithScroll(proxy: proxy)
+                // ISOLATED INPUT BAR - typing here won't re-render messages
+                ChatInputBar(
+                    onSend: { text, images in
+                        userHasScrolledUp = false
+                        viewModel.submit(text: text, images: images)
+                    },
+                    onCancel: { viewModel.cancel() },
+                    isStreaming: viewModel.isStreaming,
+                    inputTokens: viewModel.inputTokens,
+                    outputTokens: viewModel.outputTokens,
+                    activeTools: viewModel.activeTools,
+                    onScrollToBottom: {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            userHasScrolledUp = false
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
+                    },
+                    showScrollButton: userHasScrolledUp && contentOverflows
+                )
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -374,7 +212,7 @@ struct ChatView: View {
                     chatMenuLabel
                 }
             }
-                    }
+        }
         .sheet(isPresented: $showRenameSheet) {
             ChatRenameView(title: sessionTitle) { newTitle in
                 Task {
@@ -402,103 +240,15 @@ struct ChatView: View {
         } message: {
             Text(viewModel.error?.localizedDescription ?? "Unknown error")
         }
-        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            handleImportedFiles(result)
-        }
-        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 5, matching: .images)
-        .onChange(of: selectedPhotos) { _, _ in
-            processSelectedPhotos()
-        }
         .task {
             viewModel.client = appState.getClient()
             viewModel.sseClient = appState.getSSEClient()
             await viewModel.loadMessages()
-            // Small delay to let scroll position settle before showing
             try? await Task.sleep(nanoseconds: 50_000_000)
             withAnimation(.easeIn(duration: 0.15)) {
                 isReady = true
             }
         }
-    }
-
-    private func sendMessage() {
-        guard hasAttachments else { return }
-
-        // Build the text: user input + file contents
-        var fullText = inputText
-        for file in fileAttachments {
-            let fileBlock = "[\(file.filename)]\n```\n\(file.content)\n```"
-            if fullText.isEmpty {
-                fullText = fileBlock
-            } else {
-                fullText += "\n\n" + fileBlock
-            }
-        }
-
-        let images = imageAttachments.map { $0.attachment }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        viewModel.submit(text: fullText, images: images)
-        inputText = ""
-        imageAttachments = []
-        userHasScrolledUp = false
-        fileAttachments = []
-        selectedPhotos = []
-    }
-
-    private func handleImportedFiles(_ result: Result<[URL], Error>) {
-        guard case .success(let urls) = result else { return }
-
-        for url in urls {
-            guard url.startAccessingSecurityScopedResource() else { continue }
-            defer { url.stopAccessingSecurityScopedResource() }
-
-            let filename = url.lastPathComponent
-            let uti = UTType(filenameExtension: url.pathExtension)
-
-            // Image files → route through image pipeline
-            if let uti, uti.conforms(to: .image) {
-                if let data = try? Data(contentsOf: url),
-                   let uiImage = UIImage(data: data),
-                   let prepared = ImageUtils.prepareForUpload(uiImage) {
-                    let base64 = prepared.data.base64EncodedString()
-                    let attachment = ImageAttachment(
-                        path: filename,
-                        mediaType: prepared.mediaType,
-                        data: base64
-                    )
-                    imageAttachments.append(ImageAttachmentPreview(thumbnail: uiImage, attachment: attachment))
-                }
-                continue
-            }
-
-            // Text-based files → read content
-            if let content = try? String(contentsOf: url, encoding: .utf8) {
-                fileAttachments.append(FileAttachmentPreview(filename: filename, content: content))
-            }
-        }
-    }
-
-    private func processSelectedPhotos() {
-        Task {
-            var previews: [ImageAttachmentPreview] = []
-            for item in selectedPhotos {
-                guard let data = try? await item.loadTransferable(type: Data.self),
-                      let uiImage = UIImage(data: data),
-                      let prepared = ImageUtils.prepareForUpload(uiImage) else { continue }
-                let base64 = prepared.data.base64EncodedString()
-                let attachment = ImageAttachment(
-                    path: "photo_\(UUID().uuidString.prefix(8)).jpg",
-                    mediaType: prepared.mediaType,
-                    data: base64
-                )
-                previews.append(ImageAttachmentPreview(thumbnail: uiImage, attachment: attachment))
-            }
-            imageAttachments = previews
-        }
-    }
-
-    private func cancelMessage() {
-        viewModel.cancel()
     }
 
     private func renameSession(_ newTitle: String) async {
@@ -527,7 +277,7 @@ struct ChatView: View {
         do {
             try await client.setTags(sessionID: session.id, tags: newTags)
         } catch {
-            isStarred.toggle() // Revert on error
+            isStarred.toggle()
             viewModel.error = error
         }
     }

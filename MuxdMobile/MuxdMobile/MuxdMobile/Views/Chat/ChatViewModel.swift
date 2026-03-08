@@ -3,7 +3,13 @@ import Combine
 
 @MainActor
 class ChatViewModel: ObservableObject {
-    @Published var messages: [TranscriptMessage] = []
+    // All messages from server (kept in memory for tool result lookups)
+    private var allMessages: [TranscriptMessage] = []
+    
+    // Windowed messages for display (last 100 by default)
+    @Published var visibleMessages: [TranscriptMessage] = []
+    @Published var hasOlderMessages = false
+    
     @Published var streamingText = ""
     @Published var isStreaming = false
     @Published var activeTools: [String: ToolStatus] = [:]
@@ -16,6 +22,7 @@ class ChatViewModel: ObservableObject {
     var sseClient: SSEClient?
 
     let sessionID: String
+    private let windowSize = 100
 
     struct ToolStatus {
         let name: String
@@ -33,14 +40,46 @@ class ChatViewModel: ObservableObject {
     init(sessionID: String) {
         self.sessionID = sessionID
     }
+    
+    // Access to all messages for tool result lookups
+    var messages: [TranscriptMessage] {
+        allMessages
+    }
 
     func loadMessages() async {
         guard let client = client else { return }
 
         do {
-            messages = try await client.getMessages(sessionID: sessionID)
+            allMessages = try await client.getMessages(sessionID: sessionID)
+            updateVisibleMessages()
         } catch {
             self.error = error
+        }
+    }
+    
+    func loadOlderMessages() {
+        // Expand window by another 100 messages
+        let currentCount = visibleMessages.count
+        let totalCount = allMessages.count
+        
+        guard currentCount < totalCount else { return }
+        
+        let newCount = min(currentCount + windowSize, totalCount)
+        let startIndex = totalCount - newCount
+        visibleMessages = Array(allMessages[startIndex...])
+        hasOlderMessages = visibleMessages.count < allMessages.count
+    }
+    
+    private func updateVisibleMessages() {
+        let totalCount = allMessages.count
+        
+        if totalCount <= windowSize {
+            visibleMessages = allMessages
+            hasOlderMessages = false
+        } else {
+            let startIndex = totalCount - windowSize
+            visibleMessages = Array(allMessages[startIndex...])
+            hasOlderMessages = true
         }
     }
 
@@ -66,7 +105,8 @@ class ChatViewModel: ObservableObject {
             content: text,
             blocks: blocks.isEmpty ? nil : blocks
         )
-        messages.append(userMessage)
+        allMessages.append(userMessage)
+        updateVisibleMessages()
 
         streamingText = ""
         isStreaming = true
