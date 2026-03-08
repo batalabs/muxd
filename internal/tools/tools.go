@@ -74,6 +74,7 @@ type ToolContext struct {
 	BraveAPIKey        string
 	TextbeltAPIKey     string
 	MCP                MCPManager
+	HubDiscovery       func() ([]HubNodeInfo, error) // returns node info from hub
 }
 
 // ToolFunc is the signature for tool execution functions.
@@ -122,6 +123,7 @@ func AllTools() []ToolDef {
 		scheduleTaskTool(),
 		scheduleListTool(),
 		scheduleCancelTool(),
+		hubDiscoveryTool(),
 	}
 }
 
@@ -234,7 +236,7 @@ func fileReadTool() ToolDef {
 	return ToolDef{
 		Spec: provider.ToolSpec{
 			Name:        "file_read",
-			Description: "Read a file's contents with line numbers. Use offset and limit for large files. Read before editing to get exact text.",
+			Description: "Read a file's contents with line numbers. Supports text files and PDFs. Use offset and limit for large files. Read before editing to get exact text.",
 			Properties: map[string]provider.ToolProp{
 				"path":   {Type: "string", Description: "Absolute or relative file path to read"},
 				"offset": {Type: "integer", Description: "Line number to start reading from (1-based, default: 1)"},
@@ -252,6 +254,24 @@ func fileReadTool() ToolDef {
 				return "", fmt.Errorf("access denied: %s contains secrets and cannot be read by the agent", filepath.Base(path))
 			}
 
+			offset := 1
+			if v, ok := input["offset"].(float64); ok && v > 0 {
+				offset = int(v)
+			}
+
+			limit := 0
+			if v, ok := input["limit"].(float64); ok && v > 0 {
+				limit = int(v)
+			}
+
+			// PDF files: extract text with page markers
+			if strings.EqualFold(filepath.Ext(path), ".pdf") {
+				if limit == 0 {
+					limit = 1 << 30 // effectively unlimited
+				}
+				return readPDFText(path, offset, limit)
+			}
+
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return "", fmt.Errorf("reading %s: %w", path, err)
@@ -260,14 +280,8 @@ func fileReadTool() ToolDef {
 			text := strings.ReplaceAll(string(data), "\r\n", "\n")
 			lines := strings.Split(text, "\n")
 
-			offset := 1
-			if v, ok := input["offset"].(float64); ok && v > 0 {
-				offset = int(v)
-			}
-
-			limit := len(lines)
-			if v, ok := input["limit"].(float64); ok && v > 0 {
-				limit = int(v)
+			if limit == 0 {
+				limit = len(lines)
 			}
 
 			start := offset - 1

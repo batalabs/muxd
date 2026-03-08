@@ -299,6 +299,13 @@ func (a *Service) SetPushHubMemory(fn func(facts map[string]string) error) {
 	a.pushHubMemory = fn
 }
 
+// SetHubDiscovery sets the callback for querying hub nodes.
+func (a *Service) SetHubDiscovery(fn func() ([]tools.HubNodeInfo, error)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.hubDiscovery = fn
+}
+
 // SetDisabledTools replaces the user-disabled tools set.
 func (a *Service) SetDisabledTools(disabled map[string]bool) {
 	a.mu.Lock()

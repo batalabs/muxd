@@ -53,11 +53,17 @@ func (h *Hub) handleHealth(w http.ResponseWriter, _ *http.Request) {
 // ---------------------------------------------------------------------------
 
 type registerRequest struct {
-	Name    string `json:"name"`
-	Host    string `json:"host"`
-	Port    int    `json:"port"`
-	Token   string `json:"token"`
-	Version string `json:"version"`
+	Name     string   `json:"name"`
+	Host     string   `json:"host"`
+	Port     int      `json:"port"`
+	Token    string   `json:"token"`
+	Version  string   `json:"version"`
+	Platform string   `json:"platform,omitempty"`
+	Arch     string   `json:"arch,omitempty"`
+	Provider string   `json:"provider,omitempty"`
+	Model    string   `json:"model,omitempty"`
+	Tools    []string `json:"tools,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
 }
 
 func (h *Hub) handleRegisterNode(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +76,15 @@ func (h *Hub) handleRegisterNode(w http.ResponseWriter, r *http.Request) {
 		writeHubJSON(w, http.StatusBadRequest, map[string]string{"error": "host, port, and token are required"})
 		return
 	}
-	node, err := h.registerNode(req.Name, req.Host, req.Port, req.Token, req.Version)
+	caps := NodeCapabilities{
+		Platform: req.Platform,
+		Arch:     req.Arch,
+		Provider: req.Provider,
+		Model:    req.Model,
+		Tools:    req.Tools,
+		MCPTools: req.MCPTools,
+	}
+	node, err := h.registerNode(req.Name, req.Host, req.Port, req.Token, req.Version, caps)
 	if err != nil {
 		writeHubJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -112,11 +126,35 @@ func (h *Hub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		writeHubJSON(w, http.StatusNotFound, map[string]string{"error": "node not found"})
 		return
 	}
-	if err := h.touchNode(id); err != nil {
+	// Parse optional capabilities update from heartbeat body.
+	var caps NodeCapabilities
+	if r.Body != nil && r.ContentLength > 0 {
+		var hb heartbeatRequest
+		if err := json.NewDecoder(r.Body).Decode(&hb); err == nil {
+			caps = NodeCapabilities{
+				Platform: hb.Platform,
+				Arch:     hb.Arch,
+				Provider: hb.Provider,
+				Model:    hb.Model,
+				Tools:    hb.Tools,
+				MCPTools: hb.MCPTools,
+			}
+		}
+	}
+	if err := h.touchNode(id, caps); err != nil {
 		writeHubJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	writeHubJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+type heartbeatRequest struct {
+	Platform string   `json:"platform,omitempty"`
+	Arch     string   `json:"arch,omitempty"`
+	Provider string   `json:"provider,omitempty"`
+	Model    string   `json:"model,omitempty"`
+	Tools    []string `json:"tools,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

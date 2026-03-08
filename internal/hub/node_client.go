@@ -28,15 +28,34 @@ func NewNodeClient(hubURL, hubToken, nodeToken string) *NodeClient {
 	}
 }
 
+// NodeInfo holds runtime capabilities sent during registration and heartbeats.
+type NodeInfo struct {
+	Platform string   `json:"platform,omitempty"`
+	Arch     string   `json:"arch,omitempty"`
+	Provider string   `json:"provider,omitempty"`
+	Model    string   `json:"model,omitempty"`
+	Tools    []string `json:"tools,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
+}
+
 // Register registers this node with the hub. Returns the assigned node ID.
-func (c *NodeClient) Register(name, host string, port int, version string) (string, error) {
-	body, err := json.Marshal(registerRequest{
+func (c *NodeClient) Register(name, host string, port int, version string, info ...NodeInfo) (string, error) {
+	regReq := registerRequest{
 		Name:    name,
 		Host:    host,
 		Port:    port,
 		Token:   c.nodeToken,
 		Version: version,
-	})
+	}
+	if len(info) > 0 {
+		regReq.Platform = info[0].Platform
+		regReq.Arch = info[0].Arch
+		regReq.Provider = info[0].Provider
+		regReq.Model = info[0].Model
+		regReq.Tools = info[0].Tools
+		regReq.MCPTools = info[0].MCPTools
+	}
+	body, err := json.Marshal(regReq)
 	if err != nil {
 		return "", fmt.Errorf("marshaling register request: %w", err)
 	}
@@ -67,6 +86,45 @@ func (c *NodeClient) Register(name, host string, port int, version string) (stri
 		return "", fmt.Errorf("decoding register response: %w", err)
 	}
 	return result.ID, nil
+}
+
+// NodeListEntry is a node returned by the hub's list-nodes API.
+type NodeListEntry struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Version  string   `json:"version"`
+	Status   string   `json:"status"`
+	Platform string   `json:"platform"`
+	Arch     string   `json:"arch"`
+	Provider string   `json:"provider"`
+	Model    string   `json:"model"`
+	Tools    []string `json:"tools"`
+	MCPTools []string `json:"mcp_tools"`
+}
+
+// ListNodes fetches the list of all nodes registered with the hub.
+func (c *NodeClient) ListNodes() ([]NodeListEntry, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/hub/nodes", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating list nodes request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.hubToken)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("listing hub nodes: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("hub list nodes failed: %d", resp.StatusCode)
+	}
+
+	var nodes []NodeListEntry
+	if err := json.NewDecoder(resp.Body).Decode(&nodes); err != nil {
+		return nil, fmt.Errorf("decoding hub nodes: %w", err)
+	}
+	return nodes, nil
 }
 
 // Deregister removes this node from the hub.
@@ -143,11 +201,27 @@ func (c *NodeClient) PushMemory(facts map[string]string) error {
 	return nil
 }
 
-// Heartbeat sends a liveness signal to the hub.
-func (c *NodeClient) Heartbeat(nodeID string) error {
-	req, err := http.NewRequest("POST", c.baseURL+"/api/hub/nodes/"+nodeID+"/heartbeat", nil)
-	if err != nil {
-		return fmt.Errorf("creating heartbeat request: %w", err)
+// Heartbeat sends a liveness signal to the hub, optionally refreshing capabilities.
+func (c *NodeClient) Heartbeat(nodeID string, info ...NodeInfo) error {
+	var bodyReader *bytes.Reader
+	if len(info) > 0 {
+		b, _ := json.Marshal(info[0])
+		bodyReader = bytes.NewReader(b)
+	}
+
+	var req *http.Request
+	var err error
+	if bodyReader != nil {
+		req, err = http.NewRequest("POST", c.baseURL+"/api/hub/nodes/"+nodeID+"/heartbeat", bodyReader)
+		if err != nil {
+			return fmt.Errorf("creating heartbeat request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req, err = http.NewRequest("POST", c.baseURL+"/api/hub/nodes/"+nodeID+"/heartbeat", nil)
+		if err != nil {
+			return fmt.Errorf("creating heartbeat request: %w", err)
+		}
 	}
 	req.Header.Set("Authorization", "Bearer "+c.hubToken)
 

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/debug"
 	"syscall"
 	"time"
@@ -254,6 +255,7 @@ func main() {
 		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
 			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, srv.AuthToken())
 			srv.SetPushHubMemory(hubClient.PushMemory)
+			srv.SetHubDiscovery(hubDiscoveryFunc(hubClient))
 			go func() {
 				port := srv.Port() // blocks until listener is bound
 				name := prefs.HubNodeName
@@ -262,7 +264,7 @@ func main() {
 					name = hostname
 				}
 				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
-				nodeID, err := hubClient.Register(name, regHost, port, version)
+				nodeID, err := hubClient.Register(name, regHost, port, version, buildNodeInfo(srv))
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "hub: registration failed: %v\n", err)
 					return
@@ -284,7 +286,7 @@ func main() {
 				for {
 					select {
 					case <-ticker.C:
-						if err := hubClient.Heartbeat(nodeID); err != nil {
+						if err := hubClient.Heartbeat(nodeID, buildNodeInfo(srv)); err != nil {
 							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
 						}
 						syncCounter++
@@ -377,6 +379,7 @@ func main() {
 		if prefs.HubURL != "" && prefs.HubNodeToken != "" {
 			embeddedHubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, embeddedServer.AuthToken())
 			embeddedServer.SetPushHubMemory(embeddedHubClient.PushMemory)
+			embeddedServer.SetHubDiscovery(hubDiscoveryFunc(embeddedHubClient))
 			embeddedHubDone = make(chan struct{})
 			go func() {
 				port := embeddedServer.Port()
@@ -386,7 +389,7 @@ func main() {
 					name = hostname
 				}
 				regHost := resolveHubRegistrationHost(bindAddr, prefs.HubURL)
-				nodeID, err := embeddedHubClient.Register(name, regHost, port, version)
+				nodeID, err := embeddedHubClient.Register(name, regHost, port, version, buildNodeInfo(embeddedServer))
 				if err != nil {
 					logStderr("hub: registration failed: %v", err)
 					return
@@ -410,7 +413,7 @@ func main() {
 				for {
 					select {
 					case <-ticker.C:
-						if err := embeddedHubClient.Heartbeat(nodeID); err != nil {
+						if err := embeddedHubClient.Heartbeat(nodeID, buildNodeInfo(embeddedServer)); err != nil {
 							logStderr("hub: heartbeat failed: %v", err)
 						}
 						syncCounter++
@@ -649,4 +652,52 @@ func printHubInfo() {
 	fmt.Printf("  hub:   %s:%d\n", host, lf.Port)
 	fmt.Printf("  token: %s\n", lf.Token)
 	fmt.Printf("\n  connect: muxd --remote %s:%d --token %s\n\n", host, lf.Port, lf.Token)
+}
+
+// hubDiscoveryFunc returns a closure that queries the hub for connected nodes.
+func hubDiscoveryFunc(hc *hub.NodeClient) func() ([]tools.HubNodeInfo, error) {
+	return func() ([]tools.HubNodeInfo, error) {
+		entries, err := hc.ListNodes()
+		if err != nil {
+			return nil, err
+		}
+		nodes := make([]tools.HubNodeInfo, len(entries))
+		for i, e := range entries {
+			nodes[i] = tools.HubNodeInfo{
+				ID:       e.ID,
+				Name:     e.Name,
+				Status:   e.Status,
+				Version:  e.Version,
+				Platform: e.Platform,
+				Arch:     e.Arch,
+				Provider: e.Provider,
+				Model:    e.Model,
+				Tools:    e.Tools,
+				MCPTools: e.MCPTools,
+			}
+		}
+		return nodes, nil
+	}
+}
+
+// buildNodeInfo extracts capabilities from a daemon server for hub registration.
+func buildNodeInfo(srv *daemon.Server) hub.NodeInfo {
+	info := srv.NodeInfo()
+	ni := hub.NodeInfo{
+		Platform: runtime.GOOS,
+		Arch:     runtime.GOARCH,
+	}
+	if v, ok := info["provider"].(string); ok {
+		ni.Provider = v
+	}
+	if v, ok := info["model"].(string); ok {
+		ni.Model = v
+	}
+	if v, ok := info["tools"].([]string); ok {
+		ni.Tools = v
+	}
+	if v, ok := info["mcp_tools"].([]string); ok {
+		ni.MCPTools = v
+	}
+	return ni
 }

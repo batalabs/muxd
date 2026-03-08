@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,6 +67,7 @@ type Server struct {
 	mcpManager    *mcp.Manager
 	logger        *config.Logger
 	pushHubMemory func(facts map[string]string) error
+	hubDiscovery  func() ([]tools.HubNodeInfo, error)
 }
 
 // NewServer creates a new daemon server.
@@ -148,6 +150,11 @@ func (s *Server) SetPushHubMemory(fn func(facts map[string]string) error) {
 	s.pushHubMemory = fn
 }
 
+// SetHubDiscovery sets the callback for querying hub nodes.
+func (s *Server) SetHubDiscovery(fn func() ([]tools.HubNodeInfo, error)) {
+	s.hubDiscovery = fn
+}
+
 // logf writes a timestamped log line if a logger is configured.
 func (s *Server) logf(format string, args ...any) {
 	if s.logger != nil {
@@ -159,6 +166,34 @@ func (s *Server) logf(format string, args ...any) {
 // Must be called before Start(). Defaults to "localhost" if not set.
 func (s *Server) SetBindAddress(addr string) {
 	s.bindAddr = addr
+}
+
+// NodeInfo returns the current capabilities of this daemon for hub registration.
+func (s *Server) NodeInfo() map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	info := map[string]any{
+		"platform": runtime.GOOS,
+		"arch":     runtime.GOARCH,
+	}
+	if s.provider != nil {
+		info["provider"] = s.provider.Name()
+	}
+	if s.modelLabel != "" {
+		info["model"] = s.modelLabel
+	}
+
+	builtinTools := make([]string, 0, len(tools.AllTools()))
+	for _, t := range tools.AllTools() {
+		builtinTools = append(builtinTools, t.Spec.Name)
+	}
+	info["tools"] = builtinTools
+
+	if s.mcpManager != nil {
+		info["mcp_tools"] = s.mcpManager.ToolNames()
+	}
+	return info
 }
 
 // BindAddress returns the bind address. Returns "localhost" if not explicitly set.
@@ -1073,6 +1108,11 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	// Wire hub memory push if configured
 	if s.pushHubMemory != nil {
 		ag.SetPushHubMemory(s.pushHubMemory)
+	}
+
+	// Wire hub discovery if configured
+	if s.hubDiscovery != nil {
+		ag.SetHubDiscovery(s.hubDiscovery)
 	}
 }
 

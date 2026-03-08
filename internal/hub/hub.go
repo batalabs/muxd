@@ -42,6 +42,14 @@ type Node struct {
 	Status       NodeStatus `json:"status"`
 	RegisteredAt time.Time  `json:"registered_at"`
 	LastSeenAt   time.Time  `json:"last_seen_at"`
+
+	// Capabilities reported by the node at registration and heartbeat.
+	Platform string   `json:"platform,omitempty"` // runtime.GOOS
+	Arch     string   `json:"arch,omitempty"`     // runtime.GOARCH
+	Provider string   `json:"provider,omitempty"` // active provider name
+	Model    string   `json:"model,omitempty"`    // active model label
+	Tools    []string `json:"tools,omitempty"`    // built-in tool names
+	MCPTools []string `json:"mcp_tools,omitempty"` // MCP tool names
 }
 
 // Hub is the central coordinator that tracks nodes, proxies requests,
@@ -168,7 +176,38 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 // Node registry
 // ---------------------------------------------------------------------------
 
-func (h *Hub) registerNode(name, host string, port int, token, version string) (*Node, error) {
+// NodeCapabilities holds runtime information reported by a node.
+type NodeCapabilities struct {
+	Platform string
+	Arch     string
+	Provider string
+	Model    string
+	Tools    []string
+	MCPTools []string
+}
+
+func (c NodeCapabilities) applyTo(n *Node) {
+	if c.Platform != "" {
+		n.Platform = c.Platform
+	}
+	if c.Arch != "" {
+		n.Arch = c.Arch
+	}
+	if c.Provider != "" {
+		n.Provider = c.Provider
+	}
+	if c.Model != "" {
+		n.Model = c.Model
+	}
+	if len(c.Tools) > 0 {
+		n.Tools = c.Tools
+	}
+	if len(c.MCPTools) > 0 {
+		n.MCPTools = c.MCPTools
+	}
+}
+
+func (h *Hub) registerNode(name, host string, port int, token, version string, caps NodeCapabilities) (*Node, error) {
 	now := time.Now().UTC()
 
 	// Check for an existing node with the same name -replace it instead of
@@ -182,6 +221,7 @@ func (h *Hub) registerNode(name, host string, port int, token, version string) (
 			n.Version = version
 			n.Status = StatusOnline
 			n.LastSeenAt = now
+			caps.applyTo(n)
 		}
 		h.mu.Unlock()
 		h.db.Exec(
@@ -204,6 +244,7 @@ func (h *Hub) registerNode(name, host string, port int, token, version string) (
 		RegisteredAt: now,
 		LastSeenAt:   now,
 	}
+	caps.applyTo(node)
 
 	_, err := h.db.Exec(
 		`INSERT INTO nodes (id, name, host, port, token, version, status, registered_at, last_seen_at)
@@ -248,7 +289,7 @@ func (h *Hub) deregisterNode(id string) error {
 	return nil
 }
 
-func (h *Hub) touchNode(id string) error {
+func (h *Hub) touchNode(id string, caps NodeCapabilities) error {
 	now := time.Now().UTC()
 	_, err := h.db.Exec(
 		`UPDATE nodes SET last_seen_at = ?, status = ? WHERE id = ?`,
@@ -261,6 +302,7 @@ func (h *Hub) touchNode(id string) error {
 	if n, ok := h.nodes[id]; ok {
 		n.LastSeenAt = now
 		n.Status = StatusOnline
+		caps.applyTo(n)
 	}
 	h.mu.Unlock()
 	return nil

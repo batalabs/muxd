@@ -193,7 +193,7 @@ func TestNodeClient_PushMemory(t *testing.T) {
 func TestHub_RegisterNode(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("node-a", "127.0.0.1", 9000, "tok-a", "0.1.0")
+	node, err := h.registerNode("node-a", "127.0.0.1", 9000, "tok-a", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("registerNode: %v", err)
 	}
@@ -219,12 +219,12 @@ func TestHub_RegisterNode(t *testing.T) {
 func TestHub_RegisterNode_reregister(t *testing.T) {
 	h := newTestHub(t)
 
-	node1, err := h.registerNode("same-name", "127.0.0.1", 9000, "tok-1", "0.1.0")
+	node1, err := h.registerNode("same-name", "127.0.0.1", 9000, "tok-1", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("first register: %v", err)
 	}
 
-	node2, err := h.registerNode("same-name", "127.0.0.1", 9001, "tok-2", "0.2.0")
+	node2, err := h.registerNode("same-name", "127.0.0.1", 9001, "tok-2", "0.2.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("second register: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestHub_RegisterNode_reregister(t *testing.T) {
 func TestHub_DeregisterNode(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("node-b", "127.0.0.1", 9000, "tok-b", "0.1.0")
+	node, err := h.registerNode("node-b", "127.0.0.1", 9000, "tok-b", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("registerNode: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestHub_DeregisterNode_notFound(t *testing.T) {
 func TestHub_TouchNode(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("node-c", "127.0.0.1", 9000, "tok-c", "0.1.0")
+	node, err := h.registerNode("node-c", "127.0.0.1", 9000, "tok-c", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("registerNode: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestHub_TouchNode(t *testing.T) {
 
 	// Small sleep to ensure time difference.
 	// We can't avoid this since touchNode uses time.Now().
-	if err := h.touchNode(node.ID); err != nil {
+	if err := h.touchNode(node.ID, NodeCapabilities{}); err != nil {
 		t.Fatalf("touchNode: %v", err)
 	}
 
@@ -446,11 +446,11 @@ func TestHub_HandleListNodes(t *testing.T) {
 	h := newTestHub(t)
 
 	// Register two nodes.
-	n1, err := h.registerNode("alpha", "127.0.0.1", 8001, "tok-a", "0.1.0")
+	n1, err := h.registerNode("alpha", "127.0.0.1", 8001, "tok-a", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("register node 1: %v", err)
 	}
-	n2, err := h.registerNode("beta", "127.0.0.1", 8002, "tok-b", "0.1.0")
+	n2, err := h.registerNode("beta", "127.0.0.1", 8002, "tok-b", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("register node 2: %v", err)
 	}
@@ -487,7 +487,7 @@ func TestHub_HandleListNodes(t *testing.T) {
 func TestHub_HandleGetNode(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("gamma", "127.0.0.1", 8003, "tok-g", "0.1.0")
+	node, err := h.registerNode("gamma", "127.0.0.1", 8003, "tok-g", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -604,7 +604,7 @@ func TestHub_HandleProxy_nodeNotFound(t *testing.T) {
 func TestHub_HandleProxy_nodeOffline(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("offline-node", "127.0.0.1", 9999, "tok-off", "0.1.0")
+	node, err := h.registerNode("offline-node", "127.0.0.1", 9999, "tok-off", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -632,7 +632,7 @@ func TestHub_HandleProxy_nodeOffline(t *testing.T) {
 func TestHub_SweepOfflineNodes(t *testing.T) {
 	h := newTestHub(t)
 
-	node, err := h.registerNode("stale-node", "127.0.0.1", 9000, "tok-s", "0.1.0")
+	node, err := h.registerNode("stale-node", "127.0.0.1", 9000, "tok-s", "0.1.0", NodeCapabilities{})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}

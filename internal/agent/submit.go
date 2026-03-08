@@ -108,6 +108,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			PlanMode:       &a.planMode,
 			Disabled:       disabled,
 			PushHubMemory:  a.pushHubMemory,
+			HubDiscovery:   a.hubDiscovery,
 			BraveAPIKey:    a.braveAPIKey,
 			TextbeltAPIKey: a.textbeltAPIKey,
 			MCP:            mcpMgr,

@@ -168,6 +168,9 @@ type Service struct {
 	// pushHubMemory is called to push shared facts to the hub.
 	pushHubMemory func(facts map[string]string) error
 
+	// hubDiscovery returns node info from the hub for the hub_discovery tool.
+	hubDiscovery func() ([]tools.HubNodeInfo, error)
+
 	// logger writes background errors to the muxd log file.
 	logger *config.Logger
 }
