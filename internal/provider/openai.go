@@ -373,9 +373,10 @@ type openaiSSEDelta struct {
 	Choices []struct {
 		Index int `json:"index"`
 		Delta struct {
-			Role      string               `json:"role"`
-			Content   string               `json:"content"`
-			ToolCalls []openaiSSEToolDelta `json:"tool_calls"`
+			Role             string               `json:"role"`
+			Content          string               `json:"content"`
+			ReasoningContent string               `json:"reasoning_content"`
+			ToolCalls        []openaiSSEToolDelta `json:"tool_calls"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
@@ -398,6 +399,7 @@ type openaiSSEToolDelta struct {
 // parseOpenAISSE parses the OpenAI SSE stream and returns content blocks.
 func parseOpenAISSE(body io.Reader, onDelta func(string)) ([]domain.ContentBlock, string, Usage, error) {
 	var textBuf strings.Builder
+	var thinkBuf strings.Builder
 	toolBuilders := make(map[int]*openaiToolBuilder)
 	usage := Usage{}
 	finishReason := ""
@@ -426,6 +428,11 @@ func parseOpenAISSE(body io.Reader, onDelta func(string)) ([]domain.ContentBlock
 		}
 
 		for _, choice := range chunk.Choices {
+			// Reasoning/thinking content (e.g. GLM-5, DeepSeek-R1)
+			if choice.Delta.ReasoningContent != "" {
+				thinkBuf.WriteString(choice.Delta.ReasoningContent)
+			}
+
 			// Text content
 			if choice.Delta.Content != "" {
 				textBuf.WriteString(choice.Delta.Content)
@@ -458,6 +465,9 @@ func parseOpenAISSE(body io.Reader, onDelta func(string)) ([]domain.ContentBlock
 
 	// Build content blocks
 	var blocks []domain.ContentBlock
+	if think := thinkBuf.String(); think != "" {
+		blocks = append(blocks, domain.ContentBlock{Type: "thinking", Text: think})
+	}
 	if text := textBuf.String(); text != "" {
 		blocks = append(blocks, domain.ContentBlock{Type: "text", Text: text})
 	}

@@ -126,6 +126,47 @@ data: [DONE]
 	}
 }
 
+func TestParseOpenAISSE_reasoningContent(t *testing.T) {
+	sse := `data: {"choices":[{"index":0,"delta":{"role":"assistant","reasoning_content":"Let me think"}}]}
+
+data: {"choices":[{"index":0,"delta":{"reasoning_content":" about this..."}}]}
+
+data: {"choices":[{"index":0,"delta":{"content":"The answer is 42."}}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":15,"completion_tokens":10}}
+
+data: [DONE]
+
+`
+	var deltas []string
+	blocks, stop, usage, err := parseOpenAISSE(strings.NewReader(sse), func(s string) {
+		deltas = append(deltas, s)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stop != "end_turn" {
+		t.Errorf("stop = %q, want end_turn", stop)
+	}
+	if usage.InputTokens != 15 || usage.OutputTokens != 10 {
+		t.Errorf("usage = %+v", usage)
+	}
+	// Should have 2 blocks: thinking + text
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 blocks, got %d: %+v", len(blocks), blocks)
+	}
+	if blocks[0].Type != "thinking" || blocks[0].Text != "Let me think about this..." {
+		t.Errorf("thinking block = %+v", blocks[0])
+	}
+	if blocks[1].Type != "text" || blocks[1].Text != "The answer is 42." {
+		t.Errorf("text block = %+v", blocks[1])
+	}
+	// Only text deltas should be sent via onDelta (not reasoning)
+	if len(deltas) != 1 || deltas[0] != "The answer is 42." {
+		t.Errorf("deltas = %v, want [\"The answer is 42.\"]", deltas)
+	}
+}
+
 func TestParseOpenAISSE_emptyStream(t *testing.T) {
 	blocks, stop, _, err := parseOpenAISSE(strings.NewReader("data: [DONE]\n\n"), nil)
 	if err != nil {
