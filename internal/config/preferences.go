@@ -29,6 +29,7 @@ type Preferences struct {
 	Provider              string `json:"provider,omitempty"`
 	AnthropicAPIKey       string `json:"anthropic_api_key,omitempty"`
 	ZAIAPIKey             string `json:"zai_api_key,omitempty"`
+	ZAICodingPlan         bool   `json:"zai_coding_plan,omitempty"`
 	GrokAPIKey            string `json:"grok_api_key,omitempty"`
 	MistralAPIKey         string `json:"mistral_api_key,omitempty"`
 	OpenAIAPIKey          string `json:"openai_api_key,omitempty"`
@@ -76,7 +77,7 @@ type ConfigGroupDef struct {
 var ConfigGroupDefs = []ConfigGroupDef{
 	{
 		Name: "models",
-		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "deepinfra.api_key", "ollama.url"},
+		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "zai.coding_plan", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "deepinfra.api_key", "ollama.url"},
 	},
 	{
 		Name: "tools",
@@ -209,6 +210,9 @@ func mergePreferences(dst, src *Preferences) {
 	}
 	if src.ZAIAPIKey != "" {
 		dst.ZAIAPIKey = src.ZAIAPIKey
+	}
+	if src.ZAICodingPlan {
+		dst.ZAICodingPlan = true
 	}
 	if src.OpenAIAPIKey != "" {
 		dst.OpenAIAPIKey = src.OpenAIAPIKey
@@ -373,6 +377,7 @@ func (p Preferences) All() []PrefEntry {
 		{"model.tags", p.ModelTags},
 		{"anthropic.api_key", resolveKeyDisplay(p.AnthropicAPIKey, "ANTHROPIC_API_KEY")},
 		{"zai.api_key", resolveKeyDisplay(p.ZAIAPIKey, "ZAI_API_KEY")},
+		{"zai.coding_plan", strconv.FormatBool(p.ZAICodingPlan)},
 		{"grok.api_key", resolveKeyDisplay(p.GrokAPIKey, "XAI_API_KEY")},
 		{"mistral.api_key", resolveKeyDisplay(p.MistralAPIKey, "MISTRAL_API_KEY")},
 		{"openai.api_key", resolveKeyDisplay(p.OpenAIAPIKey, "OPENAI_API_KEY")},
@@ -421,6 +426,8 @@ func (p Preferences) Get(key string) string {
 		return MaskKey(p.AnthropicAPIKey)
 	case "zai.api_key":
 		return MaskKey(p.ZAIAPIKey)
+	case "zai.coding_plan":
+		return strconv.FormatBool(p.ZAICodingPlan)
 	case "openai.api_key":
 		return MaskKey(p.OpenAIAPIKey)
 	case "mistral.api_key":
@@ -515,6 +522,12 @@ func (p *Preferences) Set(key, value string) error {
 		p.AnthropicAPIKey = value
 	case "zai.api_key":
 		p.ZAIAPIKey = value
+	case "zai.coding_plan":
+		b, err := ParseBoolish(value)
+		if err != nil {
+			return err
+		}
+		p.ZAICodingPlan = b
 	case "openai.api_key":
 		p.OpenAIAPIKey = value
 	case "mistral.api_key":

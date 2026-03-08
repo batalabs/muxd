@@ -2184,6 +2184,15 @@ func (m *Model) applyConfigSetting(key, value string) {
 			}
 		}
 	}
+	if key == "zai.coding_plan" {
+		b, _ := config.ParseBoolish(value)
+		provider.SetZAICodingPlan(b)
+		if m.Daemon != nil {
+			if _, err := m.Daemon.SetConfig(key, value); err != nil {
+				fmt.Fprintf(os.Stderr, "tui: set config %s: %v\n", key, err)
+			}
+		}
+	}
 	if strings.HasPrefix(key, "x.") && m.Daemon != nil {
 		if _, err := m.Daemon.SetConfig(key, value); err != nil {
 			fmt.Fprintf(os.Stderr, "tui: set config %s: %v\n", key, err)

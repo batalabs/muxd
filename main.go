@@ -193,6 +193,7 @@ func main() {
 	}
 
 	provider.SetOllamaBaseURL(prefs.OllamaURL)
+	provider.SetZAICodingPlan(prefs.ZAICodingPlan)
 
 	// Resolve provider and model (no hardcoded default -user must configure)
 	modelLabel := *modelFlag

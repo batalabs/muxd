@@ -957,6 +957,10 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	if req.Key == "ollama.url" {
 		provider.SetOllamaBaseURL(req.Value)
 	}
+	if req.Key == "zai.coding_plan" {
+		b, _ := config.ParseBoolish(req.Value)
+		provider.SetZAICodingPlan(b)
+	}
 	if req.Key == "brave.api_key" {
 		for _, ag := range s.agents {
 			ag.SetBraveAPIKey(req.Value)

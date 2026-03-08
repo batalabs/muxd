@@ -44,12 +44,12 @@ type Node struct {
 	LastSeenAt   time.Time  `json:"last_seen_at"`
 
 	// Capabilities reported by the node at registration and heartbeat.
-	Platform string   `json:"platform,omitempty"` // runtime.GOOS
-	Arch     string   `json:"arch,omitempty"`     // runtime.GOARCH
-	Provider string   `json:"provider,omitempty"` // active provider name
-	Model    string   `json:"model,omitempty"`    // active model label
-	Tools    []string `json:"tools,omitempty"`    // built-in tool names
-	MCPTools []string `json:"mcp_tools,omitempty"` // MCP tool names
+	Platform string   `json:"platform,omitempty"`
+	Arch     string   `json:"arch,omitempty"`
+	Provider string   `json:"provider,omitempty"`
+	Model    string   `json:"model,omitempty"`
+	Tools    []string `json:"tools,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
 }
 
 // Hub is the central coordinator that tracks nodes, proxies requests,

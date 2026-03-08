@@ -12,8 +12,23 @@ import (
 
 var zaiAPIBaseURL = "https://api.z.ai/api/paas/v4"
 
+const (
+	zaiBaseURLDefault = "https://api.z.ai/api/paas/v4"
+	zaiBaseURLCoding  = "https://api.z.ai/api/coding/paas/v4"
+)
+
 // setZAIBaseURL overrides the base URL (used in tests).
 func setZAIBaseURL(url string) { zaiAPIBaseURL = url }
+
+// SetZAICodingPlan switches the Z.AI API endpoint between the regular
+// pay-per-token API and the subscription-based Coding Plan API.
+func SetZAICodingPlan(enabled bool) {
+	if enabled {
+		zaiAPIBaseURL = zaiBaseURLCoding
+	} else {
+		zaiAPIBaseURL = zaiBaseURLDefault
+	}
+}
 
 // ZAIProvider implements Provider for Z.AI's chat API.
 // It uses OpenAI-compatible request/stream formats.

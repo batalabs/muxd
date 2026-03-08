@@ -131,14 +131,7 @@ func (h *Hub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if r.Body != nil && r.ContentLength > 0 {
 		var hb heartbeatRequest
 		if err := json.NewDecoder(r.Body).Decode(&hb); err == nil {
-			caps = NodeCapabilities{
-				Platform: hb.Platform,
-				Arch:     hb.Arch,
-				Provider: hb.Provider,
-				Model:    hb.Model,
-				Tools:    hb.Tools,
-				MCPTools: hb.MCPTools,
-			}
+			caps = NodeCapabilities(hb)
 		}
 	}
 	if err := h.touchNode(id, caps); err != nil {
