@@ -24,6 +24,10 @@ class ChatViewModel: ObservableObject {
     let sessionID: String
     private let windowSize = 100
 
+    // Streaming debounce: buffer deltas and flush at ~16fps
+    private var streamingBuffer = ""
+    private var flushTask: Task<Void, Never>?
+
     struct ToolStatus {
         let name: String
         var inputSummary: String?
@@ -119,6 +123,7 @@ class ChatViewModel: ObservableObject {
     func cancel() {
         guard let client = client else { return }
 
+        finalFlush()
         sseClient?.cancel()
         isStreaming = false
 
@@ -155,6 +160,7 @@ class ChatViewModel: ObservableObject {
 
         sseClient?.onComplete = { [weak self] in
             Task { @MainActor [weak self] in
+                self?.finalFlush()
                 self?.isStreaming = false
                 self?.activeTools = [:]
                 await self?.loadMessages()
@@ -169,11 +175,33 @@ class ChatViewModel: ObservableObject {
         }
     }
 
+    private func scheduleFlush() {
+        guard flushTask == nil else { return }
+        flushTask = Task {
+            try? await Task.sleep(nanoseconds: 60_000_000) // ~60ms ≈ 16fps
+            flushStreamingBuffer()
+        }
+    }
+
+    private func flushStreamingBuffer() {
+        guard !streamingBuffer.isEmpty else { return }
+        streamingText += streamingBuffer
+        streamingBuffer = ""
+        flushTask = nil
+    }
+
+    private func finalFlush() {
+        flushTask?.cancel()
+        flushTask = nil
+        flushStreamingBuffer()
+    }
+
     private func handleEvent(_ event: SSEEvent) {
         switch event.type {
         case .delta:
             if let text = event.deltaText {
-                streamingText += text
+                streamingBuffer += text
+                scheduleFlush()
             }
 
         case .toolStart:
@@ -199,6 +227,7 @@ class ChatViewModel: ObservableObject {
             }
 
         case .turnDone:
+            finalFlush()
             isStreaming = false
             activeTools = [:]
             UINotificationFeedbackGenerator().notificationOccurred(.success)

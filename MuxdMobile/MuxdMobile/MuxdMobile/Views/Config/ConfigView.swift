@@ -108,7 +108,7 @@ struct ConfigView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    ShareLink(item: URL(string: "https://apps.apple.com/app/muxd/id123456789")!) {
+                    ShareLink(item: URL(string: "https://apps.apple.com/us/app/muxd/id6759869997")!) {
                         HStack {
                             Text("Share App")
                             Spacer()

@@ -142,8 +142,8 @@ struct ChatView: View {
                     }
                 }
             }
-            .onChange(of: viewModel.streamingText) { _, newValue in
-                if viewModel.isStreaming && !userHasScrolledUp && newValue.count % 50 < 5 {
+            .onChange(of: viewModel.streamingText) { _, _ in
+                if viewModel.isStreaming && !userHasScrolledUp {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
             }
