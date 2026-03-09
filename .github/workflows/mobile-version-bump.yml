@@ -10,7 +10,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     # Skip if the push was the version bump commit itself
-    if: "!contains(github.event.head_commit.message, 'chore(mobile): bump version')"
+    if: "!contains(github.event.head_commit.message, 'chore(mobile): bump version') && !contains(github.event.head_commit.message, '[skip-version]')"
 
     steps:
       - uses: actions/checkout@v4
