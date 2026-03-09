@@ -51,8 +51,14 @@ struct MuxdMobileApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        let config = PostHogConfig(apiKey: "phc_wDg7GYZ7WFZ1fAHPeEl7VrqEbXVnE7k2cbawUgBuinO", host: "https://us.i.posthog.com")
-        PostHogSDK.shared.setup(config)
+        // Read PostHog config from Info.plist (values come from Config.xcconfig)
+        let apiKey = Bundle.main.infoDictionary?["POSTHOG_API_KEY"] as? String ?? ""
+        let host = Bundle.main.infoDictionary?["POSTHOG_HOST"] as? String ?? "https://us.i.posthog.com"
+        
+        if !apiKey.isEmpty {
+            let config = PostHogConfig(apiKey: apiKey, host: host)
+            PostHogSDK.shared.setup(config)
+        }
     }
 
     var body: some Scene {

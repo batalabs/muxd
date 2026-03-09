@@ -12,6 +12,7 @@
 
 /* Begin PBXFileReference section */
 		B2C32EB92F4F338E0058B6FE /* MuxdMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MuxdMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2C32ECA2F5130000058B6FE /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -52,6 +53,7 @@
 			children = (
 				B2C32EBB2F4F338E0058B6FE /* MuxdMobile */,
 				B2C32EBA2F4F338E0058B6FE /* Products */,
+				B2C32ECA2F5130000058B6FE /* Config.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -270,6 +272,7 @@
 		};
 		B2C32EC52F4F33900058B6FE /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B2C32ECA2F5130000058B6FE /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -297,6 +300,7 @@
 		};
 		B2C32EC62F4F33900058B6FE /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B2C32ECA2F5130000058B6FE /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

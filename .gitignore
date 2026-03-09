@@ -13,6 +13,9 @@ dist/
 xcuserdata/
 *.xcuserstate
 
+# Xcode config with secrets
+MuxdMobile/**/Config.xcconfig
+
 # Claude Code
 .claude/
 CLAUDE.md
