@@ -1,0 +1,61 @@
+name: Mobile Version Bump
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'MuxdMobile/**'
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # Skip if the push was the version bump commit itself
+    if: "!contains(github.event.head_commit.message, 'chore(mobile): bump version')"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine bump type from commits
+        id: bump
+        run: |
+          # Look at commits since last version bump
+          LAST_BUMP=$(git log --oneline --grep='chore(mobile): bump version' -1 --format='%H' || echo '')
+          if [ -n "$LAST_BUMP" ]; then
+            RANGE="${LAST_BUMP}..HEAD"
+          else
+            RANGE="HEAD~10..HEAD"
+          fi
+
+          # Only consider commits that touch MuxdMobile/
+          MESSAGES=$(git log "$RANGE" --format='%s' -- MuxdMobile/)
+
+          if echo "$MESSAGES" | grep -qiE '^feat!|BREAKING CHANGE'; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$MESSAGES" | grep -qiE '^feat'; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          elif echo "$MESSAGES" | grep -qiE '^fix|^perf|^refactor'; then
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        if: steps.bump.outputs.type != 'none'
+        working-directory: MuxdMobile
+        run: |
+          # sed -i on Linux (no '' needed like macOS)
+          sed -i 's/sed -i '"'"''"'"'/sed -i/' bump-version.sh
+          chmod +x bump-version.sh
+          ./bump-version.sh ${{ steps.bump.outputs.type }}
+
+      - name: Commit and push
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add MuxdMobile/MuxdMobile/MuxdMobile.xcodeproj/project.pbxproj
+          git commit -m "chore(mobile): bump version (${{ steps.bump.outputs.type }})"
+          git push

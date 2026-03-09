@@ -1,4 +1,5 @@
 import SwiftUI
+import PostHog
 
 struct AppGlassModifier: ViewModifier {
     var circular: Bool = false
@@ -48,6 +49,11 @@ struct MuxdMobileApp: App {
     @StateObject private var biometricManager = BiometricManager()
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        let config = PostHogConfig(apiKey: "phc_wDg7GYZ7WFZ1fAHPeEl7VrqEbXVnE7k2cbawUgBuinO", host: "https://us.i.posthog.com")
+        PostHogSDK.shared.setup(config)
+    }
 
     var body: some Scene {
         WindowGroup {
