@@ -24,9 +24,10 @@ class ChatViewModel: ObservableObject {
     let sessionID: String
     private let windowSize = 100
 
-    // Streaming debounce: buffer deltas and flush at ~16fps
+    // Streaming debounce: buffer deltas and flush at ~30fps
     private var streamingBuffer = ""
     private var flushTask: Task<Void, Never>?
+    private let maxBufferChars = 40
 
     struct ToolStatus {
         let name: String
@@ -176,9 +177,16 @@ class ChatViewModel: ObservableObject {
     }
 
     private func scheduleFlush() {
+        // Flush immediately if buffer is large enough for responsive feel
+        if streamingBuffer.count >= maxBufferChars {
+            flushTask?.cancel()
+            flushTask = nil
+            flushStreamingBuffer()
+            return
+        }
         guard flushTask == nil else { return }
         flushTask = Task {
-            try? await Task.sleep(nanoseconds: 60_000_000) // ~60ms ≈ 16fps
+            try? await Task.sleep(nanoseconds: 33_000_000) // ~33ms ≈ 30fps
             flushStreamingBuffer()
         }
     }

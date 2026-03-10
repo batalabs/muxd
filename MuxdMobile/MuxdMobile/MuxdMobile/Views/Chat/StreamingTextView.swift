@@ -4,6 +4,70 @@ struct StreamingTextView: View {
     let text: String
     @AppStorage("fontSize") private var fontSize: AppFontSize = .medium
 
+    /// Strip incomplete markdown syntax from the last line of streaming text
+    private var sanitizedText: String {
+        guard !text.isEmpty else { return text }
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard !lines.isEmpty else { return text }
+
+        let lastIdx = lines.count - 1
+        var lastLine = lines[lastIdx]
+
+        // 1. Last line is only heading markers + spaces → drop entirely
+        let trimmed = lastLine.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty, trimmed.contains("#"),
+           trimmed.allSatisfy({ $0 == "#" || $0 == " " }) {
+            lines.removeLast()
+            return lines.joined(separator: "\n")
+        }
+
+        // 1b. Incomplete list marker on last line (-, *, +, or "1." with no content)
+        if trimmed == "-" || trimmed == "*" || trimmed == "+" {
+            lines.removeLast()
+            return lines.joined(separator: "\n")
+        }
+        if trimmed.hasSuffix("."), trimmed.dropLast().allSatisfy(\.isNumber), !trimmed.dropLast().isEmpty {
+            lines.removeLast()
+            return lines.joined(separator: "\n")
+        }
+
+        // 2. Strip trailing * characters (partial bold/italic marker being typed)
+        while lastLine.last == "*" {
+            lastLine.removeLast()
+        }
+
+        // 3. Strip unmatched ** on last line (opening bold with no close yet)
+        //    "a**b" → 2 parts (1 separator = unmatched), "a**b**c" → 3 parts (2 = matched)
+        let starParts = lastLine.components(separatedBy: "**")
+        if starParts.count % 2 == 0, let range = lastLine.range(of: "**", options: .backwards) {
+            lastLine = String(lastLine[..<range.lowerBound])
+        }
+
+        // 4. Strip unmatched single * (italic) — count * that aren't part of **
+        let cleaned = lastLine.replacingOccurrences(of: "**", with: "")
+        let singleStarCount = cleaned.filter({ $0 == "*" }).count
+        if singleStarCount % 2 != 0, let range = lastLine.range(of: "*", options: .backwards) {
+            lastLine = String(lastLine[..<range.lowerBound])
+        }
+
+        // 5. Strip trailing backticks (incomplete inline code)
+        let backtickCount = lastLine.reversed().prefix(while: { $0 == "`" }).count
+        if backtickCount > 0 && backtickCount < 3 {
+            lastLine.removeLast(backtickCount)
+        }
+
+        // 6. Strip incomplete link syntax: [ without closing ]
+        if let openBracket = lastLine.range(of: "[", options: .backwards) {
+            let rest = String(lastLine[openBracket.lowerBound...])
+            if !rest.contains("]") {
+                lastLine = String(lastLine[..<openBracket.lowerBound])
+            }
+        }
+
+        lines[lastIdx] = lastLine
+        return lines.joined(separator: "\n")
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -18,9 +82,7 @@ struct StreamingTextView: View {
                 }
                 .foregroundColor(.secondary)
 
-                Text(text)
-                    .font(.system(size: fontSize.scale * 16))
-                    .textSelection(.enabled)
+                MarkdownText(sanitizedText, scale: fontSize.scale)
                     .padding(.horizontal, 12)
                     .padding(.top, 6)
                     .padding(.bottom, 12)
@@ -28,7 +90,6 @@ struct StreamingTextView: View {
                     .background(Color(.systemGray5))
                     .cornerRadius(8)
                     .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-                    .padding(.bottom, 2)
             }
             Spacer(minLength: 20)
         }
