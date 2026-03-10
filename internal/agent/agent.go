@@ -171,6 +171,9 @@ type Service struct {
 	// hubDiscovery returns node info from the hub for the hub_discovery tool.
 	hubDiscovery func() ([]tools.HubNodeInfo, error)
 
+	// hubDispatch dispatches a task to a remote hub node.
+	hubDispatch func(string, string) (string, error)
+
 	// logger writes background errors to the muxd log file.
 	logger *config.Logger
 }

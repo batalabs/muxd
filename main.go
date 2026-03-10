@@ -257,6 +257,7 @@ func main() {
 			hubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, srv.AuthToken())
 			srv.SetPushHubMemory(hubClient.PushMemory)
 			srv.SetHubDiscovery(hubDiscoveryFunc(hubClient))
+			srv.SetHubDispatch(hubClient.Dispatch)
 			go func() {
 				port := srv.Port() // blocks until listener is bound
 				name := prefs.HubNodeName
@@ -381,6 +382,7 @@ func main() {
 			embeddedHubClient = hub.NewNodeClient(prefs.HubURL, prefs.HubNodeToken, embeddedServer.AuthToken())
 			embeddedServer.SetPushHubMemory(embeddedHubClient.PushMemory)
 			embeddedServer.SetHubDiscovery(hubDiscoveryFunc(embeddedHubClient))
+			embeddedServer.SetHubDispatch(embeddedHubClient.Dispatch)
 			embeddedHubDone = make(chan struct{})
 			go func() {
 				port := embeddedServer.Port()
