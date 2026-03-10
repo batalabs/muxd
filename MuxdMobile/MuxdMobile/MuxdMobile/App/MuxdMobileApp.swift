@@ -57,6 +57,7 @@ struct MuxdMobileApp: App {
             options.dsn = dsn
             options.enableAutoSessionTracking = true
             options.enableCaptureFailedRequests = true
+            options.enableLogs = true
             #if DEBUG
             options.debug = true
             options.environment = "development"
