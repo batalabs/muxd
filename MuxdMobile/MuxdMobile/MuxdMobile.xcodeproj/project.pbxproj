@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B26100A42F50FD990072C740 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B26100A32F50FD990072C740 /* MarkdownUI */; };
+		B274B9B42F5FB25000EFFC35 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = B274B9B32F5FB25000EFFC35 /* PostHog */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26100A42F50FD990072C740 /* MarkdownUI in Frameworks */,
+				B274B9B42F5FB25000EFFC35 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,6 +88,7 @@
 			name = MuxdMobile;
 			packageProductDependencies = (
 				B26100A32F50FD990072C740 /* MarkdownUI */,
+				B274B9B32F5FB25000EFFC35 /* PostHog */,
 			);
 			productName = MuxdMobile;
 			productReference = B2C32EB92F4F338E0058B6FE /* MuxdMobile.app */;
@@ -117,6 +120,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B26100A22F50FD990072C740 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				B274B9B22F5FB25000EFFC35 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B2C32EBA2F4F338E0058B6FE /* Products */;
@@ -277,7 +281,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 339446G6GX;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = MuxdMobile/Info.plist;
@@ -305,7 +309,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 339446G6GX;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = MuxdMobile/Info.plist;
@@ -358,6 +362,14 @@
 				minimumVersion = 2.4.1;
 			};
 		};
+		B274B9B22F5FB25000EFFC35 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.45.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -365,6 +377,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B26100A22F50FD990072C740 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		B274B9B32F5FB25000EFFC35 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B274B9B22F5FB25000EFFC35 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

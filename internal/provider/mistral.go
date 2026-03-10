@@ -97,6 +97,9 @@ func (p *MistralProvider) StreamMessage(
 			errType = errResp.Error.Type
 			errMessage = errResp.Error.Message
 		}
+		if resp.StatusCode == 400 && historyHasImages(history) {
+			errMessage += " (this model may not support images — try a vision-capable model)"
+		}
 		return nil, "", Usage{}, NewAPIError(resp.StatusCode, errType, errMessage, resp.Header)
 	}
 
