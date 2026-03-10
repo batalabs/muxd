@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/batalabs/muxd/internal/daemon"
 )
 
 const nodeClientTimeout = 10 * time.Second
@@ -234,4 +238,133 @@ func (c *NodeClient) Heartbeat(nodeID string, info ...NodeInfo) error {
 		return fmt.Errorf("hub heartbeat failed: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// Dispatch sends a task to a remote node via the hub proxy. It creates a
+// session on the target node, submits the prompt, reads the SSE stream to
+// collect the agent's text output, and returns it.
+func (c *NodeClient) Dispatch(nodeIDOrName, prompt string) (string, error) {
+	// 1. Resolve node name → node ID.
+	nodeID, err := c.resolveNodeID(nodeIDOrName)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. Create a session on the target node via hub proxy.
+	sessionID, err := c.proxyCreateSession(nodeID)
+	if err != nil {
+		return "", fmt.Errorf("creating remote session: %w", err)
+	}
+
+	// 3. Submit the prompt and collect SSE output.
+	result, err := c.proxySubmit(nodeID, sessionID, prompt)
+	if err != nil {
+		return "", fmt.Errorf("remote submit: %w", err)
+	}
+
+	return result, nil
+}
+
+// resolveNodeID looks up a node by name or ID from the hub's node list.
+func (c *NodeClient) resolveNodeID(nameOrID string) (string, error) {
+	nodes, err := c.ListNodes()
+	if err != nil {
+		return "", fmt.Errorf("listing nodes: %w", err)
+	}
+
+	lower := strings.ToLower(nameOrID)
+	for _, n := range nodes {
+		if n.ID == nameOrID || strings.ToLower(n.Name) == lower {
+			if n.Status != "online" {
+				return "", fmt.Errorf("node %q is %s (not online)", n.Name, n.Status)
+			}
+			return n.ID, nil
+		}
+	}
+	return "", fmt.Errorf("node %q not found", nameOrID)
+}
+
+// proxyCreateSession creates a new session on a remote node via the hub proxy.
+func (c *NodeClient) proxyCreateSession(nodeID string) (string, error) {
+	body, _ := json.Marshal(map[string]string{"project_path": "__hub_dispatch__"})
+	url := fmt.Sprintf("%s/api/hub/proxy/%s/api/sessions", c.baseURL, nodeID)
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.hubToken)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(raw))
+	}
+
+	var result struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decoding session response: %w", err)
+	}
+	return result.SessionID, nil
+}
+
+// proxySubmit submits a prompt to a remote session via the hub proxy and
+// collects the agent's text output from the SSE stream.
+func (c *NodeClient) proxySubmit(nodeID, sessionID, prompt string) (string, error) {
+	body, _ := json.Marshal(map[string]string{"text": prompt})
+	url := fmt.Sprintf("%s/api/hub/proxy/%s/api/sessions/%s/submit", c.baseURL, nodeID, sessionID)
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.hubToken)
+
+	// No timeout — agent loops can take a long time.
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(raw))
+	}
+
+	const maxOutput = 50 * 1024
+	var output strings.Builder
+
+	err = daemon.ParseSSEStream(resp.Body, func(evt daemon.SSEEvent) {
+		switch evt.Type {
+		case "delta":
+			if output.Len() < maxOutput {
+				output.WriteString(evt.DeltaText)
+			}
+		case "error":
+			if evt.ErrorMsg != "" {
+				output.WriteString("\nError: " + evt.ErrorMsg)
+			}
+		}
+	})
+	if err != nil {
+		return "", fmt.Errorf("reading SSE stream: %w", err)
+	}
+
+	result := output.String()
+	if len(result) > maxOutput {
+		result = result[:maxOutput] + "\n... (truncated at 50KB)"
+	}
+
+	return result, nil
 }
