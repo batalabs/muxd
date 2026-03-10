@@ -74,7 +74,8 @@ type ToolContext struct {
 	BraveAPIKey        string
 	TextbeltAPIKey     string
 	MCP                MCPManager
-	HubDiscovery       func() ([]HubNodeInfo, error) // returns node info from hub
+	HubDiscovery       func() ([]HubNodeInfo, error)              // returns node info from hub
+	HubDispatch        func(nodeIDOrName, prompt string) (string, error) // dispatch task to remote node
 }
 
 // ToolFunc is the signature for tool execution functions.
@@ -124,6 +125,7 @@ func AllTools() []ToolDef {
 		scheduleListTool(),
 		scheduleCancelTool(),
 		hubDiscoveryTool(),
+		hubDispatchTool(),
 	}
 }
 

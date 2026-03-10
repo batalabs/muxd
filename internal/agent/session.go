@@ -306,6 +306,13 @@ func (a *Service) SetHubDiscovery(fn func() ([]tools.HubNodeInfo, error)) {
 	a.hubDiscovery = fn
 }
 
+// SetHubDispatch sets the callback for dispatching tasks to remote hub nodes.
+func (a *Service) SetHubDispatch(fn func(string, string) (string, error)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.hubDispatch = fn
+}
+
 // SetDisabledTools replaces the user-disabled tools set.
 func (a *Service) SetDisabledTools(disabled map[string]bool) {
 	a.mu.Lock()

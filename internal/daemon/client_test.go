@@ -291,7 +291,7 @@ func TestParseSSEStream_toleratesUnexpectedEOFAfterCompletion(t *testing.T) {
 
 	r := &unexpectedEOFReader{buf: bytes.NewBufferString(input)}
 	var events []SSEEvent
-	err := parseSSEStream(r, func(evt SSEEvent) {
+	err := ParseSSEStream(r, func(evt SSEEvent) {
 		events = append(events, evt)
 	})
 	if err != nil {
@@ -305,7 +305,7 @@ func TestParseSSEStream_toleratesUnexpectedEOFAfterCompletion(t *testing.T) {
 func TestParseSSEStream_unexpectedEOFBeforeCompletionReturnsError(t *testing.T) {
 	input := "event: delta\ndata: {\"text\":\"partial\"}\n\n"
 	r := &unexpectedEOFReader{buf: bytes.NewBufferString(input)}
-	err := parseSSEStream(r, func(SSEEvent) {})
+	err := ParseSSEStream(r, func(SSEEvent) {})
 	if err == nil {
 		t.Fatal("expected error")
 	}

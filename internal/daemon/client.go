@@ -276,7 +276,7 @@ func (c *DaemonClient) Submit(sessionID, text string, images []SubmitImage, onEv
 		return fmt.Errorf("submit failed (HTTP %d): %s", resp.StatusCode, string(raw))
 	}
 
-	return parseSSEStream(resp.Body, onEvent)
+	return ParseSSEStream(resp.Body, onEvent)
 }
 
 // Cancel cancels the running agent loop for a session.
@@ -483,7 +483,7 @@ func (c *DaemonClient) BaseURL() string {
 // SSE parsing
 // ---------------------------------------------------------------------------
 
-func parseSSEStream(body io.Reader, onEvent func(SSEEvent)) error {
+func ParseSSEStream(body io.Reader, onEvent func(SSEEvent)) error {
 	scanner := bufio.NewScanner(body)
 	// Increase buffer size for large tool results
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

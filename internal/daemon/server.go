@@ -68,6 +68,7 @@ type Server struct {
 	logger        *config.Logger
 	pushHubMemory func(facts map[string]string) error
 	hubDiscovery  func() ([]tools.HubNodeInfo, error)
+	hubDispatch   func(nodeIDOrName, prompt string) (string, error)
 }
 
 // NewServer creates a new daemon server.
@@ -153,6 +154,11 @@ func (s *Server) SetPushHubMemory(fn func(facts map[string]string) error) {
 // SetHubDiscovery sets the callback for querying hub nodes.
 func (s *Server) SetHubDiscovery(fn func() ([]tools.HubNodeInfo, error)) {
 	s.hubDiscovery = fn
+}
+
+// SetHubDispatch sets the callback for dispatching tasks to remote hub nodes.
+func (s *Server) SetHubDispatch(fn func(nodeIDOrName, prompt string) (string, error)) {
+	s.hubDispatch = fn
 }
 
 // logf writes a timestamped log line if a logger is configured.
@@ -1117,6 +1123,11 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	// Wire hub discovery if configured
 	if s.hubDiscovery != nil {
 		ag.SetHubDiscovery(s.hubDiscovery)
+	}
+
+	// Wire hub dispatch if configured
+	if s.hubDispatch != nil {
+		ag.SetHubDispatch(s.hubDispatch)
 	}
 }
 
