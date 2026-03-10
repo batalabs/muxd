@@ -1,5 +1,2 @@
 // Example config for local development
 // Copy this file to Config.xcconfig and fill in your values
-
-POSTHOG_API_KEY = your_posthog_api_key_here
-POSTHOG_HOST = https://us.i.posthog.com

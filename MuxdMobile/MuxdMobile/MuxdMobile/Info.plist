@@ -57,9 +57,5 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>POSTHOG_API_KEY</key>
-	<string>$(POSTHOG_API_KEY)</string>
-	<key>POSTHOG_HOST</key>
-	<string>$(POSTHOG_HOST)</string>
 </dict>
 </plist>
