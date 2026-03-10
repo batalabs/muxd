@@ -1,4 +1,5 @@
 // Example config for local development
 // Copy this file to Config.xcconfig and fill in your values
 
-SENTRY_DSN = your_sentry_dsn_here
+// Note: use /$()/  to escape // in URLs (xcconfig treats // as comments)
+SENTRY_DSN = https:/$()/your_key@your_org.ingest.us.sentry.io/$()/your_project_id
