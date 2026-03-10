@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Sentry
 
 @MainActor
 class ChatViewModel: ObservableObject {
@@ -170,6 +171,7 @@ class ChatViewModel: ObservableObject {
 
         sseClient?.onError = { [weak self] error in
             Task { @MainActor [weak self] in
+                SentrySDK.logger.error("SSE streaming error", attributes: ["error": error.localizedDescription])
                 self?.error = error
                 self?.isStreaming = false
             }
@@ -250,6 +252,7 @@ class ChatViewModel: ObservableObject {
                     Task { await loadMessages() }
                     return
                 }
+                SentrySDK.logger.error("Server error", attributes: ["message": msg])
                 error = MuxdError.serverError(msg)
             }
             isStreaming = false

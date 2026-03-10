@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Sentry
 import UIKit
 
 @MainActor
@@ -66,6 +67,7 @@ class AppState: ObservableObject {
             }
 
             if healthResp.isHub {
+                SentrySDK.logger.info("Connected to hub", attributes: ["host": info.host, "port": info.port])
                 // Hub mode: store hub client, don't set isConnected yet (user must pick node)
                 hubClient = newClient
                 connectionMode = .hub
@@ -81,6 +83,7 @@ class AppState: ObservableObject {
                 // Pre-fetch nodes
                 await refreshNodes()
             } else {
+                SentrySDK.logger.info("Connected to daemon", attributes: ["host": info.host, "port": info.port])
                 // Daemon mode: existing flow
                 client = newClient
                 sseClient = SSEClient(host: info.host, port: info.port, token: info.token)
@@ -99,6 +102,7 @@ class AppState: ObservableObject {
                 hapticSuccess()
             }
         } catch MuxdError.unauthorized {
+            SentrySDK.logger.warn("Connection unauthorized", attributes: ["host": info.host])
             resetConnectionState()
             KeychainHelper.deleteConnectionInfo()
             if !silent {
@@ -106,6 +110,7 @@ class AppState: ObservableObject {
                 hapticError()
             }
         } catch {
+            SentrySDK.logger.error("Connection failed", attributes: ["host": info.host, "error": error.localizedDescription])
             resetConnectionState()
             if !silent {
                 self.error = .connectionFailed(error.localizedDescription)

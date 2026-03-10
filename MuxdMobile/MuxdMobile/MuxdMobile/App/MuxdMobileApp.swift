@@ -65,6 +65,7 @@ struct MuxdMobileApp: App {
             options.environment = "production"
             #endif
         }
+        SentrySDK.logger.info("App launched")
     }
 
     var body: some Scene {
