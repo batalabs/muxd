@@ -1,3 +1,4 @@
+import Sentry
 import SwiftUI
 
 struct AppGlassModifier: ViewModifier {
@@ -48,6 +49,23 @@ struct MuxdMobileApp: App {
     @StateObject private var biometricManager = BiometricManager()
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        let dsn = Bundle.main.infoDictionary?["SENTRY_DSN"] as? String ?? ""
+        if !dsn.isEmpty {
+            SentrySDK.start { options in
+                options.dsn = dsn
+                options.enableAutoSessionTracking = true
+                options.enableCaptureFailedRequests = true
+                #if DEBUG
+                options.debug = true
+                options.environment = "development"
+                #else
+                options.environment = "production"
+                #endif
+            }
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

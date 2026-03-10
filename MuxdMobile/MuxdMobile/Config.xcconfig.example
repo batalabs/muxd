@@ -1,2 +1,4 @@
 // Example config for local development
 // Copy this file to Config.xcconfig and fill in your values
+
+SENTRY_DSN = your_sentry_dsn_here

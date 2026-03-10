@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B26100A42F50FD990072C740 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B26100A32F50FD990072C740 /* MarkdownUI */; };
+		B2A1F0012F6F000000000001 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = B2A1F0002F6F000000000001 /* Sentry */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26100A42F50FD990072C740 /* MarkdownUI in Frameworks */,
+				B2A1F0012F6F000000000001 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,6 +88,7 @@
 			name = MuxdMobile;
 			packageProductDependencies = (
 				B26100A32F50FD990072C740 /* MarkdownUI */,
+				B2A1F0002F6F000000000001 /* Sentry */,
 			);
 			productName = MuxdMobile;
 			productReference = B2C32EB92F4F338E0058B6FE /* MuxdMobile.app */;
@@ -117,6 +120,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B26100A22F50FD990072C740 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				B2A1F0022F6F000000000001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B2C32EBA2F4F338E0058B6FE /* Products */;
@@ -358,6 +362,14 @@
 				minimumVersion = 2.4.1;
 			};
 		};
+		B2A1F0022F6F000000000001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.49.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -365,6 +377,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B26100A22F50FD990072C740 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		B2A1F0002F6F000000000001 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B2A1F0022F6F000000000001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
