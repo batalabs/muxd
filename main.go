@@ -283,13 +283,29 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
+				heartbeatFailures := 0
 				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
 					case <-ticker.C:
 						if err := hubClient.Heartbeat(nodeID, buildNodeInfo(srv)); err != nil {
-							fmt.Fprintf(os.Stderr, "hub: heartbeat failed: %v\n", err)
+							heartbeatFailures++
+							fmt.Fprintf(os.Stderr, "hub: heartbeat failed (%d): %v\n", heartbeatFailures, err)
+							if heartbeatFailures >= 3 {
+								fmt.Fprintf(os.Stderr, "hub: attempting re-registration...\n")
+								newID, regErr := hubClient.Register(name, regHost, port, version, buildNodeInfo(srv))
+								if regErr != nil {
+									fmt.Fprintf(os.Stderr, "hub: re-registration failed: %v\n", regErr)
+								} else {
+									nodeID = newID
+									hubNodeID = nodeID
+									heartbeatFailures = 0
+									fmt.Fprintf(os.Stderr, "hub: re-registered as node %s\n", nodeID)
+								}
+							}
+						} else {
+							heartbeatFailures = 0
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
@@ -411,13 +427,29 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
+				heartbeatFailures := 0
 				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
 					case <-ticker.C:
 						if err := embeddedHubClient.Heartbeat(nodeID, buildNodeInfo(embeddedServer)); err != nil {
-							logStderr("hub: heartbeat failed: %v", err)
+							heartbeatFailures++
+							logStderr("hub: heartbeat failed (%d): %v", heartbeatFailures, err)
+							if heartbeatFailures >= 3 {
+								logStderr("hub: attempting re-registration...")
+								newID, regErr := embeddedHubClient.Register(name, regHost, port, version, buildNodeInfo(embeddedServer))
+								if regErr != nil {
+									logStderr("hub: re-registration failed: %v", regErr)
+								} else {
+									nodeID = newID
+									embeddedHubNodeID = nodeID
+									heartbeatFailures = 0
+									logStderr("hub: re-registered as node %s", nodeID)
+								}
+							}
+						} else {
+							heartbeatFailures = 0
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
