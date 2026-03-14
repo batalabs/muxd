@@ -69,6 +69,8 @@ type Server struct {
 	pushHubMemory func(facts map[string]string) error
 	hubDiscovery  func() ([]tools.HubNodeInfo, error)
 	hubDispatch   func(nodeIDOrName, prompt string) (string, error)
+
+	customToolRegistry *tools.CustomToolRegistry
 }
 
 // NewServer creates a new daemon server.
@@ -159,6 +161,13 @@ func (s *Server) SetHubDiscovery(fn func() ([]tools.HubNodeInfo, error)) {
 // SetHubDispatch sets the callback for dispatching tasks to remote hub nodes.
 func (s *Server) SetHubDispatch(fn func(nodeIDOrName, prompt string) (string, error)) {
 	s.hubDispatch = fn
+}
+
+// SetCustomToolRegistry sets the custom tool registry used by all agents on this server.
+func (s *Server) SetCustomToolRegistry(r *tools.CustomToolRegistry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.customToolRegistry = r
 }
 
 // logf writes a timestamped log line if a logger is configured.
@@ -1100,6 +1109,10 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	}
 	if s.mcpManager != nil {
 		ag.SetMCPManager(s.mcpManager)
+	}
+
+	if s.customToolRegistry != nil {
+		ag.SetCustomTools(s.customToolRegistry)
 	}
 
 	// Detect git repo

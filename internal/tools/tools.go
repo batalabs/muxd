@@ -78,6 +78,7 @@ type ToolContext struct {
 	MCP                MCPManager
 	HubDiscovery       func() ([]HubNodeInfo, error)                     // returns node info from hub
 	HubDispatch        func(nodeIDOrName, prompt string) (string, error) // dispatch task to remote node
+	CustomTools        *CustomToolRegistry
 }
 
 // ToolFunc is the signature for tool execution functions.
@@ -128,6 +129,9 @@ func AllTools() []ToolDef {
 		scheduleCancelTool(),
 		hubDiscoveryTool(),
 		hubDispatchTool(),
+		toolCreateDef(),
+		toolRegisterDef(),
+		toolListCustomDef(),
 	}
 }
 
@@ -149,6 +153,28 @@ func FindTool(name string) (ToolDef, bool) {
 		}
 	}
 	return ToolDef{}, false
+}
+
+// FindToolWithCustom looks up a tool by name, checking built-in tools first
+// and then the provided custom tool registry.
+func FindToolWithCustom(name string, registry *CustomToolRegistry) *ToolDef {
+	if t, ok := FindTool(name); ok {
+		return &t
+	}
+	if registry == nil {
+		return nil
+	}
+	def := registry.Find(name)
+	if def == nil {
+		return nil
+	}
+	td := ToolDef{
+		Spec: def.ToSpec(),
+		Execute: func(input map[string]any, ctx *ToolContext) (string, error) {
+			return registry.Execute(def.Name, input, ctx.Cwd)
+		},
+	}
+	return &td
 }
 
 // ToolNames returns all built-in tool names, sorted alphabetically.
