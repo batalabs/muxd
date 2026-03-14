@@ -162,6 +162,9 @@ type Service struct {
 	// mcpManager manages MCP server connections and tool routing.
 	mcpManager *mcp.Manager
 
+	// customTools holds user-defined tools for this agent.
+	customTools *tools.CustomToolRegistry
+
 	// memory is the per-project persistent fact store.
 	memory *tools.ProjectMemory
 

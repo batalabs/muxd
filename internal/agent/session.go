@@ -285,6 +285,13 @@ func (a *Service) SetMCPManager(m *mcp.Manager) {
 	a.mcpManager = m
 }
 
+// SetCustomTools sets the custom tool registry for this agent.
+func (a *Service) SetCustomTools(r *tools.CustomToolRegistry) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.customTools = r
+}
+
 // SetMemory sets the per-project memory store.
 func (a *Service) SetMemory(m *tools.ProjectMemory) {
 	a.mu.Lock()

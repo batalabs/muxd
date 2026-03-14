@@ -113,6 +113,7 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			BraveAPIKey:    a.braveAPIKey,
 			TextbeltAPIKey: a.textbeltAPIKey,
 			MCP:            mcpMgr,
+			CustomTools:    a.customTools,
 		}
 		if schedStore, ok := a.store.(ScheduledToolJobStore); ok {
 			toolCtx.ScheduleTool = schedStore.CreateScheduledToolJob
@@ -178,6 +179,14 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 				if !disabled[spec.Name] {
 					toolSpecs = append(toolSpecs, spec)
 					mcpToolNames = append(mcpToolNames, spec.Name)
+				}
+			}
+		}
+		// Append custom tool specs (filtered by disabled set).
+		if toolCtx.CustomTools != nil {
+			for _, spec := range toolCtx.CustomTools.Specs() {
+				if !disabled[spec.Name] {
+					toolSpecs = append(toolSpecs, spec)
 				}
 			}
 		}

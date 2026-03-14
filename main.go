@@ -250,6 +250,14 @@ func main() {
 	}
 	defer func() { _ = st.Close() }()
 
+	// Create and load the custom tool registry (persistent tools from disk).
+	customToolRegistry := tools.NewCustomToolRegistry()
+	if ctDir, err := tools.CustomToolsDir(); err == nil {
+		if err := customToolRegistry.LoadFromDir(ctDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: loading custom tools: %v\n", err)
+		}
+	}
+
 	// Agent factory for the daemon server
 	agentFactory := func(key, mID, mLabel string, s *store.Store, sess *domain.Session, p provider.Provider) *agent.Service {
 		return agent.NewService(key, mID, mLabel, s, sess, p)
@@ -272,6 +280,7 @@ func main() {
 		srv.SetDetectGitRepo(checkpoint.DetectGitRepo)
 		srv.SetBindAddress(bindAddr)
 		srv.SetLogger(logger)
+		srv.SetCustomToolRegistry(customToolRegistry)
 
 		// Handle graceful shutdown
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -412,6 +421,7 @@ func main() {
 		embeddedServer.SetQuiet(true)
 		embeddedServer.SetBindAddress(bindAddr)
 		embeddedServer.SetLogger(logger)
+		embeddedServer.SetCustomToolRegistry(customToolRegistry)
 		go func() {
 			if err := embeddedServer.Start(4096); err != nil {
 				logStderr("embedded server error: %v", err)
