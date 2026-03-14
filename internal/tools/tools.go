@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/batalabs/muxd/internal/config"
+	"github.com/batalabs/muxd/internal/diff"
+	"github.com/batalabs/muxd/internal/docread"
 	"github.com/batalabs/muxd/internal/provider"
 )
 
@@ -266,6 +268,32 @@ func fileReadTool() ToolDef {
 				limit = int(v)
 			}
 
+			ext := strings.ToLower(filepath.Ext(path))
+			if docread.CanExtract(ext) {
+				text, err := docread.Extract(path)
+				if err != nil {
+					return "", fmt.Errorf("reading document: %w", err)
+				}
+				header := fmt.Sprintf("[Extracted from %s (%s)]\n\n", filepath.Base(path), strings.TrimPrefix(ext, "."))
+				fullText := header + text
+				lines := strings.Split(fullText, "\n")
+				start := 0
+				if offset > 1 {
+					start = offset - 1
+					if start >= len(lines) {
+						start = len(lines)
+					}
+				}
+				end := len(lines)
+				if limit > 0 {
+					end = start + limit
+					if end > len(lines) {
+						end = len(lines)
+					}
+				}
+				return strings.Join(lines[start:end], "\n"), nil
+			}
+
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return "", fmt.Errorf("reading %s: %w", path, err)
@@ -327,6 +355,9 @@ func fileWriteTool() ToolDef {
 			}
 			content, _ := input["content"].(string)
 
+			oldBytes, readErr := os.ReadFile(path)
+			isNew := readErr != nil
+
 			dir := filepath.Dir(path)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return "", fmt.Errorf("creating directories: %w", err)
@@ -337,7 +368,16 @@ func fileWriteTool() ToolDef {
 			}
 
 			lines := strings.Count(content, "\n") + 1
-			return fmt.Sprintf("Wrote %d bytes (%d lines) to %s", len(content), lines, path), nil
+			result := fmt.Sprintf("Wrote %d bytes (%d lines) to %s", len(content), lines, path)
+
+			if !isNew {
+				d := diff.ComputeUnifiedDiff(string(oldBytes), content, filepath.Base(path))
+				if d != "" {
+					result += diff.DiffSentinel + d
+				}
+			}
+
+			return result, nil
 		},
 	}
 }
@@ -400,7 +440,12 @@ func fileEditTool() ToolDef {
 				return "", fmt.Errorf("writing %s: %w", path, err)
 			}
 
-			return fmt.Sprintf("Edited %s: replaced %d occurrence(s) of %d bytes with %d bytes", path, count, len(oldStr), len(newStr)), nil
+			result := fmt.Sprintf("Edited %s: replaced %d occurrence(s) of %d bytes with %d bytes", path, count, len(oldStr), len(newStr))
+			d := diff.ComputeUnifiedDiff(content, newContent, filepath.Base(path))
+			if d != "" {
+				result += diff.DiffSentinel + d
+			}
+			return result, nil
 		},
 	}
 }

@@ -63,6 +63,46 @@ func ExtractImagePaths(text string) (paths []string, remaining string) {
 	return found, result
 }
 
+// docPathRe matches file paths ending with a document extension.
+// Handles: /unix/paths, C:\windows\paths, relative/paths, "quoted paths"
+var docPathRe = regexp.MustCompile(`(?i)(?:"([^"]+\.(?:pdf|docx|xlsx|pptx|html?|csv|json|xml))"|([^\s"]+\.(?:pdf|docx|xlsx|pptx|html?|csv|json|xml)))`)
+
+// ExtractDocPaths scans text for file paths ending in document extensions.
+// Returns the list of paths that exist on disk and the remaining text with paths removed.
+func ExtractDocPaths(text string) (paths []string, remaining string) {
+	matches := docPathRe.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return nil, text
+	}
+
+	var found []string
+	result := text
+	// Process matches in reverse so index shifting doesn't affect earlier matches.
+	for i := len(matches) - 1; i >= 0; i-- {
+		m := matches[i]
+		fullStart, fullEnd := m[0], m[1]
+
+		// Extract the path from whichever capture group matched.
+		var path string
+		if m[2] >= 0 { // quoted group
+			path = text[m[2]:m[3]]
+		} else { // unquoted group
+			path = text[m[4]:m[5]]
+		}
+
+		if !fileExists(path) {
+			continue
+		}
+
+		found = append([]string{path}, found...)
+		result = result[:fullStart] + result[fullEnd:]
+	}
+
+	// Collapse multiple spaces left by path removal.
+	result = strings.Join(strings.Fields(result), " ")
+	return found, result
+}
+
 // fileExists reports whether path exists and is a regular file.
 func fileExists(path string) bool {
 	info, err := os.Stat(path)

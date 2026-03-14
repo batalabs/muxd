@@ -10,6 +10,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/batalabs/muxd/internal/diff"
 	"github.com/batalabs/muxd/internal/domain"
 )
 
@@ -817,14 +818,23 @@ func ToolResultHeader(toolName, result string) string {
 func FormatToolResult(toolName, result string, isError bool, width int) string {
 	style := ToolResultStyle
 	var label string
+
+	// Split off any diff appended via diff.DiffSentinel.
+	toolOutput := result
+	diffText := ""
+	if idx := strings.Index(result, diff.DiffSentinel); idx != -1 {
+		toolOutput = result[:idx]
+		diffText = result[idx+len(diff.DiffSentinel):]
+	}
+
 	if isError {
 		label = "[error] " + toolName
 		style = ErrorLineStyle
 	} else {
-		label = ToolResultHeader(toolName, result)
+		label = ToolResultHeader(toolName, toolOutput)
 	}
 
-	lines := strings.Split(result, "\n")
+	lines := strings.Split(toolOutput, "\n")
 	if len(lines) > 20 {
 		lines = append(lines[:20], fmt.Sprintf("... (%d more lines)", len(lines)-20))
 	}
@@ -835,10 +845,21 @@ func FormatToolResult(toolName, result string, isError bool, width int) string {
 	}
 
 	header := style.Render(label)
+	var out string
 	if strings.TrimSpace(truncated) == "" {
-		return header
+		out = header
+	} else {
+		out = header + "\n" + ToolInputStyle.Render(truncated)
 	}
-	return header + "\n" + ToolInputStyle.Render(truncated)
+
+	if diffText != "" {
+		rendered := RenderDiff(diffText, width)
+		if rendered != "" {
+			out = out + "\n" + rendered
+		}
+	}
+
+	return out
 }
 
 // FormatMessageForScrollback renders a single transcript message into a

@@ -21,6 +21,8 @@ import (
 
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/daemon"
+	"github.com/batalabs/muxd/internal/diff"
+	"github.com/batalabs/muxd/internal/docread"
 	"github.com/batalabs/muxd/internal/domain"
 	"github.com/batalabs/muxd/internal/hub"
 	"github.com/batalabs/muxd/internal/mcp"
@@ -523,7 +525,13 @@ func (m Model) handleToolStatus(msg ToolStatusMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleToolResult(msg ToolResultMsg) (tea.Model, tea.Cmd) {
 	m.toolStatus = fmt.Sprintf("Finished %s, waiting for model...", msg.Name)
 	m.appendRuntimeLog(fmt.Sprintf("tool_done: %s error=%t bytes=%d", msg.Name, msg.IsError, len(msg.Result)))
-	resultFormatted := FormatToolResult(msg.Name, msg.Result, msg.IsError, max(20, m.width-4))
+	result := msg.Result
+	if m.Prefs.HideDiffs {
+		if idx := strings.Index(result, diff.DiffSentinel); idx != -1 {
+			result = result[:idx]
+		}
+	}
+	resultFormatted := FormatToolResult(msg.Name, result, msg.IsError, max(20, m.width-4))
 	return m, PrintToScrollback(resultFormatted)
 }
 
@@ -1421,6 +1429,19 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 
 	// Detect image paths in the input and build multi-block message if found.
 	imgPaths, remainingText := tools.ExtractImagePaths(trimmed)
+
+	// Detect document paths and inline their extracted text into the message.
+	docPaths, remainingText2 := tools.ExtractDocPaths(remainingText)
+	remainingText = remainingText2
+	for _, docPath := range docPaths {
+		text, err := docread.Extract(docPath)
+		if err != nil {
+			continue // skip unreadable docs
+		}
+		header := fmt.Sprintf("[Document: %s]\n", filepath.Base(docPath))
+		remainingText = header + text + "\n\n" + remainingText
+	}
+
 	var userMsg domain.TranscriptMessage
 	var images []daemon.SubmitImage
 
