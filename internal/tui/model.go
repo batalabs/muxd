@@ -143,6 +143,12 @@ type HubSyncMsg struct {
 	Count int
 }
 
+// ConsultResponseMsg carries a second-opinion response from the consult model.
+type ConsultResponseMsg struct {
+	Model string
+	Text  string
+}
+
 // Checkpoint represents a snapshot of the working tree.
 type Checkpoint struct {
 	TurnNumber int
@@ -444,6 +450,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case HubSyncMsg:
 		text := fmt.Sprintf("[hub] synced %d memory facts", msg.Count)
 		return m, PrintToScrollback(HubStyle.Render(text))
+
+	case ConsultResponseMsg:
+		formatted := FormatConsultResponse(msg.Model, msg.Text, m.width)
+		return m, PrintToScrollback(formatted)
 
 	case spinner.TickMsg:
 		if m.thinking {
@@ -1768,6 +1778,37 @@ func (m Model) handleSlashCommand(input string) (tea.Model, tea.Cmd) {
 	case "/schedule":
 		return m.handleScheduleCommand(parts[1:])
 
+	case "/consult":
+		question := strings.TrimSpace(strings.TrimPrefix(clean, "/consult"))
+		if question == "" {
+			// Auto-build from last user+assistant messages in m.messages
+			var lastUser, lastAsst string
+			for _, msg := range m.messages {
+				if msg.Role == "user" && msg.Content != "" {
+					lastUser = msg.Content
+				} else if msg.Role == "assistant" && msg.Content != "" {
+					lastAsst = msg.Content
+				}
+			}
+			if lastUser == "" && lastAsst == "" {
+				return m, PrintToScrollback(m.renderError("No conversation to consult about"))
+			}
+			if lastUser != "" {
+				question = "User asked: " + lastUser
+			}
+			if lastAsst != "" {
+				if question != "" {
+					question += "\n\nAssistant responded: " + lastAsst
+				} else {
+					question = "Assistant responded: " + lastAsst
+				}
+			}
+		}
+		if m.Daemon == nil {
+			return m, PrintToScrollback(m.renderError("Consult requires a daemon connection."))
+		}
+		return m, ConsultCmd(m.Daemon, m.Session.ID, question)
+
 	case "/help":
 		cmds := domain.CommandHelp()
 		grouped := make(map[string][]domain.CommandDef)
@@ -3048,6 +3089,20 @@ func SendAskResponseCmd(d *daemon.DaemonClient, sessionID, askID, answer string)
 			fmt.Fprintf(os.Stderr, "tui: send ask response: %v\n", err)
 		}
 		return nil
+	}
+}
+
+// ConsultCmd sends a consult request to the daemon and returns a ConsultResponseMsg.
+func ConsultCmd(d *daemon.DaemonClient, sessionID, question string) tea.Cmd {
+	return func() tea.Msg {
+		if d == nil {
+			return ConsultResponseMsg{Model: "", Text: "No daemon connection."}
+		}
+		model, response, err := d.Consult(sessionID, question)
+		if err != nil {
+			return ConsultResponseMsg{Model: "", Text: "Consult error: " + err.Error()}
+		}
+		return ConsultResponseMsg{Model: model, Text: response}
 	}
 }
 
