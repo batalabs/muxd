@@ -67,12 +67,7 @@ func extractSlideText(f *zip.File) (string, error) {
 	}
 	defer rc.Close()
 
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return "", err
-	}
-
-	dec := xml.NewDecoder(strings.NewReader(string(data)))
+	dec := xml.NewDecoder(rc)
 	var sb strings.Builder
 	for {
 		tok, err := dec.Token()
