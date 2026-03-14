@@ -9,9 +9,15 @@ import (
 )
 
 const (
-	// CompactThreshold is the input token count above which compaction runs.
-	// Set at 100k to compact early for tool-heavy workflows.
-	CompactThreshold = 100_000
+	// Tier1Threshold is the input token count above which tool result
+	// compression fires (no LLM call — just shortens verbose tool outputs).
+	Tier1Threshold = 60_000
+	// Tier2Threshold is the input token count above which old-turn collapse
+	// fires (no LLM call — replaces old turns with one-line summaries).
+	Tier2Threshold = 75_000
+	// Tier3Threshold is the input token count above which full LLM
+	// summarization runs (drops middle messages and generates a summary).
+	Tier3Threshold = 90_000
 	// CompactKeepTail is the number of trailing messages to keep.
 	CompactKeepTail = 20
 )
@@ -104,16 +110,53 @@ func CompactMessages(msgs []domain.TranscriptMessage) CompactResult {
 	}
 }
 
-// compactIfNeeded checks if context exceeds the threshold and performs
-// compaction with LLM-generated summary if needed.
-// Acts as a safety net -if server-side compaction (Anthropic) triggers first,
-// input tokens stay below threshold and this never activates.
+// compactIfNeeded applies tiered context compression when input tokens exceed
+// configured thresholds. The tiers are applied progressively:
+//
+//   - Tier 1 (>60k tokens): compress tool results in older messages (no LLM call).
+//   - Tier 2 (>75k tokens): collapse old turns to one-line summaries (no LLM call).
+//   - Tier 3 (>90k tokens): full LLM summarization — drops middle, generates summary.
+//
+// Each tier fires at most once before Tier 3 resets the flags for a fresh cycle.
 func (a *Service) compactIfNeeded(onEvent EventFunc) {
 	a.mu.Lock()
-	if a.lastInputTokens <= CompactThreshold {
+	inputTokens := a.lastInputTokens
+
+	// ── Tier 1: tool result compression ──────────────────────────────────
+	if inputTokens > Tier1Threshold && !a.tier1Applied {
+		tailStart := len(a.messages) - CompactKeepTail
+		if tailStart < 0 {
+			tailStart = 0
+		}
+		a.messages = compressTier1(a.messages, tailStart)
+		a.tier1Applied = true
+		a.mu.Unlock()
+		onEvent(Event{Kind: EventCompacted, ModelUsed: "tier1"})
+		return
+	}
+
+	// ── Tier 2: old turn collapse ────────────────────────────────────────
+	if inputTokens > Tier2Threshold && !a.tier2Applied {
+		tailStart := len(a.messages) - CompactKeepTail
+		if tailStart < 0 {
+			tailStart = 0
+		}
+		a.messages = compressTier2(a.messages, tailStart)
+		a.tier2Applied = true
+		a.mu.Unlock()
+		onEvent(Event{Kind: EventCompacted, ModelUsed: "tier2"})
+		return
+	}
+
+	// ── Tier 3: full LLM summarization ───────────────────────────────────
+	if inputTokens <= Tier3Threshold {
 		a.mu.Unlock()
 		return
 	}
+
+	// Reset tier flags so tiers 1 & 2 can fire again after this full recompaction.
+	a.tier1Applied = false
+	a.tier2Applied = false
 
 	result := CompactMessages(a.messages)
 	if !result.DidCompact {
@@ -129,7 +172,7 @@ func (a *Service) compactIfNeeded(onEvent EventFunc) {
 
 	onEvent(Event{Kind: EventToolStart, ToolUseID: "internal_compact", ToolName: "compact_context"})
 
-	// Generate LLM summary of dropped messages (unlocked -makes API call).
+	// Generate LLM summary of dropped messages (unlocked — makes API call).
 	summary := a.generateCompactionSummary(result.Dropped)
 
 	// Replace the placeholder user message with the real summary.
