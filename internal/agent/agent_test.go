@@ -796,8 +796,10 @@ func TestCompactIfNeeded(t *testing.T) {
 			apiKey:          "fake",
 			modelID:         "fake",
 			prov:            &testAnthropicProvider{},
-			lastInputTokens: CompactThreshold + 1,
+			lastInputTokens: Tier3Threshold + 1,
 			messages:        msgs,
+			tier1Applied:    true,
+			tier2Applied:    true,
 		}
 
 		var events []Event

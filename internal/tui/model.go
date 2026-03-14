@@ -3230,9 +3230,7 @@ func (m Model) plainTranscript() string {
 // ---------------------------------------------------------------------------
 
 const (
-	// CompactThreshold is the token count threshold for compaction.
-	CompactThreshold = 100_000
-	// CompactKeepTail is the number of recent messages to keep.
+	// CompactKeepTail is the number of recent messages to keep during compaction.
 	CompactKeepTail = 20
 )
 
