@@ -726,10 +726,10 @@ func TestNodeClient_resolveNodeID(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		input     string
-		wantID    string
-		wantErr   string
+		name    string
+		input   string
+		wantID  string
+		wantErr string
 	}{
 		{
 			name:   "resolve by exact ID",
@@ -790,12 +790,12 @@ func TestNodeClient_resolveNodeID(t *testing.T) {
 
 func TestNodeClient_proxyCreateSession(t *testing.T) {
 	tests := []struct {
-		name          string
-		nodeID        string
-		serverStatus  int
-		sessionID     string
-		wantErr       bool
-		checkRequest  bool
+		name         string
+		nodeID       string
+		serverStatus int
+		sessionID    string
+		wantErr      bool
+		checkRequest bool
 	}{
 		{
 			name:         "success: correct path auth body returns session_id",
