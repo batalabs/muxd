@@ -24,7 +24,7 @@ func extractXLSX(path string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("reading sheet %q: %w", sheet, err)
 		}
-		sb.WriteString(fmt.Sprintf("--- Sheet: %s ---\n", sheet))
+		fmt.Fprintf(&sb, "--- Sheet: %s ---\n", sheet)
 		for _, row := range rows {
 			sb.WriteString(strings.Join(row, "\t"))
 			sb.WriteByte('\n')
