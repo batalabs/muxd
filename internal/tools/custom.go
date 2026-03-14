@@ -3,8 +3,12 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -197,4 +201,69 @@ func (r *CustomToolRegistry) Execute(name string, input map[string]any, cwd stri
 		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.String(), nil
+}
+
+// CustomToolsDir returns the path to the user's custom tools directory:
+// ~/.config/muxd/tools/
+func CustomToolsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving home dir: %w", err)
+	}
+	return filepath.Join(home, ".config", "muxd", "tools"), nil
+}
+
+// SaveTool writes def as an indented JSON file to <dir>/<name>.json,
+// creating dir if it does not exist.
+func SaveTool(dir string, def *CustomToolDef) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("creating tools dir: %w", err)
+	}
+	data, err := json.MarshalIndent(def, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling tool %q: %w", def.Name, err)
+	}
+	dest := filepath.Join(dir, def.Name+".json")
+	if err := os.WriteFile(dest, data, 0o644); err != nil {
+		return fmt.Errorf("writing tool file %q: %w", dest, err)
+	}
+	return nil
+}
+
+// LoadFromDir scans dir for *.json files, parses each as a CustomToolDef,
+// marks it Persistent, resolves relative Script paths against dir, and
+// registers it. Invalid or duplicate files are silently skipped.
+// Returns nil if dir does not exist.
+func (r *CustomToolRegistry) LoadFromDir(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("reading tools dir %q: %w", dir, err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var def CustomToolDef
+		if err := json.Unmarshal(data, &def); err != nil {
+			continue
+		}
+		def.Persistent = true
+		if def.Script != "" && !filepath.IsAbs(def.Script) {
+			def.Script = filepath.Join(dir, def.Script)
+		}
+		// Silently ignore invalid or duplicate registrations.
+		_ = r.Register(&def)
+	}
+	return nil
 }

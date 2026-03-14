@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -279,5 +281,105 @@ func TestCustomToolRegistry_Specs(t *testing.T) {
 	}
 	if len(spec.Required) != 1 || spec.Required[0] != "name" {
 		t.Errorf("spec.Required = %v, want [name]", spec.Required)
+	}
+}
+
+func TestCustomToolRegistry_SaveAndLoad(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+
+	def := &CustomToolDef{
+		Name:        "save_tool",
+		Description: "a saved tool",
+		Parameters: map[string]provider.ToolProp{
+			"msg": {Type: "string", Description: "message"},
+		},
+		Required: []string{"msg"},
+		Command:  "echo {{msg}}",
+	}
+
+	if err := SaveTool(dir, def); err != nil {
+		t.Fatalf("SaveTool error: %v", err)
+	}
+
+	// Verify file was created.
+	wantFile := filepath.Join(dir, "save_tool.json")
+	if _, err := os.Stat(wantFile); err != nil {
+		t.Fatalf("expected file %q to exist: %v", wantFile, err)
+	}
+
+	// Load into a fresh registry and verify round-trip.
+	reg := NewCustomToolRegistry()
+	if err := reg.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir error: %v", err)
+	}
+
+	got := reg.Find("save_tool")
+	if got == nil {
+		t.Fatal("Find returned nil after LoadFromDir")
+	}
+	if got.Name != def.Name {
+		t.Errorf("Name: got %q, want %q", got.Name, def.Name)
+	}
+	if got.Description != def.Description {
+		t.Errorf("Description: got %q, want %q", got.Description, def.Description)
+	}
+	if got.Command != def.Command {
+		t.Errorf("Command: got %q, want %q", got.Command, def.Command)
+	}
+	if !got.Persistent {
+		t.Error("Persistent should be true after LoadFromDir")
+	}
+	if len(got.Required) != 1 || got.Required[0] != "msg" {
+		t.Errorf("Required: got %v, want [msg]", got.Required)
+	}
+	prop, ok := got.Parameters["msg"]
+	if !ok {
+		t.Error("Parameters missing 'msg' key")
+	} else if prop.Type != "string" {
+		t.Errorf("Parameters[msg].Type = %q, want %q", prop.Type, "string")
+	}
+}
+
+func TestCustomToolRegistry_LoadFromDir_empty(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewCustomToolRegistry()
+	if err := reg.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir on empty dir returned error: %v", err)
+	}
+	if tools := reg.All(); len(tools) != 0 {
+		t.Errorf("expected 0 tools, got %d", len(tools))
+	}
+}
+
+func TestCustomToolRegistry_LoadFromDir_nonexistent(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "does_not_exist")
+	reg := NewCustomToolRegistry()
+	if err := reg.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir on nonexistent dir should return nil, got: %v", err)
+	}
+}
+
+func TestCustomToolRegistry_LoadFromDir_invalidJSON(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write bad JSON.
+	if err := os.WriteFile(filepath.Join(dir, "bad.json"), []byte("{not valid json"), 0o644); err != nil {
+		t.Fatalf("WriteFile error: %v", err)
+	}
+	// Write a valid tool alongside it.
+	valid := &CustomToolDef{Name: "good_tool", Command: "echo ok"}
+	if err := SaveTool(dir, valid); err != nil {
+		t.Fatalf("SaveTool error: %v", err)
+	}
+
+	reg := NewCustomToolRegistry()
+	if err := reg.LoadFromDir(dir); err != nil {
+		t.Fatalf("LoadFromDir returned unexpected error: %v", err)
+	}
+
+	// bad.json should be silently skipped; good_tool should be registered.
+	if reg.Find("good_tool") == nil {
+		t.Error("expected good_tool to be registered")
 	}
 }
