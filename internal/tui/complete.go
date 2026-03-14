@@ -11,7 +11,7 @@ import (
 
 // SlashCommands lists the available slash commands.
 var SlashCommands = []string{
-	"/branch", "/clear", "/config", "/continue", "/emoji", "/exit", "/help",
+	"/branch", "/clear", "/config", "/consult", "/continue", "/emoji", "/exit", "/help",
 	"/new", "/nodes", "/qr", "/quit", "/redo", "/refresh", "/remember", "/rename", "/resume", "/schedule", "/sessions", "/sh", "/tools", "/undo",
 }
 

@@ -450,6 +450,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/config", s.withAuth(s.handleSetConfig))
 	mux.HandleFunc("GET /api/config", s.withAuth(s.handleGetConfig))
 	mux.HandleFunc("GET /api/mcp/tools", s.withAuth(s.handleMCPTools))
+	mux.HandleFunc("POST /api/sessions/{id}/consult", s.withAuth(s.handleConsult))
 }
 
 func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -1036,6 +1037,50 @@ func (s *Server) handleMCPTools(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+
+	var req struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if strings.TrimSpace(req.Summary) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "summary is required"})
+		return
+	}
+
+	ag, err := s.getOrCreateAgent(sessionID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, errSessionNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+
+	response, err := ag.Consult(req.Summary)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	s.mu.Lock()
+	modelConsult := ""
+	if s.prefs != nil {
+		modelConsult = s.prefs.ModelConsult
+	}
+	s.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"model":    modelConsult,
+		"response": response,
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Agent lifecycle
 // ---------------------------------------------------------------------------
@@ -1106,6 +1151,9 @@ func (s *Server) configureAgent(ag *agent.Service) {
 	if s.prefs != nil && s.prefs.ModelTags != "" {
 		_, tagsID := provider.ResolveProviderAndModel(s.prefs.ModelTags, s.provider.Name())
 		ag.SetModelTags(tagsID)
+	}
+	if s.prefs != nil && s.prefs.ModelConsult != "" {
+		ag.SetModelConsult(s.prefs.ModelConsult)
 	}
 	if s.mcpManager != nil {
 		ag.SetMCPManager(s.mcpManager)

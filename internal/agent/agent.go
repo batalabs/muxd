@@ -155,6 +155,7 @@ type Service struct {
 	modelCompact string // for compaction summaries
 	modelTitle   string // for auto-title generation
 	modelTags    string // for auto-tag generation
+	modelConsult string // for second-opinion consult calls
 
 	// disabledTools are excluded from model tool specs and execution.
 	disabledTools map[string]bool

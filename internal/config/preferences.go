@@ -25,6 +25,7 @@ type Preferences struct {
 	ModelCompact      string `json:"model_compact,omitempty"`
 	ModelTitle        string `json:"model_title,omitempty"`
 	ModelTags         string `json:"model_tags,omitempty"`
+	ModelConsult      string `json:"model_consult,omitempty"`
 
 	// Provider and API keys
 	Provider              string `json:"provider,omitempty"`
@@ -78,7 +79,7 @@ type ConfigGroupDef struct {
 var ConfigGroupDefs = []ConfigGroupDef{
 	{
 		Name: "models",
-		Keys: []string{"model", "model.compact", "model.title", "model.tags", "anthropic.api_key", "zai.api_key", "zai.coding_plan", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "deepinfra.api_key", "ollama.url"},
+		Keys: []string{"model", "model.compact", "model.title", "model.tags", "model.consult", "anthropic.api_key", "zai.api_key", "zai.coding_plan", "grok.api_key", "mistral.api_key", "openai.api_key", "google.api_key", "fireworks.api_key", "deepinfra.api_key", "ollama.url"},
 	},
 	{
 		Name: "tools",
@@ -202,6 +203,9 @@ func mergePreferences(dst, src *Preferences) {
 	}
 	if src.ModelTags != "" {
 		dst.ModelTags = src.ModelTags
+	}
+	if src.ModelConsult != "" {
+		dst.ModelConsult = src.ModelConsult
 	}
 	if src.Provider != "" {
 		dst.Provider = src.Provider
@@ -377,6 +381,7 @@ func (p Preferences) All() []PrefEntry {
 		{"model.compact", p.ModelCompact},
 		{"model.title", p.ModelTitle},
 		{"model.tags", p.ModelTags},
+		{"model.consult", p.ModelConsult},
 		{"anthropic.api_key", resolveKeyDisplay(p.AnthropicAPIKey, "ANTHROPIC_API_KEY")},
 		{"zai.api_key", resolveKeyDisplay(p.ZAIAPIKey, "ZAI_API_KEY")},
 		{"zai.coding_plan", strconv.FormatBool(p.ZAICodingPlan)},
@@ -426,6 +431,8 @@ func (p Preferences) Get(key string) string {
 		return p.ModelTitle
 	case "model.tags":
 		return p.ModelTags
+	case "model.consult":
+		return p.ModelConsult
 	case "anthropic.api_key":
 		return MaskKey(p.AnthropicAPIKey)
 	case "zai.api_key":
@@ -528,6 +535,8 @@ func (p *Preferences) Set(key, value string) error {
 		p.ModelTitle = value
 	case "model.tags":
 		p.ModelTags = value
+	case "model.consult":
+		p.ModelConsult = value
 	case "anthropic.api_key":
 		p.AnthropicAPIKey = value
 	case "zai.api_key":
@@ -627,6 +636,7 @@ func sanitizePreferences(p *Preferences) bool {
 	sanitize(&p.ModelCompact)
 	sanitize(&p.ModelTitle)
 	sanitize(&p.ModelTags)
+	sanitize(&p.ModelConsult)
 	sanitize(&p.Provider)
 	sanitize(&p.AnthropicAPIKey)
 	sanitize(&p.ZAIAPIKey)

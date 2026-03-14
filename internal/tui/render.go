@@ -928,6 +928,38 @@ func FormatMessageForScrollback(msg domain.TranscriptMessage, width int) string 
 	}
 }
 
+// FormatConsultResponse renders a second-opinion response from the consult model
+// with a header, dividers, and styled text for display in terminal scrollback.
+func FormatConsultResponse(model, text string, width int) string {
+	if width < 20 {
+		width = 80
+	}
+	dividerWidth := width - 4
+	if dividerWidth < 10 {
+		dividerWidth = 10
+	}
+	divider := strings.Repeat("\u2500", dividerWidth)
+
+	label := "Second Opinion"
+	if model != "" {
+		label = "Second Opinion (" + model + ")"
+	}
+
+	var b strings.Builder
+	b.WriteString(FooterHead.Render("\U0001f52e " + label))
+	b.WriteString("\n")
+	b.WriteString(FooterMeta.Render(divider))
+	b.WriteString("\n")
+
+	for _, line := range strings.Split(text, "\n") {
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+
+	b.WriteString(FooterMeta.Render(divider))
+	return b.String()
+}
+
 // formatBytes formats a byte count into a human-readable string.
 func formatBytes(b int) string {
 	switch {
