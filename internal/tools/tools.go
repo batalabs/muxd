@@ -17,6 +17,7 @@ import (
 
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/diff"
+	"github.com/batalabs/muxd/internal/docread"
 	"github.com/batalabs/muxd/internal/provider"
 )
 
@@ -265,6 +266,32 @@ func fileReadTool() ToolDef {
 			limit := 0
 			if v, ok := input["limit"].(float64); ok && v > 0 {
 				limit = int(v)
+			}
+
+			ext := strings.ToLower(filepath.Ext(path))
+			if docread.CanExtract(ext) {
+				text, err := docread.Extract(path)
+				if err != nil {
+					return "", fmt.Errorf("reading document: %w", err)
+				}
+				header := fmt.Sprintf("[Extracted from %s (%s)]\n\n", filepath.Base(path), strings.TrimPrefix(ext, "."))
+				fullText := header + text
+				lines := strings.Split(fullText, "\n")
+				start := 0
+				if offset > 1 {
+					start = offset - 1
+					if start >= len(lines) {
+						start = len(lines)
+					}
+				}
+				end := len(lines)
+				if limit > 0 {
+					end = start + limit
+					if end > len(lines) {
+						end = len(lines)
+					}
+				}
+				return strings.Join(lines[start:end], "\n"), nil
 			}
 
 			data, err := os.ReadFile(path)

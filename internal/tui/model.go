@@ -22,6 +22,7 @@ import (
 	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/daemon"
 	"github.com/batalabs/muxd/internal/diff"
+	"github.com/batalabs/muxd/internal/docread"
 	"github.com/batalabs/muxd/internal/domain"
 	"github.com/batalabs/muxd/internal/hub"
 	"github.com/batalabs/muxd/internal/mcp"
@@ -1428,6 +1429,19 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 
 	// Detect image paths in the input and build multi-block message if found.
 	imgPaths, remainingText := tools.ExtractImagePaths(trimmed)
+
+	// Detect document paths and inline their extracted text into the message.
+	docPaths, remainingText2 := tools.ExtractDocPaths(remainingText)
+	remainingText = remainingText2
+	for _, docPath := range docPaths {
+		text, err := docread.Extract(docPath)
+		if err != nil {
+			continue // skip unreadable docs
+		}
+		header := fmt.Sprintf("[Document: %s]\n", filepath.Base(docPath))
+		remainingText = header + text + "\n\n" + remainingText
+	}
+
 	var userMsg domain.TranscriptMessage
 	var images []daemon.SubmitImage
 
