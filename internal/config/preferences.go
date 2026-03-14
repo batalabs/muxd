@@ -20,6 +20,7 @@ type Preferences struct {
 	FooterSession     bool   `json:"footer_session"`
 	FooterKeybindings bool   `json:"footer_keybindings"`
 	FooterEmoji       string `json:"footer_emoji,omitempty"`
+	HideDiffs         bool   `json:"hide_diffs,omitempty"`
 	Model             string `json:"model"`
 	ModelCompact      string `json:"model_compact,omitempty"`
 	ModelTitle        string `json:"model_title,omitempty"`
@@ -97,7 +98,7 @@ var ConfigGroupDefs = []ConfigGroupDef{
 	},
 	{
 		Name: "theme",
-		Keys: []string{"footer.tokens", "footer.cost", "footer.cwd", "footer.session", "footer.keybindings", "footer.emoji"},
+		Keys: []string{"footer.tokens", "footer.cost", "footer.cwd", "footer.session", "footer.keybindings", "footer.emoji", "show_diffs"},
 	},
 }
 
@@ -371,6 +372,7 @@ func (p Preferences) All() []PrefEntry {
 		{"footer.session", strconv.FormatBool(p.FooterSession)},
 		{"footer.keybindings", strconv.FormatBool(p.FooterKeybindings)},
 		{"footer.emoji", p.FooterEmoji},
+		{"show_diffs", strconv.FormatBool(!p.HideDiffs)},
 		{"model", p.Model},
 		{"model.compact", p.ModelCompact},
 		{"model.title", p.ModelTitle},
@@ -414,6 +416,8 @@ func (p Preferences) Get(key string) string {
 		return strconv.FormatBool(p.FooterKeybindings)
 	case "footer.emoji":
 		return p.FooterEmoji
+	case "show_diffs":
+		return strconv.FormatBool(!p.HideDiffs)
 	case "model":
 		return p.Model
 	case "model.compact":
@@ -510,6 +514,12 @@ func (p *Preferences) Set(key, value string) error {
 		p.FooterKeybindings = b
 	case "footer.emoji":
 		p.FooterEmoji = ResolveEmoji(value)
+	case "show_diffs":
+		b, err := ParseBoolish(value)
+		if err != nil {
+			return err
+		}
+		p.HideDiffs = !b
 	case "model":
 		p.Model = value
 	case "model.compact":
