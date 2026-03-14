@@ -154,3 +154,26 @@ func TestBuildSystemPrompt(t *testing.T) {
 		}
 	})
 }
+
+func TestCheapModel(t *testing.T) {
+	tests := []struct {
+		provider string
+		want     string
+	}{
+		{"anthropic", "claude-haiku-4-5-20251001"},
+		{"openai", "gpt-4o-mini"},
+		{"mistral", "mistral-small-latest"},
+		{"grok", "grok-3-mini"},
+		{"ollama", ""},
+		{"unknown", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.provider, func(t *testing.T) {
+			got := CheapModel(tt.provider)
+			if got != tt.want {
+				t.Errorf("CheapModel(%q) = %q, want %q", tt.provider, got, tt.want)
+			}
+		})
+	}
+}

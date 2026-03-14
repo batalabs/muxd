@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/batalabs/muxd/internal/domain"
+	"github.com/batalabs/muxd/internal/provider"
 )
 
 const (
@@ -355,11 +356,16 @@ func compressTier1(msgs []domain.TranscriptMessage, tailStart int) []domain.Tran
 }
 
 // summarizationModel returns the model ID for compaction summaries.
-// Uses the user-configured model.compact if set, otherwise defaults to the
+// Priority: explicit modelCompact config > cheapest model for the provider >
 // main model.
 func (a *Service) summarizationModel() string {
 	if a.modelCompact != "" {
 		return a.modelCompact
+	}
+	if a.prov != nil {
+		if cheap := provider.CheapModel(a.prov.Name()); cheap != "" {
+			return cheap
+		}
 	}
 	return a.modelID
 }

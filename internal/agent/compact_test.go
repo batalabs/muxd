@@ -30,44 +30,44 @@ func TestCompactSummaryPrompt(t *testing.T) {
 }
 
 func TestSummarizationModel(t *testing.T) {
-	t.Run("defaults to main model for anthropic", func(t *testing.T) {
+	t.Run("returns cheap model for anthropic", func(t *testing.T) {
 		svc := &Service{
 			modelID: "claude-sonnet-4-20250514",
 			prov:    &fakeProvider{name: "anthropic"},
 		}
 		got := svc.summarizationModel()
-		if got != "claude-sonnet-4-20250514" {
-			t.Errorf("expected main model, got %s", got)
+		if got != "claude-haiku-4-5-20251001" {
+			t.Errorf("expected claude-haiku-4-5-20251001 (cheap model), got %s", got)
 		}
 	})
 
-	t.Run("defaults to main model for openai", func(t *testing.T) {
+	t.Run("returns cheap model for openai", func(t *testing.T) {
 		svc := &Service{
 			modelID: "gpt-4o",
 			prov:    &fakeProvider{name: "openai"},
 		}
 		got := svc.summarizationModel()
-		if got != "gpt-4o" {
-			t.Errorf("expected main model, got %s", got)
+		if got != "gpt-4o-mini" {
+			t.Errorf("expected gpt-4o-mini (cheap model), got %s", got)
 		}
 	})
 
-	t.Run("defaults to main model for unknown provider", func(t *testing.T) {
+	t.Run("falls back to main model for unknown provider", func(t *testing.T) {
 		svc := &Service{
 			modelID: "custom-model",
 			prov:    &fakeProvider{name: "ollama"},
 		}
 		got := svc.summarizationModel()
 		if got != "custom-model" {
-			t.Errorf("expected main model, got %s", got)
+			t.Errorf("expected main model for unknown provider, got %s", got)
 		}
 	})
 
-	t.Run("defaults to main model when no provider", func(t *testing.T) {
+	t.Run("falls back to main model when no provider", func(t *testing.T) {
 		svc := &Service{modelID: "my-model"}
 		got := svc.summarizationModel()
 		if got != "my-model" {
-			t.Errorf("expected main model, got %s", got)
+			t.Errorf("expected main model when no provider, got %s", got)
 		}
 	})
 
@@ -90,7 +90,7 @@ func TestSummarizationModel(t *testing.T) {
 			prov:         &fakeProvider{name: "anthropic"},
 		}
 		got := svc.summarizationModel()
-		// Should use modelCompact, not the default haiku
+		// modelCompact must take priority over cheap model default
 		if got != "claude-sonnet-4-6" {
 			t.Errorf("expected claude-sonnet-4-6, got %s", got)
 		}

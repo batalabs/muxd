@@ -25,6 +25,24 @@ var ModelAliases = map[string]string{
 	"claude-opus":   "claude-opus-4-6",
 }
 
+// CheapModel returns the cheapest available model ID for the given provider
+// name. Returns an empty string if the provider is unknown or has no cheap
+// model defined.
+func CheapModel(providerName string) string {
+	switch providerName {
+	case "anthropic":
+		return "claude-haiku-4-5-20251001"
+	case "openai":
+		return "gpt-4o-mini"
+	case "mistral":
+		return "mistral-small-latest"
+	case "grok":
+		return "grok-3-mini"
+	default:
+		return ""
+	}
+}
+
 // ResolveModel maps user-friendly names to Anthropic API model IDs.
 func ResolveModel(name string) string {
 	trimmed := strings.TrimSpace(name)
