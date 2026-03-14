@@ -629,6 +629,52 @@ func TestHub_HandleProxy_nodeOffline(t *testing.T) {
 // SweepOfflineNodes
 // ---------------------------------------------------------------------------
 
+func TestHub_HandleHeartbeat_unknownNode(t *testing.T) {
+	h := newTestHub(t)
+
+	mux := newTestMux(h)
+	req := httptest.NewRequest("POST", "/api/hub/nodes/nonexistent-id/heartbeat", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown node heartbeat, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestNodeClient_Heartbeat_404_returnsNodePurged(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeHubJSON(w, http.StatusNotFound, map[string]string{"error": "node not found"})
+	}))
+	defer srv.Close()
+
+	c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+	err := c.Heartbeat("some-node-id")
+	if err == nil {
+		t.Fatal("expected error for 404 heartbeat")
+	}
+	if !IsNodePurgedError(err) {
+		t.Errorf("expected node purged error, got: %v", err)
+	}
+}
+
+func TestNodeClient_Heartbeat_500_notPurgedError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeHubJSON(w, http.StatusInternalServerError, map[string]string{"error": "db busy"})
+	}))
+	defer srv.Close()
+
+	c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+	err := c.Heartbeat("some-node-id")
+	if err == nil {
+		t.Fatal("expected error for 500 heartbeat")
+	}
+	if IsNodePurgedError(err) {
+		t.Error("500 error should not be a node-purged error")
+	}
+}
+
 func TestHub_SweepOfflineNodes(t *testing.T) {
 	h := newTestHub(t)
 

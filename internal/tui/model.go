@@ -237,6 +237,10 @@ type Model struct {
 	// Paste detection: rapid keystrokes (< 5ms apart) indicate pasted text.
 	lastKeypressTime time.Time
 
+	// Last submit payload for session-recovery retry.
+	lastSubmitText   string
+	lastSubmitImages []daemon.SubmitImage
+
 	// Shell mode: interactive shell session
 	shellActive      bool
 	shellInput       string
@@ -1473,6 +1477,9 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 	if len(images) > 0 {
 		submitText = remainingText
 	}
+
+	m.lastSubmitText = submitText
+	m.lastSubmitImages = images
 
 	formatted := FormatMessageForScrollback(userMsg, m.width)
 	cmds := []tea.Cmd{
@@ -2874,10 +2881,35 @@ func (m Model) handleStreamDone(msg StreamDoneMsg) (tea.Model, tea.Cmd) {
 		m.streamBuf = ""
 		m.streamFlushedLen = 0
 		m.appendRuntimeLog("stream_error: " + msg.Err.Error())
-		errText := "Error: " + msg.Err.Error()
+
+		// Auto-recover: create a new session and retry the submit.
 		if strings.Contains(msg.Err.Error(), "session not found") || strings.Contains(msg.Err.Error(), "no rows in result set") {
-			errText += "\nhint: session may have been lost. Use /new to start a new session."
+			if m.Daemon != nil && m.lastSubmitText != "" {
+				cwd := MustGetwd()
+				sessionID, err := m.Daemon.CreateSession(cwd, m.modelID)
+				if err == nil {
+					if sess, err := m.Daemon.GetSession(sessionID); err == nil {
+						m.appendRuntimeLog("session_recovery: new session " + sessionID)
+						m.Session = sess
+						m.messages = nil
+						m.inputTokens = 0
+						m.outputTokens = 0
+						m.titled = false
+						notice := WelcomeStyle.Render("Session recovered — created new session " + sessionID[:8] + ".")
+						m.thinking = true
+						return m, tea.Batch(
+							PrintToScrollback(notice),
+							StreamViaDaemon(m.Daemon, m.Session.ID, m.lastSubmitText, m.lastSubmitImages),
+							m.spinner.Tick,
+						)
+					}
+				}
+				m.appendRuntimeLog("session_recovery_failed: " + err.Error())
+			}
+			return m, PrintToScrollback(m.renderError("Error: " + msg.Err.Error() + "\nhint: session may have been lost. Use /new to start a new session."))
 		}
+
+		errText := "Error: " + msg.Err.Error()
 		return m, PrintToScrollback(m.renderError(errText))
 	}
 

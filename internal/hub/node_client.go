@@ -234,10 +234,21 @@ func (c *NodeClient) Heartbeat(nodeID string, info ...NodeInfo) error {
 		return fmt.Errorf("sending heartbeat: %w", err)
 	}
 	resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return errNodePurged
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("hub heartbeat failed: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// errNodePurged is returned when the hub no longer recognizes this node.
+var errNodePurged = fmt.Errorf("node not found on hub (purged)")
+
+// IsNodePurgedError reports whether the error indicates the node was purged from the hub.
+func IsNodePurgedError(err error) bool {
+	return err == errNodePurged
 }
 
 // Dispatch sends a task to a remote node via the hub proxy. It creates a

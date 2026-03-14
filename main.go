@@ -34,7 +34,34 @@ const (
 	shutdownTimeout         = 5 * time.Second
 	embeddedShutdownTimeout = 2 * time.Second
 	heartbeatInterval       = 30 * time.Second
+	heartbeatWindowSize     = 6 // track last 6 heartbeats (3 min at 30s)
+	heartbeatReRegThreshold = 4 // re-register if 4+ of last 6 failed
 )
+
+// appendHeartbeat appends a result to the sliding window, capping at heartbeatWindowSize.
+func appendHeartbeat(window []bool, ok bool) []bool {
+	window = append(window, ok)
+	if len(window) > heartbeatWindowSize {
+		window = window[len(window)-heartbeatWindowSize:]
+	}
+	return window
+}
+
+// countHeartbeatFailures counts false entries in the window.
+func countHeartbeatFailures(window []bool) int {
+	n := 0
+	for _, ok := range window {
+		if !ok {
+			n++
+		}
+	}
+	return n
+}
+
+// shouldReRegister returns true when enough recent heartbeats have failed.
+func shouldReRegister(window []bool) bool {
+	return len(window) >= heartbeatReRegThreshold && countHeartbeatFailures(window) >= heartbeatReRegThreshold
+}
 
 var version = "dev"
 
@@ -283,16 +310,17 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
-				heartbeatFailures := 0
+				hbWindow := make([]bool, 0, heartbeatWindowSize)
 				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
 					case <-ticker.C:
 						if err := hubClient.Heartbeat(nodeID, buildNodeInfo(srv)); err != nil {
-							heartbeatFailures++
-							fmt.Fprintf(os.Stderr, "hub: heartbeat failed (%d): %v\n", heartbeatFailures, err)
-							if heartbeatFailures >= 3 {
+							hbWindow = appendHeartbeat(hbWindow, false)
+							failures := countHeartbeatFailures(hbWindow)
+							fmt.Fprintf(os.Stderr, "hub: heartbeat failed (%d/%d): %v\n", failures, len(hbWindow), err)
+							if hub.IsNodePurgedError(err) || shouldReRegister(hbWindow) {
 								fmt.Fprintf(os.Stderr, "hub: attempting re-registration...\n")
 								newID, regErr := hubClient.Register(name, regHost, port, version, buildNodeInfo(srv))
 								if regErr != nil {
@@ -300,12 +328,12 @@ func main() {
 								} else {
 									nodeID = newID
 									hubNodeID = nodeID
-									heartbeatFailures = 0
+									hbWindow = hbWindow[:0]
 									fmt.Fprintf(os.Stderr, "hub: re-registered as node %s\n", nodeID)
 								}
 							}
 						} else {
-							heartbeatFailures = 0
+							hbWindow = appendHeartbeat(hbWindow, true)
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
@@ -427,16 +455,17 @@ func main() {
 				cwd, _ := os.Getwd()
 				mem := tools.NewProjectMemory(cwd)
 				syncCounter := 0
-				heartbeatFailures := 0
+				hbWindow := make([]bool, 0, heartbeatWindowSize)
 				ticker := time.NewTicker(heartbeatInterval)
 				defer ticker.Stop()
 				for {
 					select {
 					case <-ticker.C:
 						if err := embeddedHubClient.Heartbeat(nodeID, buildNodeInfo(embeddedServer)); err != nil {
-							heartbeatFailures++
-							logStderr("hub: heartbeat failed (%d): %v", heartbeatFailures, err)
-							if heartbeatFailures >= 3 {
+							hbWindow = appendHeartbeat(hbWindow, false)
+							failures := countHeartbeatFailures(hbWindow)
+							logStderr("hub: heartbeat failed (%d/%d): %v", failures, len(hbWindow), err)
+							if hub.IsNodePurgedError(err) || shouldReRegister(hbWindow) {
 								logStderr("hub: attempting re-registration...")
 								newID, regErr := embeddedHubClient.Register(name, regHost, port, version, buildNodeInfo(embeddedServer))
 								if regErr != nil {
@@ -444,12 +473,12 @@ func main() {
 								} else {
 									nodeID = newID
 									embeddedHubNodeID = nodeID
-									heartbeatFailures = 0
+									hbWindow = hbWindow[:0]
 									logStderr("hub: re-registered as node %s", nodeID)
 								}
 							}
 						} else {
-							heartbeatFailures = 0
+							hbWindow = appendHeartbeat(hbWindow, true)
 						}
 						syncCounter++
 						if syncCounter%2 == 0 {
