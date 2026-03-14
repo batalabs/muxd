@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/batalabs/muxd/internal/config"
+	"github.com/batalabs/muxd/internal/diff"
 	"github.com/batalabs/muxd/internal/provider"
 )
 
@@ -327,6 +328,9 @@ func fileWriteTool() ToolDef {
 			}
 			content, _ := input["content"].(string)
 
+			oldBytes, readErr := os.ReadFile(path)
+			isNew := readErr != nil
+
 			dir := filepath.Dir(path)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return "", fmt.Errorf("creating directories: %w", err)
@@ -337,7 +341,16 @@ func fileWriteTool() ToolDef {
 			}
 
 			lines := strings.Count(content, "\n") + 1
-			return fmt.Sprintf("Wrote %d bytes (%d lines) to %s", len(content), lines, path), nil
+			result := fmt.Sprintf("Wrote %d bytes (%d lines) to %s", len(content), lines, path)
+
+			if !isNew {
+				d := diff.ComputeUnifiedDiff(string(oldBytes), content, filepath.Base(path))
+				if d != "" {
+					result += diff.DiffSentinel + d
+				}
+			}
+
+			return result, nil
 		},
 	}
 }
@@ -400,7 +413,12 @@ func fileEditTool() ToolDef {
 				return "", fmt.Errorf("writing %s: %w", path, err)
 			}
 
-			return fmt.Sprintf("Edited %s: replaced %d occurrence(s) of %d bytes with %d bytes", path, count, len(oldStr), len(newStr)), nil
+			result := fmt.Sprintf("Edited %s: replaced %d occurrence(s) of %d bytes with %d bytes", path, count, len(oldStr), len(newStr))
+			d := diff.ComputeUnifiedDiff(content, newContent, filepath.Base(path))
+			if d != "" {
+				result += diff.DiffSentinel + d
+			}
+			return result, nil
 		},
 	}
 }
