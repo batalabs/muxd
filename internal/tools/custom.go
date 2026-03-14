@@ -1,9 +1,15 @@
 package tools
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"os/exec"
 	"regexp"
+	"runtime"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/batalabs/muxd/internal/provider"
 )
@@ -107,4 +113,88 @@ func (r *CustomToolRegistry) Specs() []provider.ToolSpec {
 		specs = append(specs, d.ToSpec())
 	}
 	return specs
+}
+
+// substituteParams replaces {{name}} placeholders in tmpl with the
+// corresponding values from params. Values that contain shell special
+// characters are wrapped in single quotes with internal single quotes
+// escaped as '\''. Placeholders with no matching key are left as-is.
+func substituteParams(tmpl string, params map[string]any) string {
+	return placeholderRe.ReplaceAllStringFunc(tmpl, func(match string) string {
+		key := match[2 : len(match)-2] // strip {{ and }}
+		val, ok := params[key]
+		if !ok {
+			return match
+		}
+		s := fmt.Sprintf("%v", val)
+		return shellEscape(s)
+	})
+}
+
+// placeholderRe matches {{identifier}} tokens.
+var placeholderRe = regexp.MustCompile(`\{\{[^}]+\}\}`)
+
+// shellEscape returns s unchanged if it contains no shell special characters,
+// otherwise wraps it in single quotes, escaping embedded single quotes as '\''.
+func shellEscape(s string) string {
+	if !strings.ContainsAny(s, " \t\n!\"#$&'()*,;<=>?[\\]^`{|}~") {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// paramsToEnv converts a params map to PARAM_NAME=value environment variable
+// strings suitable for use with exec.Cmd.Env. Keys are upper-cased and
+// prefixed with PARAM_.
+func paramsToEnv(params map[string]any) []string {
+	env := make([]string, 0, len(params))
+	for k, v := range params {
+		env = append(env, "PARAM_"+strings.ToUpper(k)+"="+fmt.Sprintf("%v", v))
+	}
+	return env
+}
+
+// Execute finds the named tool, substitutes params into its command (or sets
+// environment variables for script tools), and runs it via the system shell
+// with a 30-second timeout. It returns stdout on success, or an error
+// containing stderr on non-zero exit.
+func (r *CustomToolRegistry) Execute(name string, input map[string]any, cwd string) (string, error) {
+	def := r.Find(name)
+	if def == nil {
+		return "", fmt.Errorf("custom tool %q not found", name)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var cmd *exec.Cmd
+	if def.Command != "" {
+		cmdStr := substituteParams(def.Command, input)
+		if runtime.GOOS == "windows" {
+			cmd = exec.CommandContext(ctx, "cmd", "/C", cmdStr)
+		} else {
+			cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
+		}
+	} else {
+		// Script: pass params as environment variables.
+		if runtime.GOOS == "windows" {
+			cmd = exec.CommandContext(ctx, "cmd", "/C", def.Script)
+		} else {
+			cmd = exec.CommandContext(ctx, "sh", "-c", def.Script)
+		}
+		cmd.Env = append(cmd.Environ(), paramsToEnv(input)...)
+	}
+
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), nil
 }

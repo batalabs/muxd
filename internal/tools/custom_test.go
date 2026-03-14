@@ -150,6 +150,92 @@ func TestCustomToolRegistry_RegisterValidation(t *testing.T) {
 	})
 }
 
+func TestSubstituteParams(t *testing.T) {
+	cases := []struct {
+		name   string
+		tmpl   string
+		params map[string]any
+		want   string
+	}{
+		{
+			name:   "simple substitution",
+			tmpl:   "echo {{name}}",
+			params: map[string]any{"name": "world"},
+			want:   "echo world",
+		},
+		{
+			name:   "multiple params",
+			tmpl:   "greet {{first}} {{last}}",
+			params: map[string]any{"first": "John", "last": "Doe"},
+			want:   "greet John Doe",
+		},
+		{
+			name:   "shell chars escaped",
+			tmpl:   "echo {{msg}}",
+			params: map[string]any{"msg": "hello world; rm -rf /"},
+			want:   "echo 'hello world; rm -rf /'",
+		},
+		{
+			name:   "no params passthrough",
+			tmpl:   "echo hello",
+			params: map[string]any{},
+			want:   "echo hello",
+		},
+		{
+			name:   "missing param placeholder stays",
+			tmpl:   "echo {{missing}}",
+			params: map[string]any{},
+			want:   "echo {{missing}}",
+		},
+		{
+			name:   "value with single quotes escaped",
+			tmpl:   "echo {{msg}}",
+			params: map[string]any{"msg": "it's a test"},
+			want:   "echo 'it'\\''s a test'",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := substituteParams(tc.tmpl, tc.params)
+			if got != tc.want {
+				t.Errorf("substituteParams(%q, %v) = %q, want %q", tc.tmpl, tc.params, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCustomToolRegistry_Execute(t *testing.T) {
+	reg := NewCustomToolRegistry()
+	def := &CustomToolDef{
+		Name:    "greet_cmd",
+		Command: "echo hello {{name}}",
+		Parameters: map[string]provider.ToolProp{
+			"name": {Type: "string", Description: "name to greet"},
+		},
+	}
+	if err := reg.Register(def); err != nil {
+		t.Fatalf("Register error: %v", err)
+	}
+
+	out, err := reg.Execute("greet_cmd", map[string]any{"name": "world"}, "")
+	if err != nil {
+		t.Fatalf("Execute returned unexpected error: %v", err)
+	}
+	trimmed := strings.TrimSpace(out)
+	if trimmed != "hello world" {
+		t.Errorf("Execute output = %q, want %q", trimmed, "hello world")
+	}
+}
+
+func TestCustomToolRegistry_ExecuteUnknown(t *testing.T) {
+	reg := NewCustomToolRegistry()
+	_, err := reg.Execute("no_such_tool", map[string]any{}, "")
+	if err == nil {
+		t.Error("expected error executing unknown tool, got nil")
+	}
+}
+
 func TestCustomToolRegistry_Specs(t *testing.T) {
 	reg := NewCustomToolRegistry()
 	def := &CustomToolDef{
