@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -698,4 +700,377 @@ func TestHub_SweepOfflineNodes(t *testing.T) {
 	if n.Status != StatusOffline {
 		t.Errorf("expected node status offline after sweep, got %s", n.Status)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 2: NodeClient.resolveNodeID
+// ---------------------------------------------------------------------------
+
+func makeNodeListServer(t *testing.T, nodes []NodeListEntry) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/hub/nodes" || r.Method != "GET" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		json.NewEncoder(w).Encode(nodes)
+	}))
+}
+
+func TestNodeClient_resolveNodeID(t *testing.T) {
+	nodes := []NodeListEntry{
+		{ID: "abc-123", Name: "linux-node", Status: "online"},
+		{ID: "def-456", Name: "Win-Node", Status: "online"},
+		{ID: "ghi-789", Name: "offline-node", Status: "offline"},
+	}
+
+	tests := []struct {
+		name      string
+		input     string
+		wantID    string
+		wantErr   string
+	}{
+		{
+			name:   "resolve by exact ID",
+			input:  "abc-123",
+			wantID: "abc-123",
+		},
+		{
+			name:   "resolve by name (exact case)",
+			input:  "linux-node",
+			wantID: "abc-123",
+		},
+		{
+			name:   "resolve by name (case insensitive)",
+			input:  "win-node",
+			wantID: "def-456",
+		},
+		{
+			name:    "offline node returns error with not online",
+			input:   "offline-node",
+			wantErr: "not online",
+		},
+		{
+			name:    "not found returns error with not found",
+			input:   "missing-node",
+			wantErr: "not found",
+		},
+	}
+
+	srv := makeNodeListServer(t, nodes)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+			gotID, err := c.resolveNodeID(tt.input)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErr, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotID != tt.wantID {
+				t.Errorf("expected ID %q, got %q", tt.wantID, gotID)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 3: NodeClient.proxyCreateSession
+// ---------------------------------------------------------------------------
+
+func TestNodeClient_proxyCreateSession(t *testing.T) {
+	tests := []struct {
+		name          string
+		nodeID        string
+		serverStatus  int
+		sessionID     string
+		wantErr       bool
+		checkRequest  bool
+	}{
+		{
+			name:         "success: correct path auth body returns session_id",
+			nodeID:       "node-abc",
+			serverStatus: http.StatusOK,
+			sessionID:    "sess-xyz-789",
+			checkRequest: true,
+		},
+		{
+			name:         "server error 500 returns error",
+			nodeID:       "node-abc",
+			serverStatus: http.StatusInternalServerError,
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				expectedPath := fmt.Sprintf("/api/hub/proxy/%s/api/sessions", tt.nodeID)
+				if r.URL.Path != expectedPath {
+					t.Errorf("unexpected path: got %q, want %q", r.URL.Path, expectedPath)
+				}
+				if r.Method != "POST" {
+					t.Errorf("expected POST, got %s", r.Method)
+				}
+				if tt.checkRequest {
+					authHeader := r.Header.Get("Authorization")
+					if !strings.HasPrefix(authHeader, "Bearer ") {
+						t.Errorf("expected Bearer auth header, got %q", authHeader)
+					}
+
+					var body map[string]string
+					json.NewDecoder(r.Body).Decode(&body)
+					if body["project_path"] != "__hub_dispatch__" {
+						t.Errorf("expected project_path __hub_dispatch__, got %q", body["project_path"])
+					}
+				}
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(map[string]string{"session_id": tt.sessionID})
+				} else {
+					json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+				}
+			}))
+			defer srv.Close()
+
+			c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+			gotID, err := c.proxyCreateSession(tt.nodeID)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotID != tt.sessionID {
+				t.Errorf("expected session_id %q, got %q", tt.sessionID, gotID)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 4: NodeClient.proxySubmit
+// ---------------------------------------------------------------------------
+
+// buildSSEStream builds a minimal SSE response body from a slice of events.
+// Each event is [type, jsonData].
+func buildSSEStream(events [][2]string) string {
+	var b strings.Builder
+	for _, e := range events {
+		fmt.Fprintf(&b, "event: %s\ndata: %s\n\n", e[0], e[1])
+	}
+	return b.String()
+}
+
+func TestNodeClient_proxySubmit(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     int
+		sseEvents  [][2]string
+		wantResult string
+		wantErr    string
+	}{
+		{
+			name: "collects delta text from SSE stream",
+			sseEvents: [][2]string{
+				{"delta", `{"text":"Hello "}`},
+				{"delta", `{"text":"world!"}`},
+				{"turn_done", `{"stop_reason":"end_turn"}`},
+			},
+			wantResult: "Hello world!",
+		},
+		{
+			name: "captures error events in output",
+			sseEvents: [][2]string{
+				{"delta", `{"text":"Partial"}`},
+				{"error", `{"error":"something went wrong"}`},
+				{"turn_done", `{"stop_reason":"error"}`},
+			},
+			wantResult: "Partial\nError: something went wrong",
+		},
+		{
+			name:    "HTTP error returns error",
+			status:  http.StatusInternalServerError,
+			wantErr: "HTTP 500",
+		},
+		{
+			name: "output truncated at 50KB via large single chunk",
+			sseEvents: func() [][2]string {
+				// One delta that is 60KB — exceeds 50KB limit.
+				// The guard is output.Len() < maxOutput, so this single chunk
+				// (written when output is empty) pushes output past 50KB,
+				// triggering the post-write truncation to maxOutput bytes.
+				chunk := strings.Repeat("x", 60*1024)
+				jsonData := fmt.Sprintf(`{"text":%q}`, chunk)
+				return [][2]string{
+					{"delta", jsonData},
+					{"turn_done", `{"stop_reason":"end_turn"}`},
+				}
+			}(),
+			wantResult: "truncated at 50KB",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedStatus := http.StatusOK
+			if tt.status != 0 {
+				expectedStatus = tt.status
+			}
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(expectedStatus)
+				if expectedStatus == http.StatusOK {
+					body := buildSSEStream(tt.sseEvents)
+					w.Write([]byte(body))
+				} else {
+					w.Write([]byte("internal error"))
+				}
+			}))
+			defer srv.Close()
+
+			c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+			result, err := c.proxySubmit("node-id", "sess-id", "do something")
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErr, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, tt.wantResult) {
+				t.Errorf("expected result containing %q, got %q", tt.wantResult, result)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 5: NodeClient.Dispatch integration test
+// ---------------------------------------------------------------------------
+
+func TestNodeClient_Dispatch(t *testing.T) {
+	type testNode struct {
+		id     string
+		name   string
+		status string
+	}
+
+	nodes := []testNode{
+		{id: "node-001", name: "worker", status: "online"},
+		{id: "node-002", name: "offline-worker", status: "offline"},
+	}
+
+	buildServer := func(t *testing.T, sseBody string) *httptest.Server {
+		t.Helper()
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.URL.Path == "/api/hub/nodes" && r.Method == "GET":
+				// List nodes
+				var list []NodeListEntry
+				for _, n := range nodes {
+					list = append(list, NodeListEntry{
+						ID:     n.id,
+						Name:   n.name,
+						Status: n.status,
+					})
+				}
+				json.NewEncoder(w).Encode(list)
+
+			case strings.HasSuffix(r.URL.Path, "/api/sessions") && r.Method == "POST":
+				// Create session — extract nodeID from path
+				json.NewEncoder(w).Encode(map[string]string{"session_id": "sess-dispatch-001"})
+
+			case strings.Contains(r.URL.Path, "/api/sessions/") && strings.HasSuffix(r.URL.Path, "/submit") && r.Method == "POST":
+				// Submit prompt — return SSE stream
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(sseBody))
+
+			default:
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+	}
+
+	sseBody := buildSSEStream([][2]string{
+		{"delta", `{"text":"Task done!"}`},
+		{"turn_done", `{"stop_reason":"end_turn"}`},
+	})
+
+	t.Run("dispatch by name", func(t *testing.T) {
+		srv := buildServer(t, sseBody)
+		defer srv.Close()
+
+		c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+		result, err := c.Dispatch("worker", "do the work")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "Task done!") {
+			t.Errorf("expected 'Task done!' in result, got %q", result)
+		}
+	})
+
+	t.Run("dispatch by ID", func(t *testing.T) {
+		srv := buildServer(t, sseBody)
+		defer srv.Close()
+
+		c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+		result, err := c.Dispatch("node-001", "do the work")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "Task done!") {
+			t.Errorf("expected 'Task done!' in result, got %q", result)
+		}
+	})
+
+	t.Run("unknown node returns error", func(t *testing.T) {
+		srv := buildServer(t, sseBody)
+		defer srv.Close()
+
+		c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+		_, err := c.Dispatch("nonexistent", "do the work")
+		if err == nil {
+			t.Fatal("expected error for unknown node, got nil")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("expected 'not found' in error, got %q", err.Error())
+		}
+	})
+
+	t.Run("offline node returns error", func(t *testing.T) {
+		srv := buildServer(t, sseBody)
+		defer srv.Close()
+
+		c := NewNodeClient(srv.URL, "hub-tok", "node-tok")
+		_, err := c.Dispatch("offline-worker", "do the work")
+		if err == nil {
+			t.Fatal("expected error for offline node, got nil")
+		}
+		if !strings.Contains(err.Error(), "not online") {
+			t.Errorf("expected 'not online' in error, got %q", err.Error())
+		}
+	})
 }

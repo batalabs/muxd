@@ -126,6 +126,11 @@ func TestIsSubAgentTool(t *testing.T) {
 	}{
 		{"task", true},
 		{"schedule_task", true},
+		{"hub_dispatch", true},
+		{"hub_discovery", false},
+		{"tool_create", true},
+		{"tool_register", true},
+		{"tool_list_custom", true},
 		{"file_read", false},
 		{"bash", false},
 		{"", false},
@@ -170,6 +175,18 @@ func TestAllToolsForSubAgent(t *testing.T) {
 		}
 		if tool.Spec.Name == "schedule_task" {
 			t.Error("sub-agent should not have schedule_task tool")
+		}
+		if tool.Spec.Name == "hub_dispatch" {
+			t.Error("sub-agent should not have hub_dispatch tool")
+		}
+		if tool.Spec.Name == "tool_create" {
+			t.Error("sub-agent should not have tool_create tool")
+		}
+		if tool.Spec.Name == "tool_register" {
+			t.Error("sub-agent should not have tool_register tool")
+		}
+		if tool.Spec.Name == "tool_list_custom" {
+			t.Error("sub-agent should not have tool_list_custom tool")
 		}
 	}
 	// Verify other tools are present.
