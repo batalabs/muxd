@@ -567,6 +567,11 @@ func main() {
 
 	p := tea.NewProgram(tui.InitialModel(dc, version, modelLabel, modelID, st, session, resuming, prov, prefs, apiKey))
 	tui.SetProgram(p)
+	tools.SendConsultResponse = func(model, response string) {
+		if tui.Prog != nil {
+			tui.Prog.Send(tui.ConsultResponseMsg{Model: model, Text: response})
+		}
+	}
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "muxd failed: %v\n", err)
 		os.Exit(1)

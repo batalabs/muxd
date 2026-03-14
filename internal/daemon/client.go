@@ -428,6 +428,45 @@ func (c *DaemonClient) GetMCPTools() (*MCPToolsResponse, error) {
 	return &result, nil
 }
 
+// Consult sends a summary to the daemon's consult endpoint and returns the
+// model name and response text.
+func (c *DaemonClient) Consult(sessionID, summary string) (model, response string, err error) {
+	body, _ := json.Marshal(map[string]string{"summary": summary})
+	req, reqErr := http.NewRequest(http.MethodPost, c.baseURL+"/api/sessions/"+sessionID+"/consult", bytes.NewReader(body))
+	if reqErr != nil {
+		return "", "", fmt.Errorf("creating request: %w", reqErr)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Use a longer timeout for consult calls since they invoke an LLM.
+	client := &http.Client{Timeout: 120 * time.Second}
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+	resp, doErr := client.Do(req)
+	if doErr != nil {
+		return "", "", fmt.Errorf("consult: %w", doErr)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		return "", "", fmt.Errorf("consult: %s", errResp.Error)
+	}
+
+	var result struct {
+		Model    string `json:"model"`
+		Response string `json:"response"`
+	}
+	if decErr := json.NewDecoder(resp.Body).Decode(&result); decErr != nil {
+		return "", "", fmt.Errorf("consult: parsing response: %w", decErr)
+	}
+	return result.Model, result.Response, nil
+}
+
 // WaitReady polls Health() until the daemon is responsive or the timeout is reached.
 func (c *DaemonClient) WaitReady(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)

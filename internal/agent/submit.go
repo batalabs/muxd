@@ -114,6 +114,16 @@ func (a *Service) submitMessage(userMsg domain.TranscriptMessage, onEvent EventF
 			TextbeltAPIKey: a.textbeltAPIKey,
 			MCP:            mcpMgr,
 			CustomTools:    a.customTools,
+			ConsultFunc: func(summary string) (string, string, error) {
+				response, err := a.Consult(summary)
+				if err != nil {
+					return "", "", err
+				}
+				a.mu.Lock()
+				modelConsult := a.modelConsult
+				a.mu.Unlock()
+				return modelConsult, response, nil
+			},
 		}
 		if schedStore, ok := a.store.(ScheduledToolJobStore); ok {
 			toolCtx.ScheduleTool = schedStore.CreateScheduledToolJob
