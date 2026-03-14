@@ -270,7 +270,7 @@ func summarizeToolInput(input map[string]any) string {
 // firstLine returns the first non-empty line of s, trimmed of whitespace.
 // Returns s itself (trimmed) if there are no newlines.
 func firstLine(s string) string {
-	for _, line := range strings.SplitN(s, "\n", -1) {
+	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			return line
