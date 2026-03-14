@@ -86,7 +86,7 @@ func ComputeUnifiedDiff(oldText, newText, filename string) string {
 		}
 
 		oldCount, newCount := countHunkLines(entries, g[0], g[1])
-		sb.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", oldLineOf[g[0]], oldCount, newLineOf[g[0]], newCount))
+		fmt.Fprintf(&sb, "@@ -%d,%d +%d,%d @@\n", oldLineOf[g[0]], oldCount, newLineOf[g[0]], newCount)
 
 		for k := g[0]; k <= g[1]; k++ {
 			e := entries[k]
@@ -119,7 +119,7 @@ func ComputeUnifiedDiff(oldText, newText, filename string) string {
 		if remaining < 0 {
 			remaining = 0
 		}
-		sb.WriteString(fmt.Sprintf("... %d more lines (diff truncated)\n", remaining))
+		fmt.Fprintf(&sb, "... %d more lines (diff truncated)\n", remaining)
 	}
 
 	return sb.String()

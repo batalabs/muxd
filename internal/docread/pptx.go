@@ -19,7 +19,7 @@ func extractPPTX(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("opening PPTX: %w", err)
 	}
-	defer zr.Close()
+	defer func() { _ = zr.Close() }()
 
 	// Collect slide files and sort them by slide number.
 	type slideFile struct {
@@ -52,7 +52,7 @@ func extractPPTX(filePath string) (string, error) {
 		if err != nil {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("--- Slide %d ---\n", s.num))
+		fmt.Fprintf(&sb, "--- Slide %d ---\n", s.num)
 		sb.WriteString(text)
 		sb.WriteByte('\n')
 	}

@@ -27,7 +27,7 @@ func extractPDF(path string) (string, error) {
 			continue
 		}
 		if numPages > 1 {
-			sb.WriteString(fmt.Sprintf("--- Page %d ---\n", i))
+			fmt.Fprintf(&sb, "--- Page %d ---\n", i)
 		}
 		sb.WriteString(text)
 		sb.WriteString("\n")

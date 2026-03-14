@@ -102,10 +102,8 @@ func TestComputeUnifiedDiff(t *testing.T) {
 		if result == "" {
 			t.Fatal("expected non-empty diff")
 		}
-		// Should have at least two @@ hunk markers.
-		hunkCount := strings.Count(result, "@@")
 		// Each hunk marker appears twice (opening @@), so count occurrences of "@@ -"
-		hunkCount = strings.Count(result, "@@ -")
+		hunkCount := strings.Count(result, "@@ -")
 		if hunkCount < 2 {
 			t.Errorf("expected at least 2 hunks, got %d; diff:\n%s", hunkCount, result)
 		}

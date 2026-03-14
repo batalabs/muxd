@@ -39,7 +39,7 @@ func CanExtract(ext string) bool {
 }
 
 // Extract reads a document file and returns its text content.
-// Returns ErrUnsupportedFormat for unrecognised extensions.
+// Returns ErrUnsupportedFormat for unrecognized extensions.
 // Returns an error if the file exceeds maxFileSize.
 // Output is truncated at maxExtractLen characters with a notice appended.
 func Extract(path string) (string, error) {

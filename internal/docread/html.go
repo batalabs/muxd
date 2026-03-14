@@ -62,7 +62,7 @@ func walkHTML(sb *strings.Builder, n *html.Node) {
 		}
 		text := strings.TrimSpace(linkText.String())
 		if text != "" && href != "" {
-			sb.WriteString(fmt.Sprintf("[%s](%s)", text, href))
+			fmt.Fprintf(sb, "[%s](%s)", text, href)
 		} else if text != "" {
 			sb.WriteString(text)
 		}

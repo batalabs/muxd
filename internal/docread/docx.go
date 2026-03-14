@@ -17,7 +17,7 @@ func extractDOCX(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("opening DOCX: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	doc := r.Editable()
 	content := doc.GetContent()

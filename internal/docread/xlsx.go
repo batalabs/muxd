@@ -15,7 +15,7 @@ func extractXLSX(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("opening XLSX: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	sheets := f.GetSheetList()
 	var sb strings.Builder
