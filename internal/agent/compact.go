@@ -258,6 +258,50 @@ func summarizeToolResult(toolName, result string) string {
 	}
 }
 
+// compressTier2 collapses messages before tailStart into a single compressed
+// summary user message followed by an assistant acknowledgment, then appends
+// tail messages untouched. If tailStart is 0 the slice is returned unchanged.
+// Each user message in the head becomes "- User: <first 120 chars>".
+// Each assistant message becomes "  Agent: <first 120 chars>".
+// Content is truncated at 120 chars and newlines are replaced with spaces.
+func compressTier2(msgs []domain.TranscriptMessage, tailStart int) []domain.TranscriptMessage {
+	if tailStart == 0 {
+		out := make([]domain.TranscriptMessage, len(msgs))
+		copy(out, msgs)
+		return out
+	}
+
+	const maxLen = 120
+	var b strings.Builder
+	b.WriteString("[Compressed conversation history]\n")
+	for i := 0; i < tailStart && i < len(msgs); i++ {
+		m := msgs[i]
+		text := m.TextContent()
+		if text == "" {
+			text = m.Content
+		}
+		text = strings.ReplaceAll(text, "\n", " ")
+		text = strings.ReplaceAll(text, "\r", " ")
+		if len(text) > maxLen {
+			text = text[:maxLen]
+		}
+		if m.Role == "user" {
+			fmt.Fprintf(&b, "- User: %s\n", text)
+		} else {
+			fmt.Fprintf(&b, "  Agent: %s\n", text)
+		}
+	}
+
+	tail := msgs[tailStart:]
+	out := make([]domain.TranscriptMessage, 0, 2+len(tail))
+	out = append(out,
+		domain.TranscriptMessage{Role: "user", Content: strings.TrimRight(b.String(), "\n")},
+		domain.TranscriptMessage{Role: "assistant", Content: "Understood. I have the conversation context above."},
+	)
+	out = append(out, tail...)
+	return out
+}
+
 // compressTier1 copies msgs and, for messages before tailStart, replaces any
 // tool_result block whose content exceeds 200 chars with a one-line summary
 // produced by summarizeToolResult. Messages at or after tailStart are copied

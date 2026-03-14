@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/batalabs/muxd/internal/domain"
@@ -471,6 +472,147 @@ func TestCompressTier1(t *testing.T) {
 		// Original must be unchanged
 		if msgs[0].Blocks[0].ToolResult != originalBlockResult {
 			t.Error("compressTier1 mutated the original message slice")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestCompressTier2
+// ---------------------------------------------------------------------------
+
+func TestCompressTier2(t *testing.T) {
+	t.Run("compresses head into bullet summary, tail preserved", func(t *testing.T) {
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "Hello, can you help me?"},
+			{Role: "assistant", Content: "Sure, I can help."},
+			{Role: "user", Content: "Please write a function"},
+			{Role: "assistant", Content: "Here is the function"},
+			// tail starts here (tailStart=4)
+			{Role: "user", Content: "Now add tests"},
+			{Role: "assistant", Content: "Adding tests now"},
+		}
+		tailStart := 4
+		got := compressTier2(msgs, tailStart)
+
+		// Should have: 1 compressed user msg + 1 ack + 2 tail = 4 messages
+		if len(got) != 4 {
+			t.Fatalf("expected 4 messages, got %d", len(got))
+		}
+
+		// First message must be the compressed summary (user role)
+		if got[0].Role != "user" {
+			t.Errorf("expected role=user for compressed summary, got %q", got[0].Role)
+		}
+		if !containsSubstr(got[0].Content, "[Compressed conversation history]") {
+			t.Errorf("expected compressed header in first message, got %q", got[0].Content)
+		}
+		if !containsSubstr(got[0].Content, "- User:") {
+			t.Errorf("expected '- User:' bullet in compressed summary, got %q", got[0].Content)
+		}
+		if !containsSubstr(got[0].Content, "  Agent:") {
+			t.Errorf("expected '  Agent:' bullet in compressed summary, got %q", got[0].Content)
+		}
+
+		// Second message must be the assistant acknowledgment
+		if got[1].Role != "assistant" {
+			t.Errorf("expected role=assistant for ack, got %q", got[1].Role)
+		}
+		if got[1].Content != "Understood. I have the conversation context above." {
+			t.Errorf("unexpected ack content: %q", got[1].Content)
+		}
+
+		// Tail messages must be untouched
+		if got[2].Content != "Now add tests" {
+			t.Errorf("expected tail[0] = 'Now add tests', got %q", got[2].Content)
+		}
+		if got[3].Content != "Adding tests now" {
+			t.Errorf("expected tail[1] = 'Adding tests now', got %q", got[3].Content)
+		}
+	})
+
+	t.Run("fewer messages than original", func(t *testing.T) {
+		var msgs []domain.TranscriptMessage
+		for i := 0; i < 10; i++ {
+			role := "user"
+			if i%2 == 1 {
+				role = "assistant"
+			}
+			msgs = append(msgs, domain.TranscriptMessage{Role: role, Content: "message content"})
+		}
+		tailStart := 6
+		got := compressTier2(msgs, tailStart)
+
+		// Original had 10 messages; result should have compressed_user + ack + 4 tail = 6
+		if len(got) >= len(msgs) {
+			t.Errorf("expected fewer messages after compression, got %d (original %d)", len(got), len(msgs))
+		}
+	})
+
+	t.Run("truncates long content to 120 chars", func(t *testing.T) {
+		long := make([]byte, 200)
+		for i := range long {
+			long[i] = 'a'
+		}
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: string(long)},
+			{Role: "assistant", Content: string(long)},
+			{Role: "user", Content: "tail message"},
+		}
+		tailStart := 2
+		got := compressTier2(msgs, tailStart)
+
+		// The summary should not contain the full 200-char string
+		summary := got[0].Content
+		// Each line for user/assistant should be max ~120 chars + prefix overhead
+		for _, line := range strings.Split(summary, "\n") {
+			if containsSubstr(line, "- User:") || containsSubstr(line, "  Agent:") {
+				// The total line length should not exceed 120 + prefix
+				if len(line) > 140 {
+					t.Errorf("summary line too long (%d chars): %q", len(line), line)
+				}
+			}
+		}
+	})
+
+	t.Run("newlines replaced in content", func(t *testing.T) {
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "line one\nline two\nline three"},
+			{Role: "assistant", Content: "response\nwith\nnewlines"},
+			{Role: "user", Content: "tail"},
+		}
+		tailStart := 2
+		got := compressTier2(msgs, tailStart)
+
+		summary := got[0].Content
+		for _, line := range strings.Split(summary, "\n") {
+			if containsSubstr(line, "- User:") || containsSubstr(line, "  Agent:") {
+				// The bullet line itself should not contain embedded newlines
+				// (we just check the extracted content portion has no \n)
+				_ = line // single lines by definition
+			}
+		}
+		// The summary content should replace \n with space
+		if containsSubstr(got[0].Content, "line one\nline two") {
+			t.Error("expected newlines replaced in summary content")
+		}
+	})
+}
+
+func TestCompressTier2_emptyHead(t *testing.T) {
+	t.Run("tailStart=0 returns messages unchanged", func(t *testing.T) {
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "first"},
+			{Role: "assistant", Content: "second"},
+			{Role: "user", Content: "third"},
+		}
+		got := compressTier2(msgs, 0)
+		if len(got) != len(msgs) {
+			t.Fatalf("expected %d messages, got %d", len(msgs), len(got))
+		}
+		for i, m := range got {
+			if m.Role != msgs[i].Role || m.Content != msgs[i].Content {
+				t.Errorf("message[%d] changed: got %+v, want %+v", i, m, msgs[i])
+			}
 		}
 	})
 }
