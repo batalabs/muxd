@@ -25,13 +25,13 @@ var validToolName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{0,63}$`)
 // CustomToolDef describes a user-defined tool backed by a shell command or
 // inline script.
 type CustomToolDef struct {
-	Name        string                      `json:"name"`
-	Description string                      `json:"description"`
+	Name        string                       `json:"name"`
+	Description string                       `json:"description"`
 	Parameters  map[string]provider.ToolProp `json:"parameters,omitempty"`
-	Required    []string                    `json:"required,omitempty"`
-	Command     string                      `json:"command,omitempty"`
-	Script      string                      `json:"script,omitempty"`
-	Persistent  bool                        `json:"-"`
+	Required    []string                     `json:"required,omitempty"`
+	Command     string                       `json:"command,omitempty"`
+	Script      string                       `json:"script,omitempty"`
+	Persistent  bool                         `json:"-"`
 }
 
 // ToSpec converts the definition to a provider-agnostic ToolSpec.
@@ -122,7 +122,7 @@ func (r *CustomToolRegistry) Specs() []provider.ToolSpec {
 // substituteParams replaces {{name}} placeholders in tmpl with the
 // corresponding values from params. Values that contain shell special
 // characters are wrapped in single quotes with internal single quotes
-// escaped as '\''. Placeholders with no matching key are left as-is.
+// escaped as '\”. Placeholders with no matching key are left as-is.
 func substituteParams(tmpl string, params map[string]any) string {
 	return placeholderRe.ReplaceAllStringFunc(tmpl, func(match string) string {
 		key := match[2 : len(match)-2] // strip {{ and }}
@@ -139,7 +139,7 @@ func substituteParams(tmpl string, params map[string]any) string {
 var placeholderRe = regexp.MustCompile(`\{\{[^}]+\}\}`)
 
 // shellEscape returns s unchanged if it contains no shell special characters,
-// otherwise wraps it in single quotes, escaping embedded single quotes as '\''.
+// otherwise wraps it in single quotes, escaping embedded single quotes as '\”.
 func shellEscape(s string) string {
 	if !strings.ContainsAny(s, " \t\n!\"#$&'()*,;<=>?[\\]^`{|}~") {
 		return s
@@ -221,7 +221,7 @@ func SaveTool(dir string, def *CustomToolDef) error {
 	}
 	data, err := json.MarshalIndent(def, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshalling tool %q: %w", def.Name, err)
+		return fmt.Errorf("marshaling tool %q: %w", def.Name, err)
 	}
 	dest := filepath.Join(dir, def.Name+".json")
 	if err := os.WriteFile(dest, data, 0o644); err != nil {

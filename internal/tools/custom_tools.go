@@ -222,35 +222,35 @@ func toolListCustomDef() ToolDef {
 // ---------------------------------------------------------------------------
 
 // parseToolProps converts a map[string]any (as received from LLM input) into
-// map[string]provider.ToolProp by marshalling to JSON and back.
+// map[string]provider.ToolProp by marshaling to JSON and back.
 func parseToolProps(raw any) (map[string]provider.ToolProp, error) {
 	if raw == nil {
 		return nil, nil
 	}
 	data, err := json.Marshal(raw)
 	if err != nil {
-		return nil, fmt.Errorf("marshalling: %w", err)
+		return nil, fmt.Errorf("marshaling: %w", err)
 	}
 	var props map[string]provider.ToolProp
 	if err := json.Unmarshal(data, &props); err != nil {
-		return nil, fmt.Errorf("unmarshalling: %w", err)
+		return nil, fmt.Errorf("unmarshaling: %w", err)
 	}
 	return props, nil
 }
 
 // parseRequiredList converts a []any (as received from LLM input) into
-// []string by marshalling to JSON and back.
+// []string by marshaling to JSON and back.
 func parseRequiredList(raw any) ([]string, error) {
 	if raw == nil {
 		return nil, nil
 	}
 	data, err := json.Marshal(raw)
 	if err != nil {
-		return nil, fmt.Errorf("marshalling: %w", err)
+		return nil, fmt.Errorf("marshaling: %w", err)
 	}
 	var list []string
 	if err := json.Unmarshal(data, &list); err != nil {
-		return nil, fmt.Errorf("unmarshalling: %w", err)
+		return nil, fmt.Errorf("unmarshaling: %w", err)
 	}
 	return list, nil
 }
