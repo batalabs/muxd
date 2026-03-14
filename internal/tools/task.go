@@ -51,7 +51,8 @@ func taskTool() ToolDef {
 // to sub-agents (to prevent recursion).
 func IsSubAgentTool(name string) bool {
 	return name == "task" || name == "schedule_task" || name == "hub_dispatch" ||
-		name == "tool_create" || name == "tool_register" || name == "tool_list_custom"
+		name == "tool_create" || name == "tool_register" || name == "tool_list_custom" ||
+		name == "consult"
 }
 
 // AllToolsForSubAgent returns tools available to sub-agents (all except task).

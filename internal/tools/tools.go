@@ -72,6 +72,7 @@ type ToolContext struct {
 	ListScheduledJobs  func(toolName string, limit int) ([]ScheduledJobInfo, error)
 	CancelScheduledJob func(id string) error
 	UpdateScheduledJob func(id string, toolInput map[string]any, scheduledFor *time.Time, recurrence *string) error
+	ConsultFunc        func(summary string) (model string, response string, err error)
 	PushHubMemory      func(facts map[string]string) error
 	BraveAPIKey        string
 	TextbeltAPIKey     string
@@ -132,6 +133,7 @@ func AllTools() []ToolDef {
 		toolCreateDef(),
 		toolRegisterDef(),
 		toolListCustomDef(),
+		consultToolDef(),
 	}
 }
 
