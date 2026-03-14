@@ -8,6 +8,27 @@ import (
 	"github.com/batalabs/muxd/internal/provider"
 )
 
+// ---------------------------------------------------------------------------
+// TestCompactSummaryPrompt
+// ---------------------------------------------------------------------------
+
+func TestCompactSummaryPrompt(t *testing.T) {
+	requiredSections := []string{
+		"## Decisions made",
+		"## Files changed",
+		"## Current plan",
+		"## Key constraints",
+		"## Errors encountered",
+	}
+	for _, section := range requiredSections {
+		t.Run("contains "+section, func(t *testing.T) {
+			if !strings.Contains(compactSummaryPrompt, section) {
+				t.Errorf("compactSummaryPrompt missing required section %q", section)
+			}
+		})
+	}
+}
+
 func TestSummarizationModel(t *testing.T) {
 	t.Run("defaults to main model for anthropic", func(t *testing.T) {
 		svc := &Service{

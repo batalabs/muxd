@@ -15,6 +15,31 @@ const (
 	CompactKeepTail = 20
 )
 
+// compactSummaryPrompt is the system prompt used when generating a structured
+// compaction summary with an LLM. It guides the model to produce a summary
+// that captures decisions, files, and the current plan so that the agent can
+// continue work using only the summary and the most recent messages.
+const compactSummaryPrompt = `You are summarizing a coding conversation. This summary will replace the conversation history. The agent must be able to continue the current task using only this summary and the most recent messages.
+
+Produce a structured summary with these sections:
+
+## Decisions made
+What was agreed and why. Include specific technical choices so they are not revisited.
+
+## Files changed
+Every file path that was created, modified, or deleted, and a one-line description of what changed.
+
+## Current plan
+What is being worked on right now and what comes next.
+
+## Key constraints
+User preferences, patterns to follow, things to avoid.
+
+## Errors encountered
+What went wrong and how it was resolved. Include error messages if they might recur.
+
+Be specific. Use exact file paths, function names, and variable names. Maximum 600 words.`
+
 // CompactResult holds the output of a CompactMessages call.
 type CompactResult struct {
 	Messages   []domain.TranscriptMessage // compacted list (head + placeholder + tail)
@@ -349,29 +374,9 @@ func (a *Service) generateCompactionSummary(dropped []domain.TranscriptMessage) 
 		return fallback
 	}
 
-	prompt := fmt.Sprintf(`Summarize the following conversation excerpt that is being compacted to save context. Produce a concise structured summary that preserves key information for continuing the conversation.
+	prompt := fmt.Sprintf("Summarize the following conversation excerpt that is being compacted to save context.\n\n---\nConversation to summarize:\n%s", serialized)
 
-Format your response as:
-## Topics discussed
-- (bullet points)
-
-## Files modified
-- (list file paths, or "none" if no files were changed)
-
-## Tools used
-- (list tool names and what they did)
-
-## Key decisions
-- (important choices or conclusions)
-
-## Current task state
-(brief description of where things stand)
-
----
-Conversation to summarize:
-%s`, serialized)
-
-	system := "You are a conversation summarizer. Produce a concise structured summary. Maximum 500 words."
+	system := compactSummaryPrompt
 	msgs := []domain.TranscriptMessage{
 		{Role: "user", Content: prompt},
 	}
