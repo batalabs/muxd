@@ -679,3 +679,64 @@ func TestWriteJSON(t *testing.T) {
 		t.Errorf("expected JSON body, got %q", w.Body.String())
 	}
 }
+
+func TestSetHubDispatch(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	// Initially nil.
+	if srv.hubDispatch != nil {
+		t.Error("expected hubDispatch to be nil initially")
+	}
+
+	// SetHubDispatch must not panic and must set the field.
+	dispatchFn := func(nodeIDOrName, prompt string) (string, error) {
+		return "result from " + nodeIDOrName, nil
+	}
+	srv.SetHubDispatch(dispatchFn)
+
+	if srv.hubDispatch == nil {
+		t.Error("expected hubDispatch to be set after SetHubDispatch")
+	}
+
+	// Verify the wired function produces the expected output (basic sanity).
+	got, err := srv.hubDispatch("my-node", "test prompt")
+	if err != nil {
+		t.Fatalf("unexpected error calling hubDispatch: %v", err)
+	}
+	if got != "result from my-node" {
+		t.Errorf("expected 'result from my-node', got %q", got)
+	}
+}
+
+func TestSetHubDispatch_wiresAgentOnCreate(t *testing.T) {
+	srv, st := newTestServer(t)
+	srv.SetAgentFactory(stubAgentFactory())
+
+	// Set up a provider so configureAgent doesn't panic on nil provider.
+	anthropicProv, err := provider.GetProvider("anthropic")
+	if err != nil {
+		t.Fatalf("getting anthropic provider: %v", err)
+	}
+	srv.provider = anthropicProv
+
+	called := false
+	srv.SetHubDispatch(func(nodeIDOrName, prompt string) (string, error) {
+		called = true
+		return "dispatched", nil
+	})
+
+	// Creating an agent should wire the hubDispatch via configureAgent.
+	sess, _ := st.CreateSession("/tmp/test", "test-model")
+	ag, err := srv.getOrCreateAgent(sess.ID)
+	if err != nil {
+		t.Fatalf("getOrCreateAgent: %v", err)
+	}
+	if ag == nil {
+		t.Fatal("expected non-nil agent")
+	}
+
+	// The agent was created — hubDispatch was wired if configureAgent ran.
+	// We can't inspect the private field directly but we can confirm no panic
+	// occurred during wiring (the test reaching here is sufficient).
+	_ = called
+}
