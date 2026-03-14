@@ -198,6 +198,93 @@ func summarizeToolInput(input map[string]any) string {
 	return result
 }
 
+// firstLine returns the first non-empty line of s, trimmed of whitespace.
+// Returns s itself (trimmed) if there are no newlines.
+func firstLine(s string) string {
+	for _, line := range strings.SplitN(s, "\n", -1) {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+// countLines returns the number of non-empty lines in s.
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	n := 0
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// summarizeToolResult produces a short single-line summary of a tool result.
+func summarizeToolResult(toolName, result string) string {
+	switch toolName {
+	case "file_read":
+		return fmt.Sprintf("[read: %d lines]", countLines(result))
+	case "file_write":
+		return fmt.Sprintf("[wrote: %s]", firstLine(result))
+	case "file_edit":
+		return fmt.Sprintf("[edited: %s]", firstLine(result))
+	case "bash":
+		out := result
+		if len(out) > 80 {
+			out = out[:80]
+		}
+		out = strings.ReplaceAll(out, "\n", " ")
+		return fmt.Sprintf("[bash: %s]", out)
+	case "grep":
+		return fmt.Sprintf("[grep: %d matches]", countLines(result))
+	case "glob", "list_files":
+		return fmt.Sprintf("[%s: %d files]", toolName, countLines(result))
+	case "web_fetch":
+		return fmt.Sprintf("[fetched: %d chars]", len(result))
+	case "web_search":
+		return fmt.Sprintf("[search: %d results]", countLines(result))
+	default:
+		out := result
+		if len(out) > 100 {
+			out = out[:100]
+		}
+		out = strings.ReplaceAll(out, "\n", " ")
+		return fmt.Sprintf("[%s: %s]", toolName, out)
+	}
+}
+
+// compressTier1 copies msgs and, for messages before tailStart, replaces any
+// tool_result block whose content exceeds 200 chars with a one-line summary
+// produced by summarizeToolResult. Messages at or after tailStart are copied
+// unchanged. The original slice is never mutated.
+func compressTier1(msgs []domain.TranscriptMessage, tailStart int) []domain.TranscriptMessage {
+	out := make([]domain.TranscriptMessage, len(msgs))
+	copy(out, msgs)
+	for i := range out {
+		if i >= tailStart {
+			break
+		}
+		if !out[i].HasBlocks() {
+			continue
+		}
+		// Copy the blocks slice before mutating.
+		newBlocks := make([]domain.ContentBlock, len(out[i].Blocks))
+		copy(newBlocks, out[i].Blocks)
+		for j, block := range newBlocks {
+			if block.Type == "tool_result" && len(block.ToolResult) > 200 {
+				newBlocks[j].ToolResult = summarizeToolResult(block.ToolName, block.ToolResult)
+			}
+		}
+		out[i].Blocks = newBlocks
+	}
+	return out
+}
+
 // summarizationModel returns the model ID for compaction summaries.
 // Uses the user-configured model.compact if set, otherwise defaults to the
 // main model.

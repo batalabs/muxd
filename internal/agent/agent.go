@@ -165,6 +165,11 @@ type Service struct {
 	// customTools holds user-defined tools for this agent.
 	customTools *tools.CustomToolRegistry
 
+	// tier1Applied tracks whether Tier 1 (tool result summarization) has been applied.
+	tier1Applied bool
+	// tier2Applied tracks whether Tier 2 (old turn collapse) has been applied.
+	tier2Applied bool
+
 	// memory is the per-project persistent fact store.
 	memory *tools.ProjectMemory
 

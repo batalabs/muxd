@@ -213,3 +213,316 @@ func (s *persistCompactionMock) MessageMaxSequence(sessionID string) (int, error
 // fakeProvider is defined in session_test.go -the compiler sees it package-wide.
 // We need a provider for summarizationModel tests.
 var _ provider.Provider = (*fakeProvider)(nil)
+
+// ---------------------------------------------------------------------------
+// TestSummarizeToolResult
+// ---------------------------------------------------------------------------
+
+func TestSummarizeToolResult(t *testing.T) {
+	cases := []struct {
+		name       string
+		toolName   string
+		result     string
+		wantPfx    string // expected substring
+		wantAbsent string // must NOT appear in output
+	}{
+		{
+			name:     "file_read with newlines",
+			toolName: "file_read",
+			result:   "line1\nline2\nline3\n",
+			wantPfx:  "[read: 3 lines]",
+		},
+		{
+			name:     "file_read single line",
+			toolName: "file_read",
+			result:   "hello",
+			wantPfx:  "[read: 1 lines]",
+		},
+		{
+			name:     "file_read empty",
+			toolName: "file_read",
+			result:   "",
+			wantPfx:  "[read: 0 lines]",
+		},
+		{
+			name:     "file_write",
+			toolName: "file_write",
+			result:   "wrote 42 bytes\nsome extra info",
+			wantPfx:  "[wrote: wrote 42 bytes]",
+		},
+		{
+			name:     "file_edit",
+			toolName: "file_edit",
+			result:   "edited /path/to/file.go\nsome extra",
+			wantPfx:  "[edited: edited /path/to/file.go]",
+		},
+		{
+			name:     "bash short",
+			toolName: "bash",
+			result:   "ok",
+			wantPfx:  "[bash: ok]",
+		},
+		{
+			name:     "bash truncates at 80",
+			toolName: "bash",
+			// 85 chars total — truncated to 80, so "EXTRA" is cut off
+			result:     "01234567890123456789012345678901234567890123456789012345678901234567890123456789EXTRA",
+			wantPfx:    "[bash: 01234567890123456789",
+			wantAbsent: "EXTRA",
+		},
+		{
+			name:     "grep",
+			toolName: "grep",
+			result:   "match1\nmatch2\nmatch3\n",
+			wantPfx:  "[grep: 3 matches]",
+		},
+		{
+			name:     "grep empty",
+			toolName: "grep",
+			result:   "",
+			wantPfx:  "[grep: 0 matches]",
+		},
+		{
+			name:     "glob",
+			toolName: "glob",
+			result:   "file1.go\nfile2.go\n",
+			wantPfx:  "[glob: 2 files]",
+		},
+		{
+			name:     "list_files",
+			toolName: "list_files",
+			result:   "a\nb\nc\n",
+			wantPfx:  "[list_files: 3 files]",
+		},
+		{
+			name:     "web_fetch",
+			toolName: "web_fetch",
+			result:   "some content here",
+			wantPfx:  "[fetched: 17 chars]",
+		},
+		{
+			name:     "web_search",
+			toolName: "web_search",
+			result:   "result1\nresult2\n",
+			wantPfx:  "[search: 2 results]",
+		},
+		{
+			name:     "other tool short",
+			toolName: "custom_tool",
+			result:   "hello world",
+			wantPfx:  "[custom_tool: hello world]",
+		},
+		{
+			name:     "other tool truncates at 100",
+			toolName: "custom_tool",
+			result:   "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789EXTRA_CHARS_HERE_012345678",
+			wantPfx:  "[custom_tool:",
+		},
+		{
+			name:     "other tool replaces newlines",
+			toolName: "custom_tool",
+			result:   "line1\nline2\nline3",
+			wantPfx:  "[custom_tool: line1 line2 line3]",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := summarizeToolResult(tc.toolName, tc.result)
+
+			// Must be single-line
+			if containsNewline(got) {
+				t.Errorf("summarizeToolResult returned multi-line string: %q", got)
+			}
+
+			// Must be under 200 chars
+			if len(got) >= 200 {
+				t.Errorf("summarizeToolResult too long (%d chars): %q", len(got), got)
+			}
+
+			// Must contain expected prefix/content
+			if !containsStr(got, tc.wantPfx) {
+				t.Errorf("expected %q to contain %q", got, tc.wantPfx)
+			}
+
+			// Must not contain absent string
+			if tc.wantAbsent != "" && containsStr(got, tc.wantAbsent) {
+				t.Errorf("expected %q NOT to contain %q", got, tc.wantAbsent)
+			}
+		})
+	}
+}
+
+func containsNewline(s string) bool {
+	for _, c := range s {
+		if c == '\n' || c == '\r' {
+			return true
+		}
+	}
+	return false
+}
+
+func containsStr(s, sub string) bool {
+	return len(sub) == 0 || (len(s) >= len(sub) && (s == sub || len(s) > 0 && containsSubstr(s, sub)))
+}
+
+func containsSubstr(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// TestCompressTier1
+// ---------------------------------------------------------------------------
+
+func TestCompressTier1(t *testing.T) {
+	t.Run("compresses long tool results before tailStart", func(t *testing.T) {
+		longResult := make([]byte, 300)
+		for i := range longResult {
+			longResult[i] = 'x'
+		}
+
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "do something"},
+			{
+				Role: "assistant",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_use", ToolUseID: "u1", ToolName: "bash"},
+				},
+			},
+			{
+				Role: "user",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_result", ToolUseID: "u1", ToolName: "bash", ToolResult: string(longResult)},
+				},
+			},
+			{Role: "assistant", Content: "done"},
+		}
+
+		tailStart := 3 // last "done" message is in tail
+		got := compressTier1(msgs, tailStart)
+
+		if len(got) != len(msgs) {
+			t.Fatalf("expected same number of messages, got %d", len(got))
+		}
+
+		// The tool_result block in msg[2] (before tailStart) must be summarized
+		block := got[2].Blocks[0]
+		if len(block.ToolResult) >= 200 {
+			t.Errorf("expected tool result compressed, got len=%d: %q", len(block.ToolResult), block.ToolResult)
+		}
+		if block.ToolResult == string(longResult) {
+			t.Error("expected tool result to be replaced with summary, not original")
+		}
+	})
+
+	t.Run("does not compress short tool results", func(t *testing.T) {
+		shortResult := "short output"
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "do something"},
+			{
+				Role: "user",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_result", ToolUseID: "u1", ToolName: "bash", ToolResult: shortResult},
+				},
+			},
+			{Role: "assistant", Content: "done"},
+		}
+
+		tailStart := 2
+		got := compressTier1(msgs, tailStart)
+
+		block := got[1].Blocks[0]
+		if block.ToolResult != shortResult {
+			t.Errorf("expected short tool result unchanged, got %q", block.ToolResult)
+		}
+	})
+
+	t.Run("does not mutate original slice", func(t *testing.T) {
+		longResult := make([]byte, 300)
+		for i := range longResult {
+			longResult[i] = 'y'
+		}
+
+		msgs := []domain.TranscriptMessage{
+			{
+				Role: "user",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_result", ToolUseID: "u1", ToolName: "file_read", ToolResult: string(longResult)},
+				},
+			},
+			{Role: "assistant", Content: "ok"},
+		}
+
+		original := make([]domain.TranscriptMessage, len(msgs))
+		copy(original, msgs)
+		// Deep copy blocks
+		origBlocks := make([]domain.ContentBlock, len(msgs[0].Blocks))
+		copy(origBlocks, msgs[0].Blocks)
+		originalBlockResult := origBlocks[0].ToolResult
+
+		tailStart := 1
+		compressTier1(msgs, tailStart)
+
+		// Original must be unchanged
+		if msgs[0].Blocks[0].ToolResult != originalBlockResult {
+			t.Error("compressTier1 mutated the original message slice")
+		}
+	})
+}
+
+func TestCompressTier1_preservesTail(t *testing.T) {
+	t.Run("tool result in tail stays full", func(t *testing.T) {
+		longResult := make([]byte, 300)
+		for i := range longResult {
+			longResult[i] = 'z'
+		}
+
+		msgs := []domain.TranscriptMessage{
+			{Role: "user", Content: "first"},
+			{Role: "assistant", Content: "second"},
+			// tailStart = 2: everything from here is tail
+			{
+				Role: "user",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_result", ToolUseID: "u1", ToolName: "bash", ToolResult: string(longResult)},
+				},
+			},
+		}
+
+		tailStart := 2
+		got := compressTier1(msgs, tailStart)
+
+		block := got[2].Blocks[0]
+		if block.ToolResult != string(longResult) {
+			t.Errorf("expected tail tool result to be preserved, got len=%d", len(block.ToolResult))
+		}
+	})
+
+	t.Run("tailStart=0 preserves all messages", func(t *testing.T) {
+		longResult := make([]byte, 300)
+		for i := range longResult {
+			longResult[i] = 'w'
+		}
+
+		msgs := []domain.TranscriptMessage{
+			{
+				Role: "user",
+				Blocks: []domain.ContentBlock{
+					{Type: "tool_result", ToolUseID: "u1", ToolName: "bash", ToolResult: string(longResult)},
+				},
+			},
+		}
+
+		got := compressTier1(msgs, 0)
+
+		block := got[0].Blocks[0]
+		if block.ToolResult != string(longResult) {
+			t.Errorf("expected all preserved when tailStart=0, got %q", block.ToolResult)
+		}
+	})
+}
