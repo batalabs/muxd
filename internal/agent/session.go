@@ -278,6 +278,20 @@ func (a *Service) SetModelTags(id string) {
 	a.modelTags = id
 }
 
+// SetModelConsult sets the model specifier for second-opinion consult calls.
+func (a *Service) SetModelConsult(model string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.modelConsult = model
+}
+
+// ConsultModel returns the configured consult model specifier.
+func (a *Service) ConsultModel() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.modelConsult
+}
+
 // SetMCPManager sets the MCP server manager for tool routing.
 func (a *Service) SetMCPManager(m *mcp.Manager) {
 	a.mu.Lock()
