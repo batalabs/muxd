@@ -106,8 +106,8 @@ func TestBuildSystemPrompt(t *testing.T) {
 		if !strings.Contains(prompt, "/tmp/project") {
 			t.Error("expected cwd in prompt")
 		}
-		if !strings.Contains(prompt, "Tools available (26)") {
-			t.Error("expected 26 tools")
+		if !strings.Contains(prompt, "Tools available (33)") {
+			t.Error("expected 33 tools")
 		}
 		if strings.Contains(prompt, "MCP Servers:") {
 			t.Error("should not contain MCP section without tools")
@@ -119,8 +119,8 @@ func TestBuildSystemPrompt(t *testing.T) {
 
 	t.Run("with MCP tools", func(t *testing.T) {
 		prompt := BuildSystemPrompt("/tmp", []string{"mcp__fs__read", "mcp__fs__write"}, "")
-		if !strings.Contains(prompt, "Tools available (28)") {
-			t.Error("expected 28 tools (26 + 2 MCP)")
+		if !strings.Contains(prompt, "Tools available (35)") {
+			t.Error("expected 35 tools (33 + 2 MCP)")
 		}
 		if !strings.Contains(prompt, "MCP Servers:") {
 			t.Error("expected MCP section")
