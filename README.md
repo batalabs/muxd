@@ -31,8 +31,13 @@ Most AI coding tools treat each conversation as disposable -close the window and
 - **Project memory** -the agent remembers your conventions, architecture decisions, and gotchas across sessions.
 - **Hub architecture** -run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
 - **Multi-channel** -same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
-- **27 built-in tools** -file I/O, bash, git, web search, HTTP requests, SMS, scheduling, and more. See the [full list](https://muxd.sh/docs/tools).
+- **33 built-in tools** -file I/O, bash, git, web search, HTTP requests, SMS, scheduling, custom tools, document reading, and more. See the [full list](https://muxd.sh/docs/tools).
 - **Any provider** -Claude, GPT, Mistral, Grok, Fireworks, DeepInfra, Ollama, and any OpenAI-compatible API. Switch models mid-session.
+- **Inline diffs** -every file edit shows a styled red and green diff right in the chat. See exactly what changed.
+- **Read any document** -attach or reference PDFs, Word docs, Excel spreadsheets, PowerPoint slides, HTML, CSV, JSON, and XML.
+- **Self extending tools** -the agent creates its own tools at runtime. Simple command templates or full scripts, ephemeral or persistent.
+- **Second opinion** -ask a different model for a review with the `consult` tool or `/consult` command. Shown in a separate view with a crystal ball emoji.
+- **Smart compression** -tiered context compaction at 60k, 75k, and 90k tokens preserves key decisions and file changes while cutting costs.
 
 ---
 
