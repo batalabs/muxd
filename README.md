@@ -5,8 +5,8 @@
 </h1>
 
 <p align="center">
-  <b>An open-source AI coding agent that lives in your terminal.</b><br>
-  <sub>Multiplex conversations across terminal, hub, and web. Branch, resume, and search your AI history like git.</sub>
+  <b>An open source AI coding agent that lives in your terminal.</b><br>
+  <sub>33 tools. Any model. Sessions that survive reboots. An agent that builds its own tools.</sub>
 </p>
 
 <p align="center">
@@ -18,26 +18,42 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0"></a>
 </p>
 
-> 📖 **Full documentation at [muxd.sh/docs](https://muxd.sh/docs)** -setup guides for [client](https://muxd.sh/docs/client) and [hub](https://muxd.sh/docs/hub) modes, [commands](https://muxd.sh/docs/commands), [tools](https://muxd.sh/docs/tools), and [configuration](https://muxd.sh/docs/configuration).
+> **Full docs at [muxd.sh](https://muxd.sh/docs)** · [Client setup](https://muxd.sh/docs/client) · [Hub setup](https://muxd.sh/docs/hub) · [Commands](https://muxd.sh/docs/commands) · [Tools](https://muxd.sh/docs/tools) · [Config](https://muxd.sh/docs/configuration)
 
 ---
 
-## Why muxd?
+## What makes muxd different
 
-Most AI coding tools treat each conversation as disposable -close the window and it's gone. muxd saves everything to a local SQLite database so you can close your terminal, reboot, come back next week, and pick up exactly where you left off.
+Most AI coding tools treat conversations as disposable. muxd saves everything to local SQLite. Close your terminal, reboot, come back next week, and pick up exactly where you left off.
 
-- **Persistent sessions** -conversations survive restarts. Search, branch, and resume any session by project or ID.
-- **Branch and fork** -explore alternatives without losing your current thread, like git branches for conversations.
-- **Project memory** -the agent remembers your conventions, architecture decisions, and gotchas across sessions.
-- **Hub architecture** -run a central hub that coordinates multiple muxd daemons across machines. Connect from any TUI or mobile client and switch between nodes.
-- **Multi-channel** -same agent from terminal TUI, headless daemon, hub, or the [mobile app](https://github.com/batalabs/muxd-mobile).
-- **33 built-in tools** -file I/O, bash, git, web search, HTTP requests, SMS, scheduling, custom tools, document reading, and more. See the [full list](https://muxd.sh/docs/tools).
-- **Any provider** -Claude, GPT, Mistral, Grok, Fireworks, DeepInfra, Ollama, and any OpenAI-compatible API. Switch models mid-session.
-- **Inline diffs** -every file edit shows a styled red and green diff right in the chat. See exactly what changed.
-- **Read any document** -attach or reference PDFs, Word docs, Excel spreadsheets, PowerPoint slides, HTML, CSV, JSON, and XML.
-- **Self extending tools** -the agent creates its own tools at runtime. Simple command templates or full scripts, ephemeral or persistent.
-- **Second opinion** -ask a different model for a review with the `consult` tool or `/consult` command. Shown in a separate view with a crystal ball emoji.
-- **Smart compression** -tiered context compaction at 60k, 75k, and 90k tokens preserves key decisions and file changes while cutting costs.
+### Agent capabilities
+
+| | |
+|---|---|
+| **33 built in tools** | File I/O, bash, grep, glob, web search, HTTP, SMS, git, scheduling, document reading, and more |
+| **Any model** | Claude, GPT, Mistral, Grok, Fireworks, DeepInfra, Ollama, or any OpenAI compatible API |
+| **Inline diffs** | Every file edit shows a red and green diff in the chat. See exactly what changed |
+| **Read any document** | PDFs, Word, Excel, PowerPoint, HTML, CSV, JSON, XML. No plugins required |
+| **Self extending tools** | The agent creates its own tools at runtime. Command templates or scripts, ephemeral or persistent |
+| **Second opinion** | Ask a different model for a review. Response shown separately with a crystal ball emoji |
+
+### Session management
+
+| | |
+|---|---|
+| **Persistent sessions** | Conversations survive restarts. Resume any session by project or ID |
+| **Branch and fork** | Explore alternatives without losing your thread. Like git branches for conversations |
+| **Project memory** | The agent remembers your conventions and decisions across sessions |
+| **Smart compression** | Tiered compaction at 60k/75k/90k tokens. Preserves key decisions while cutting costs |
+
+### Infrastructure
+
+| | |
+|---|---|
+| **Hub architecture** | Coordinate multiple daemons across machines. Connect from any TUI or mobile client |
+| **Always on daemon** | Background service that survives reboots. Auto titles, schedules tasks, runs headless |
+| **Mobile app** | [iOS app](https://github.com/batalabs/muxd-mobile) connects via QR code. Chat with your agent from anywhere |
+| **Hub dispatch** | Send tasks to remote nodes. The agent can delegate work across your machines |
 
 ---
 
@@ -52,62 +68,6 @@ Most AI coding tools treat each conversation as disposable -close the window and
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/mobile-chat.png" alt="muxd mobile - chat" height="550">
 </p>
-
----
-
-## How it works
-
-muxd has three modes depending on how you want to use it.
-
-### Client (default)
-
-Run `muxd` and you get a terminal TUI with a built-in agent server. Everything runs locally on one machine. Sessions are stored in a local SQLite database and persist across restarts.
-
-```bash
-muxd                              # new session
-muxd -c                           # resume latest session
-muxd --model openai/gpt-4o        # use a different model
-```
-
-### Daemon
-
-Run `muxd --daemon` to start a headless agent server. This is useful for always-on machines where you want to connect from other clients (TUI, mobile app) without keeping a terminal open. Install it as a system service so it starts on boot.
-
-```bash
-muxd --daemon                     # start headless server
-muxd --daemon --bind 0.0.0.0      # accept connections from other machines
-muxd -service install             # install as system service
-```
-
-### Hub
-
-The hub is a central coordinator that manages multiple muxd daemons (called nodes) across different machines. You run one hub and point your daemons at it. The [mobile app](https://github.com/batalabs/muxd-mobile) connects to the hub and lets you pick which node to talk to.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/hub-architecture-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="assets/hub-architecture.svg">
-  <img src="assets/hub-architecture.svg" alt="Hub architecture diagram showing mobile app and TUI connecting to a central hub, which routes to multiple nodes" width="700">
-</picture>
-
-**Start a hub:**
-```bash
-muxd --hub --hub-bind 0.0.0.0     # hub on all interfaces
-```
-
-**Connect a daemon to the hub:**
-```bash
-muxd --daemon --bind 0.0.0.0      # start daemon
-# then set the hub connection in config:
-# /config set hub.url http://hub-ip:4097
-# /config set hub.node_token <hub-token>
-```
-
-**Connect from a remote TUI:**
-```bash
-muxd --remote hub-ip:4097 --token <hub-token>
-```
-
-The hub tracks node health with heartbeats, proxies requests to the right node, aggregates sessions across all nodes, and shares project memory between them.
 
 ---
 
@@ -146,6 +106,51 @@ Set your API key:
 Resume a session:
 ```bash
 muxd -c                           # resume latest session
+```
+
+Switch models:
+```bash
+muxd --model openai/gpt-4o        # use a different model
+```
+
+---
+
+## How it works
+
+muxd has three modes.
+
+### Client (default)
+
+Terminal TUI with a built in agent server. Everything runs locally.
+
+```bash
+muxd                              # new session
+muxd -c                           # resume latest
+```
+
+### Daemon
+
+Headless agent server. Connect from other clients without keeping a terminal open.
+
+```bash
+muxd --daemon                     # start headless
+muxd --daemon --bind 0.0.0.0      # accept remote connections
+muxd -service install             # install as system service
+```
+
+### Hub
+
+Central coordinator for multiple daemons across machines.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/hub-architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/hub-architecture.svg">
+  <img src="assets/hub-architecture.svg" alt="Hub architecture diagram" width="700">
+</picture>
+
+```bash
+muxd --hub --hub-bind 0.0.0.0                     # start hub
+muxd --remote hub-ip:4097 --token <hub-token>      # connect from remote TUI
 ```
 
 ---
