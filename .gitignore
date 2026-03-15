@@ -31,6 +31,10 @@ logs/
 coverage*.html
 coverage*.out
 
+# Design specs and implementation plans (local only)
+docs/specs/
+docs/plans/
+
 # Firecrawl
 .firecrawl/
 
