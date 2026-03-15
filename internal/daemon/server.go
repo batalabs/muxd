@@ -451,6 +451,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/config", s.withAuth(s.handleGetConfig))
 	mux.HandleFunc("GET /api/mcp/tools", s.withAuth(s.handleMCPTools))
 	mux.HandleFunc("POST /api/sessions/{id}/consult", s.withAuth(s.handleConsult))
+	mux.HandleFunc("GET /api/sessions/{id}/status", s.withAuth(s.handleSessionStatus))
 }
 
 func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -1078,6 +1079,23 @@ func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"model":    modelConsult,
 		"response": response,
+	})
+}
+
+func (s *Server) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	s.mu.Lock()
+	ag, ok := s.agents[sessionID]
+	s.mu.Unlock()
+
+	running := false
+	if ok {
+		running = ag.IsRunning()
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"session_id":    sessionID,
+		"agent_running": running,
 	})
 }
 

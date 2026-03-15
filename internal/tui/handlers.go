@@ -893,7 +893,18 @@ func (m Model) refreshCurrentSession() (tea.Model, tea.Cmd) {
 
 	m.messages = msgs
 	m.appendRuntimeLog(fmt.Sprintf("refresh: loaded=%d new=%d", len(msgs), len(msgs)-oldLen))
+
+	// Check if the agent is currently running and restore activity state.
+	if m.Daemon != nil && m.Daemon.IsAgentRunning(m.Session.ID) {
+		m.thinking = true
+		m.turnStartTime = time.Now()
+		m.toolStatus = "Agent is working..."
+	}
+
 	if len(newLines) == 0 {
+		if m.thinking {
+			return m, PrintToScrollback(WelcomeStyle.Render("No new messages. Agent is running..."))
+		}
 		return m, PrintToScrollback(WelcomeStyle.Render("No new messages."))
 	}
 	return m, PrintToScrollback(strings.Join(newLines, "\n\n"))

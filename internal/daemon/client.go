@@ -201,6 +201,24 @@ func (c *DaemonClient) GetSession(sessionID string) (*domain.Session, error) {
 	return &sess, nil
 }
 
+// IsAgentRunning checks whether the agent for the given session is currently executing.
+func (c *DaemonClient) IsAgentRunning(sessionID string) bool {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/sessions/"+sessionID+"/status", nil)
+	if err != nil {
+		return false
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	var result struct {
+		AgentRunning bool `json:"agent_running"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result.AgentRunning
+}
+
 // ListSessions lists sessions for the given project path.
 func (c *DaemonClient) ListSessions(projectPath string, limit int) ([]domain.Session, error) {
 	url := fmt.Sprintf("%s/api/sessions?project=%s&limit=%d", c.baseURL, projectPath, limit)
