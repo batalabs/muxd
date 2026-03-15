@@ -585,8 +585,10 @@ var thinkingMessages = []string{
 func (m Model) buildActivityStatus() string {
 	var parts []string
 
-	// Primary status: current tool or fun thinking message.
-	if m.turnCurrentTool != "" {
+	// Primary status: streaming, current tool, or fun thinking message.
+	if m.streaming {
+		parts = append(parts, "Writing...")
+	} else if m.turnCurrentTool != "" {
 		parts = append(parts, "Running "+m.turnCurrentTool)
 	} else if m.toolStatus != "" && !strings.HasPrefix(m.toolStatus, "Thinking") {
 		parts = append(parts, m.toolStatus)
@@ -842,11 +844,7 @@ func (m Model) View() string {
 	}
 
 	if m.thinking {
-		if m.streaming {
-			b.WriteString(ThinkingStyle.Render(m.spinner.View()) + "\n\n")
-		} else {
-			b.WriteString(ThinkingStyle.Render(m.spinner.View()+" "+m.buildActivityStatus()) + "\n\n")
-		}
+		b.WriteString(ThinkingStyle.Render(m.spinner.View()+" "+m.buildActivityStatus()) + "\n\n")
 	}
 
 	// Multi-line input with inline cursor and visual line wrapping.
