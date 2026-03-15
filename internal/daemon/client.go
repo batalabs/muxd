@@ -28,6 +28,7 @@ type SSEEvent struct {
 	DeltaText                string
 	ToolUseID                string
 	ToolName                 string
+	ToolInput                map[string]any
 	ToolResult               string
 	ToolIsError              bool
 	InputTokens              int
@@ -591,6 +592,9 @@ func ParseSSEEvent(eventType, data string) SSEEvent {
 	case "tool_start":
 		evt.ToolUseID, _ = raw["tool_use_id"].(string)
 		evt.ToolName, _ = raw["tool_name"].(string)
+		if ti, ok := raw["tool_input"].(map[string]any); ok {
+			evt.ToolInput = ti
+		}
 
 	case "tool_done":
 		evt.ToolUseID, _ = raw["tool_use_id"].(string)

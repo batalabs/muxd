@@ -681,8 +681,8 @@ func TestSetBaseURL(t *testing.T) {
 
 func TestParseSSEEvent_unknown_event(t *testing.T) {
 	evt := ParseSSEEvent("something_new", `{"foo":"bar"}`)
-	if evt != (SSEEvent{}) {
-		t.Errorf("expected zero SSEEvent for unknown type, got %+v", evt)
+	if evt.Type != "" {
+		t.Errorf("expected empty Type for unknown event, got %+v", evt)
 	}
 }
 
@@ -698,8 +698,8 @@ func TestParseSSEEvent_invalid_json(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			evt := ParseSSEEvent("delta", tt.data)
-			if evt != (SSEEvent{}) {
-				t.Errorf("expected zero SSEEvent for invalid JSON %q, got %+v", tt.data, evt)
+			if evt.Type != "" {
+				t.Errorf("expected empty Type for invalid JSON %q, got %+v", tt.data, evt)
 			}
 		})
 	}
