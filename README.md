@@ -52,7 +52,7 @@ Most AI coding tools treat conversations as disposable. muxd saves everything to
 |---|---|
 | **Hub architecture** | Coordinate multiple daemons across machines. Connect from any TUI or mobile client |
 | **Always on daemon** | Background service that survives reboots. Auto titles, schedules tasks, runs headless |
-| **Mobile app** | [iOS app](https://github.com/batalabs/muxd-mobile) connects via QR code. Chat with your agent from anywhere |
+| **Mobile app** | [iOS app](https://apps.apple.com/us/app/muxd/id6759869997) connects via QR code. Chat with your agent from anywhere |
 | **Hub dispatch** | Send tasks to remote nodes. The agent can delegate work across your machines |
 
 ---
