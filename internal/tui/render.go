@@ -951,9 +951,14 @@ func FormatConsultResponse(model, text string, width int) string {
 	b.WriteString(FooterMeta.Render(divider))
 	b.WriteString("\n")
 
-	for _, line := range strings.Split(text, "\n") {
-		b.WriteString(line)
-		b.WriteString("\n")
+	// Render the response through the same markdown pipeline as assistant messages.
+	contentWidth := width - 4
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+	rendered := RenderAssistantLines(text, contentWidth)
+	for _, line := range rendered {
+		b.WriteString("  " + line + "\n")
 	}
 
 	b.WriteString(FooterMeta.Render(divider))
