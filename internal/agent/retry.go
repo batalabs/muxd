@@ -124,7 +124,10 @@ func isStreamError(err error) bool {
 		strings.Contains(msg, "malformed chunked encoding") ||
 		strings.Contains(msg, "chunked line ends with bare LF") ||
 		strings.Contains(msg, "invalid byte in chunk length") ||
-		strings.Contains(msg, "reading stream:")
+		strings.Contains(msg, "reading stream:") ||
+		strings.Contains(msg, "response body closed") ||
+		strings.Contains(msg, "stream error") ||
+		strings.Contains(msg, "use of closed network connection")
 }
 
 // sleepWithCancel waits for the given duration, checking for cancellation
