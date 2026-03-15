@@ -25,7 +25,12 @@ func (a *Service) Consult(summary string) (string, error) {
 	}
 
 	providerName, modelID := provider.ResolveProviderAndModel(modelConsult, "")
-	apiKey, _ := config.LoadProviderAPIKey(config.Preferences{}, providerName)
+
+	a.mu.Lock()
+	prefs := a.prefs
+	a.mu.Unlock()
+
+	apiKey, _ := config.LoadProviderAPIKey(prefs, providerName)
 
 	// Fall back to the primary API key when the consult model uses the same
 	// provider as the primary model and no explicit key was resolved.

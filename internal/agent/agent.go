@@ -113,6 +113,7 @@ type Service struct {
 	modelID    string
 	modelLabel string
 	prov       provider.Provider
+	prefs      config.Preferences
 
 	store   Store
 	session *domain.Session

@@ -1152,8 +1152,11 @@ func (s *Server) configureAgent(ag *agent.Service) {
 		_, tagsID := provider.ResolveProviderAndModel(s.prefs.ModelTags, s.provider.Name())
 		ag.SetModelTags(tagsID)
 	}
-	if s.prefs != nil && s.prefs.ModelConsult != "" {
-		ag.SetModelConsult(s.prefs.ModelConsult)
+	if s.prefs != nil {
+		ag.SetPreferences(*s.prefs)
+		if s.prefs.ModelConsult != "" {
+			ag.SetModelConsult(s.prefs.ModelConsult)
+		}
 	}
 	if s.mcpManager != nil {
 		ag.SetMCPManager(s.mcpManager)

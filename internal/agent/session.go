@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/batalabs/muxd/internal/config"
 	"github.com/batalabs/muxd/internal/domain"
 	"github.com/batalabs/muxd/internal/mcp"
 	"github.com/batalabs/muxd/internal/provider"
@@ -290,6 +291,13 @@ func (a *Service) ConsultModel() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.modelConsult
+}
+
+// SetPreferences stores the full preferences for API key resolution.
+func (a *Service) SetPreferences(prefs config.Preferences) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.prefs = prefs
 }
 
 // SetMCPManager sets the MCP server manager for tool routing.
