@@ -198,7 +198,11 @@ type Model struct {
 	pendingAskID string
 
 	// Tool status display
-	toolStatus string
+	toolStatus       string
+	turnToolCount    int
+	turnFilesChanged map[string]bool
+	turnStartTime    time.Time
+	turnCurrentTool  string
 
 	Prefs    config.Preferences
 	Provider provider.Provider
@@ -527,6 +531,8 @@ func (m Model) handleAskUser(msg AskUserMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleToolStatus(msg ToolStatusMsg) (tea.Model, tea.Cmd) {
+	m.turnToolCount++
+	m.turnCurrentTool = msg.Name
 	m.toolStatus = "Running " + msg.Name + "..."
 	m.appendRuntimeLog("tool_start: " + msg.Name)
 	return m, nil
@@ -534,6 +540,22 @@ func (m Model) handleToolStatus(msg ToolStatusMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleToolResult(msg ToolResultMsg) (tea.Model, tea.Cmd) {
 	m.toolStatus = fmt.Sprintf("Finished %s, waiting for model...", msg.Name)
+	m.turnCurrentTool = ""
+	// Track file changes for status display.
+	if msg.Name == "file_edit" || msg.Name == "file_write" {
+		if m.turnFilesChanged == nil {
+			m.turnFilesChanged = make(map[string]bool)
+		}
+		// Extract filename from result (first word or path-like string).
+		if parts := strings.Fields(msg.Result); len(parts) > 0 {
+			for _, p := range parts {
+				if strings.Contains(p, ".") && (strings.Contains(p, "/") || strings.Contains(p, "\\") || strings.Contains(p, ".go") || strings.Contains(p, ".ts") || strings.Contains(p, ".py")) {
+					m.turnFilesChanged[p] = true
+					break
+				}
+			}
+		}
+	}
 	m.appendRuntimeLog(fmt.Sprintf("tool_done: %s error=%t bytes=%d", msg.Name, msg.IsError, len(msg.Result)))
 	result := msg.Result
 	if m.Prefs.HideDiffs {
@@ -545,9 +567,69 @@ func (m Model) handleToolResult(msg ToolResultMsg) (tea.Model, tea.Cmd) {
 	return m, PrintToScrollback(resultFormatted)
 }
 
+// thinkingMessages are fun status messages shown while the agent is thinking.
+var thinkingMessages = []string{
+	"Thinking...",
+	"Pondering...",
+	"Cooking something up...",
+	"Connecting the dots...",
+	"Brewing ideas...",
+	"Mulling it over...",
+	"Working on it...",
+	"Crunching the problem...",
+	"Processing...",
+	"Almost there...",
+}
+
+// buildActivityStatus returns a rich status string for the spinner area.
+func (m Model) buildActivityStatus() string {
+	var parts []string
+
+	// Primary status: current tool or fun thinking message.
+	if m.turnCurrentTool != "" {
+		parts = append(parts, "Running "+m.turnCurrentTool)
+	} else if m.toolStatus != "" && !strings.HasPrefix(m.toolStatus, "Thinking") {
+		parts = append(parts, m.toolStatus)
+	} else {
+		// Pick a fun message based on elapsed time (rotates every 4 seconds).
+		elapsed := time.Since(m.turnStartTime)
+		idx := int(elapsed.Seconds()/4) % len(thinkingMessages)
+		parts = append(parts, thinkingMessages[idx])
+	}
+
+	// Stats: tool count.
+	if m.turnToolCount > 0 {
+		if m.turnToolCount == 1 {
+			parts = append(parts, "1 tool call")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d tool calls", m.turnToolCount))
+		}
+	}
+
+	// Stats: files changed.
+	if len(m.turnFilesChanged) > 0 {
+		if len(m.turnFilesChanged) == 1 {
+			parts = append(parts, "1 file changed")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d files changed", len(m.turnFilesChanged)))
+		}
+	}
+
+	// Stats: elapsed time (only show after 5 seconds).
+	elapsed := time.Since(m.turnStartTime)
+	if elapsed >= 5*time.Second {
+		parts = append(parts, fmt.Sprintf("%ds", int(elapsed.Seconds())))
+	}
+
+	return strings.Join(parts, " · ")
+}
+
 func (m Model) handleTurnDone(msg TurnDoneMsg) (tea.Model, tea.Cmd) {
 	m.thinking = false
 	m.toolStatus = ""
+	m.turnToolCount = 0
+	m.turnFilesChanged = nil
+	m.turnCurrentTool = ""
 	m.streaming = false
 	// streamBuf is already flushed to viewLines by handleStreamDone
 	m.streamBuf = ""
@@ -761,13 +843,9 @@ func (m Model) View() string {
 
 	if m.thinking {
 		if m.streaming {
-			// Avoid rendering partial/unclosed markdown in the live preview area.
-			// Flushed content still appears in scrollback via flushStreamContent().
 			b.WriteString(ThinkingStyle.Render(m.spinner.View()) + "\n\n")
-		} else if m.toolStatus != "" {
-			b.WriteString(ThinkingStyle.Render(m.spinner.View()+" "+m.toolStatus) + "\n\n")
 		} else {
-			b.WriteString(ThinkingStyle.Render(m.spinner.View()+" Thinking...") + "\n\n")
+			b.WriteString(ThinkingStyle.Render(m.spinner.View()+" "+m.buildActivityStatus()) + "\n\n")
 		}
 	}
 
@@ -1502,6 +1580,10 @@ func (m Model) submit(trimmed string) (tea.Model, tea.Cmd) {
 	m.streaming = false
 	m.streamBuf = ""
 	m.streamFlushedLen = 0
+	m.turnToolCount = 0
+	m.turnFilesChanged = nil
+	m.turnStartTime = time.Now()
+	m.turnCurrentTool = ""
 	m.appendRuntimeLog("submit: " + summarizeForLog(trimmed))
 
 	submitText := trimmed
